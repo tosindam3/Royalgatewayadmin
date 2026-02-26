@@ -1,0 +1,9 @@
+{
+  "name": "HR360 Management Platform",
+  "description": "A high-performance HR management suite with attendance geofencing, multi-tenant payroll, and AI-driven performance tracking.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}

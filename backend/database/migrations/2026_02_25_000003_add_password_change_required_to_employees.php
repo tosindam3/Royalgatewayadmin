@@ -1,0 +1,28 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('employees', function (Blueprint $table) {
+            $table->boolean('password_change_required')->default(true)->after('academics');
+        });
+
+        // Make user_id unique to ensure one-to-one relationship
+        Schema::table('employees', function (Blueprint $table) {
+            $table->unique('user_id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('employees', function (Blueprint $table) {
+            $table->dropUnique(['user_id']);
+            $table->dropColumn('password_change_required');
+        });
+    }
+};
