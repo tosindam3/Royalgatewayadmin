@@ -383,16 +383,40 @@ class AttendanceController extends Controller
 
     public function getSettings()
     {
+        $user = request()->user();
+        $scopeService = app(\App\Services\AttendanceScopeService::class);
+        
+        // Check if user can manage settings
+        if (!$scopeService->canManageSettings($user)) {
+            // Return empty settings for employees instead of 403
+            return $this->success([
+                'geofencing_enabled' => false,
+                'ip_restriction_enabled' => false,
+                'biometric_sync_enabled' => false,
+                'late_grace_period' => 15,
+                'can_manage' => false,
+            ], 'Settings retrieved (read-only).');
+        }
+        
         return $this->success([
             'geofencing_enabled' => true,
             'ip_restriction_enabled' => true,
             'biometric_sync_enabled' => true,
             'late_grace_period' => 15,
+            'can_manage' => true,
         ], 'Attendance settings retrieved.');
     }
 
     public function getGeofences(Request $request)
     {
+        $user = $request->user();
+        $scopeService = app(\App\Services\AttendanceScopeService::class);
+        
+        // Return empty array for employees
+        if (!$scopeService->canManageSettings($user)) {
+            return $this->success([], 'Geofence zones retrieved.');
+        }
+        
         $query = \App\Models\GeofenceZone::query();
 
         if ($request->has('branch_id')) {
@@ -460,6 +484,14 @@ class AttendanceController extends Controller
 
     public function getIPWhitelist()
     {
+        $user = request()->user();
+        $scopeService = app(\App\Services\AttendanceScopeService::class);
+        
+        // Return empty array for employees
+        if (!$scopeService->canManageSettings($user)) {
+            return $this->success([], 'IP whitelist retrieved.');
+        }
+        
         return $this->success([], 'IP whitelist retrieved.');
     }
 

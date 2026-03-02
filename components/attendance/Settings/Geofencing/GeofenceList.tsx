@@ -1,6 +1,6 @@
 import React from 'react';
 import { GeofenceZone } from '@/types';
-import { Edit2, Trash2, Copy, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Edit2, Trash2, Copy, ToggleLeft, ToggleRight, Building2, Globe } from 'lucide-react';
 
 interface GeofenceListProps {
     zones: GeofenceZone[];
@@ -16,6 +16,7 @@ export const GeofenceList: React.FC<GeofenceListProps> = ({ zones, onEdit, onDel
                 <thead>
                     <tr className="border-b border-slate-100 dark:border-white/5 uppercase text-[10px] font-black tracking-widest text-slate-400">
                         <th className="px-4 py-3">Zone Name</th>
+                        <th className="px-4 py-3">Branch</th>
                         <th className="px-4 py-3">Radius (m)</th>
                         <th className="px-4 py-3">Status</th>
                         <th className="px-4 py-3 text-right">Actions</th>
@@ -26,6 +27,25 @@ export const GeofenceList: React.FC<GeofenceListProps> = ({ zones, onEdit, onDel
                         <tr key={zone.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                             <td className="px-4 py-4">
                                 <p className="text-xs font-bold text-slate-900 dark:text-white">{zone.name}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                                <div className="flex items-center gap-1.5">
+                                    {zone.branch_id ? (
+                                        <>
+                                            <Building2 className="w-3 h-3 text-purple-500" />
+                                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                                                {zone.branch?.name || `Branch ${zone.branch_id}`}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Globe className="w-3 h-3 text-blue-500" />
+                                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                                                Global
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
                             </td>
                             <td className="px-4 py-4">
                                 <span className="text-[10px] font-black text-slate-500">{zone.radius}m</span>

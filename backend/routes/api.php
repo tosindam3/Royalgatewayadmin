@@ -15,44 +15,56 @@ Route::prefix('v1')->group(function () {
     Route::prefix('hr-core')->group(function () {
         // Attendance System (ZKTeco + Mobile)
         Route::prefix('attendance')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+            // Everyone can check in/out and view their own status
             Route::post('/check-in', [App\Http\Controllers\AttendanceController::class, 'checkIn']);
             Route::post('/check-out', [App\Http\Controllers\AttendanceController::class, 'checkOut']);
             Route::get('/today', [App\Http\Controllers\AttendanceController::class, 'today']);
-            Route::get('/live', [App\Http\Controllers\AttendanceController::class, 'liveAttendance']);
-            Route::get('/overview', [App\Http\Controllers\AttendanceController::class, 'overview']);
-            Route::get('/daily-summary', [App\Http\Controllers\AttendanceController::class, 'dailySummary']);
-            Route::get('/overtime', [App\Http\Controllers\AttendanceController::class, 'overtime']);
-            Route::get('/history', [App\Http\Controllers\AttendanceController::class, 'history']);
+            Route::get('/scope', [App\Http\Controllers\AttendanceController::class, 'getScope']);
+            Route::get('/history', [App\Http\Controllers\AttendanceController::class, 'history']); // Moved outside middleware - auto-scoped to user
+            
+            // View access - scoped by role
+            Route::middleware('attendance.access:view')->group(function () {
+                Route::get('/live', [App\Http\Controllers\AttendanceController::class, 'liveAttendance']);
+                Route::get('/overview', [App\Http\Controllers\AttendanceController::class, 'overview']);
+                Route::get('/daily-summary', [App\Http\Controllers\AttendanceController::class, 'dailySummary']);
+                Route::get('/overtime', [App\Http\Controllers\AttendanceController::class, 'overtime']);
 
-            // Summary Tab (Monthly Aggregates)
-            Route::prefix('summary')->group(function () {
-                Route::get('/kpis', [App\Http\Controllers\AttendanceSummaryController::class, 'kpis']);
-                Route::get('/', [App\Http\Controllers\AttendanceSummaryController::class, 'index']);
-                Route::get('/{employeeId}', [App\Http\Controllers\AttendanceSummaryController::class, 'employeeMonth']);
-                Route::post('/export', [App\Http\Controllers\AttendanceSummaryController::class, 'export']);
+                // Summary Tab (Monthly Aggregates)
+                Route::prefix('summary')->group(function () {
+                    Route::get('/kpis', [App\Http\Controllers\AttendanceSummaryController::class, 'kpis']);
+                    Route::get('/', [App\Http\Controllers\AttendanceSummaryController::class, 'index']);
+                    Route::get('/{employeeId}', [App\Http\Controllers\AttendanceSummaryController::class, 'employeeMonth']);
+                });
+
+                // Record Details
+                Route::get('/records/{recordId}/details', [App\Http\Controllers\AttendanceSummaryController::class, 'recordDetails']);
             });
-
-            // Record Details
-            Route::get('/records/{recordId}/details', [App\Http\Controllers\AttendanceSummaryController::class, 'recordDetails']);
+            
+            // Export access - managers and HR only
+            Route::middleware('attendance.access:export')->group(function () {
+                Route::post('/summary/export', [App\Http\Controllers\AttendanceSummaryController::class, 'export']);
+            });
 
             // Settings Workspace
             Route::prefix('settings')->group(function () {
+                // GET routes - accessible to all (returns filtered data based on role)
                 Route::get('/', [App\Http\Controllers\AttendanceController::class, 'getSettings']);
-                Route::put('/', [App\Http\Controllers\AttendanceController::class, 'updateSettings']);
-
                 Route::get('/geofences', [App\Http\Controllers\AttendanceController::class, 'getGeofences']);
-                Route::post('/geofences', [App\Http\Controllers\AttendanceController::class, 'storeGeofence']);
-                Route::put('/geofences/{id}', [App\Http\Controllers\AttendanceController::class, 'updateGeofence']);
-                Route::delete('/geofences/{id}', [App\Http\Controllers\AttendanceController::class, 'destroyGeofence']);
-
                 Route::get('/ip-whitelist', [App\Http\Controllers\AttendanceController::class, 'getIPWhitelist']);
-                Route::post('/ip-whitelist', [App\Http\Controllers\AttendanceController::class, 'storeIPWhitelist']);
-                Route::put('/ip-whitelist/{id}', [App\Http\Controllers\AttendanceController::class, 'updateIPWhitelist']);
-                Route::delete('/ip-whitelist/{id}', [App\Http\Controllers\AttendanceController::class, 'destroyIPWhitelist']);
                 Route::get('/my-ip', [App\Http\Controllers\AttendanceController::class, 'getMyIP']);
-
-                Route::get('/biometric/devices', [App\Http\Controllers\BiometricDeviceController::class, 'index']); // Link to existing controller
+                Route::get('/biometric/devices', [App\Http\Controllers\BiometricDeviceController::class, 'index']);
                 Route::get('/audit', [App\Http\Controllers\AttendanceController::class, 'auditLogs']);
+                
+                // POST/PUT/DELETE routes - HR Admin only
+                Route::middleware('attendance.access:settings')->group(function () {
+                    Route::put('/', [App\Http\Controllers\AttendanceController::class, 'updateSettings']);
+                    Route::post('/geofences', [App\Http\Controllers\AttendanceController::class, 'storeGeofence']);
+                    Route::put('/geofences/{id}', [App\Http\Controllers\AttendanceController::class, 'updateGeofence']);
+                    Route::delete('/geofences/{id}', [App\Http\Controllers\AttendanceController::class, 'destroyGeofence']);
+                    Route::post('/ip-whitelist', [App\Http\Controllers\AttendanceController::class, 'storeIPWhitelist']);
+                    Route::put('/ip-whitelist/{id}', [App\Http\Controllers\AttendanceController::class, 'updateIPWhitelist']);
+                    Route::delete('/ip-whitelist/{id}', [App\Http\Controllers\AttendanceController::class, 'destroyIPWhitelist']);
+                });
             });
         });
 
@@ -183,5 +195,115 @@ Route::prefix('v1')->group(function () {
         Route::post('/{id}/approve', [App\Http\Controllers\ApprovalController::class, 'approve']);
         Route::post('/{id}/reject', [App\Http\Controllers\ApprovalController::class, 'reject']);
         Route::post('/{id}/cancel', [App\Http\Controllers\ApprovalController::class, 'cancel']);
+    });
+
+    // Payroll Module Routes
+    Route::prefix('payroll')->middleware('auth:sanctum')->group(function () {
+        // Payroll Periods
+        Route::get('/periods', [App\Http\Controllers\PayrollPeriodController::class, 'index']);
+        Route::get('/periods/{id}', [App\Http\Controllers\PayrollPeriodController::class, 'show']);
+
+        // Payroll Runs
+        Route::get('/runs', [App\Http\Controllers\PayrollRunController::class, 'index']);
+        Route::post('/runs', [App\Http\Controllers\PayrollRunController::class, 'store']);
+        Route::get('/runs/{id}', [App\Http\Controllers\PayrollRunController::class, 'show']);
+        Route::get('/runs/{id}/employees', [App\Http\Controllers\PayrollRunController::class, 'employees']);
+        Route::get('/runs/{runId}/employees/{employeeId}/breakdown', [App\Http\Controllers\PayrollRunController::class, 'employeeBreakdown']);
+        Route::post('/runs/{id}/recalculate', [App\Http\Controllers\PayrollRunController::class, 'recalculate']);
+        Route::post('/runs/{id}/submit', [App\Http\Controllers\PayrollRunController::class, 'submit']);
+
+        // Payroll Items
+        Route::get('/items', [App\Http\Controllers\PayrollItemController::class, 'index']);
+        Route::post('/items', [App\Http\Controllers\PayrollItemController::class, 'store']);
+        Route::patch('/items/{id}', [App\Http\Controllers\PayrollItemController::class, 'update']);
+
+        // Salary Structures
+        Route::get('/structures', [App\Http\Controllers\SalaryStructureController::class, 'index']);
+        Route::post('/structures', [App\Http\Controllers\SalaryStructureController::class, 'store']);
+        Route::get('/structures/{id}', [App\Http\Controllers\SalaryStructureController::class, 'show']);
+        Route::patch('/structures/{id}', [App\Http\Controllers\SalaryStructureController::class, 'update']);
+        Route::delete('/structures/{id}', [App\Http\Controllers\SalaryStructureController::class, 'destroy']);
+
+        // Employee Salaries
+        Route::get('/salaries', [App\Http\Controllers\EmployeeSalaryController::class, 'index']);
+        Route::post('/salaries', [App\Http\Controllers\EmployeeSalaryController::class, 'store']);
+        Route::get('/salaries/{id}', [App\Http\Controllers\EmployeeSalaryController::class, 'show']);
+        Route::patch('/salaries/{id}', [App\Http\Controllers\EmployeeSalaryController::class, 'update']);
+        Route::delete('/salaries/{id}', [App\Http\Controllers\EmployeeSalaryController::class, 'destroy']);
+
+        // Organization Settings
+        Route::get('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'index']);
+        Route::get('/settings/{key}', [App\Http\Controllers\OrganizationSettingController::class, 'show']);
+        Route::post('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'update']);
+    });
+
+    // Payroll Approval Routes
+    Route::prefix('payroll/approvals')->middleware('auth:sanctum')->group(function () {
+        Route::get('/inbox', [App\Http\Controllers\PayrollApprovalController::class, 'inbox']);
+        Route::get('/{id}', [App\Http\Controllers\PayrollApprovalController::class, 'show']);
+        Route::post('/{id}/approve', [App\Http\Controllers\PayrollApprovalController::class, 'approve']);
+        Route::post('/{id}/reject', [App\Http\Controllers\PayrollApprovalController::class, 'reject']);
+    });
+
+    // Leave Management Routes
+    Route::prefix('leave')->middleware('auth:sanctum')->group(function () {
+        // Dashboard & Statistics
+        Route::get('/dashboard', [App\Http\Controllers\LeaveController::class, 'dashboard']);
+        
+        // Leave Types
+        Route::get('/types', [App\Http\Controllers\LeaveController::class, 'types']);
+        
+        // Leave Balances
+        Route::get('/balances', [App\Http\Controllers\LeaveController::class, 'balances']);
+        
+        // Leave Requests
+        Route::get('/requests', [App\Http\Controllers\LeaveController::class, 'index']);
+        Route::post('/requests', [App\Http\Controllers\LeaveController::class, 'store']);
+        Route::get('/requests/{leaveRequest}', [App\Http\Controllers\LeaveController::class, 'show']);
+        Route::post('/requests/{leaveRequest}/approve', [App\Http\Controllers\LeaveController::class, 'approve']);
+        Route::post('/requests/{leaveRequest}/reject', [App\Http\Controllers\LeaveController::class, 'reject']);
+        Route::post('/requests/{leaveRequest}/cancel', [App\Http\Controllers\LeaveController::class, 'cancel']);
+    });
+
+    // Performance Management Routes
+    Route::prefix('performance')->middleware('auth:sanctum')->group(function () {
+        // Dashboard & Analytics
+        Route::get('/dashboard', [App\Http\Controllers\PerformanceController::class, 'dashboard']);
+        Route::get('/team-performance', [App\Http\Controllers\PerformanceController::class, 'teamPerformance']);
+        Route::get('/insights', [App\Http\Controllers\PerformanceController::class, 'insights']);
+        Route::get('/employees/{employeeId}/stats', [App\Http\Controllers\PerformanceController::class, 'employeeStats']);
+
+        // Evaluation Templates
+        Route::get('/templates', [App\Http\Controllers\EvaluationTemplateController::class, 'index']);
+        Route::post('/templates', [App\Http\Controllers\EvaluationTemplateController::class, 'store']);
+        Route::get('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'show']);
+        Route::patch('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'update']);
+        Route::delete('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'destroy']);
+
+        // Evaluation Responses
+        Route::get('/evaluations', [App\Http\Controllers\EvaluationResponseController::class, 'index']);
+        Route::get('/evaluations/pending', [App\Http\Controllers\EvaluationResponseController::class, 'pending']);
+        Route::get('/evaluations/pending-review', [App\Http\Controllers\EvaluationResponseController::class, 'pendingReview']);
+        Route::post('/evaluations', [App\Http\Controllers\EvaluationResponseController::class, 'store']);
+        Route::get('/evaluations/{id}', [App\Http\Controllers\EvaluationResponseController::class, 'show']);
+        Route::patch('/evaluations/{id}', [App\Http\Controllers\EvaluationResponseController::class, 'update']);
+        Route::post('/evaluations/{id}/submit', [App\Http\Controllers\EvaluationResponseController::class, 'submit']);
+        Route::post('/evaluations/{id}/approve', [App\Http\Controllers\EvaluationResponseController::class, 'approve']);
+        Route::post('/evaluations/{id}/reject', [App\Http\Controllers\EvaluationResponseController::class, 'reject']);
+
+        // Review Cycles
+        Route::get('/cycles', [App\Http\Controllers\ReviewCycleController::class, 'index']);
+        Route::post('/cycles', [App\Http\Controllers\ReviewCycleController::class, 'store']);
+        Route::get('/cycles/{id}', [App\Http\Controllers\ReviewCycleController::class, 'show']);
+        Route::patch('/cycles/{id}', [App\Http\Controllers\ReviewCycleController::class, 'update']);
+        Route::post('/cycles/{id}/launch', [App\Http\Controllers\ReviewCycleController::class, 'launch']);
+        Route::post('/cycles/{id}/participants', [App\Http\Controllers\ReviewCycleController::class, 'addParticipants']);
+
+        // Goals & OKRs
+        Route::get('/goals', [App\Http\Controllers\GoalController::class, 'index']);
+        Route::post('/goals', [App\Http\Controllers\GoalController::class, 'store']);
+        Route::get('/goals/{id}', [App\Http\Controllers\GoalController::class, 'show']);
+        Route::patch('/goals/{id}', [App\Http\Controllers\GoalController::class, 'update']);
+        Route::post('/goals/{goalId}/key-results/{krId}/update', [App\Http\Controllers\GoalController::class, 'updateKeyResult']);
     });
 });

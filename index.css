@@ -27,25 +27,24 @@ body {
 }
 
 .glass-morphism {
-  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.4) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .dark .glass-morphism {
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .gradient-text-live {
-  background: linear-gradient(
-    to right,
-    --brand-primary 20%,
-    #d630ff 40%,
-    #8252e9 60%,
-    #4c49d8 80%
-  );
+  background: linear-gradient(to right,
+      --brand-primary 20%,
+      #d630ff 40%,
+      #8252e9 60%,
+      #4c49d8 80%);
   background-size: 200% auto;
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: shine 4s linear infinite;
@@ -53,6 +52,20 @@ body {
 
 .gradient-bg {
   background: linear-gradient(135deg, var(--brand-primary) 0%, #d630ff 100%);
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
 }
 
 @keyframes shine {
@@ -68,13 +81,25 @@ body {
 
 /* Entrance Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideInFromBottom {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-in {
@@ -83,11 +108,28 @@ body {
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.fade-in { animation-name: fadeIn; }
-.slide-in-from-bottom-4 { animation-name: slideInFromBottom; }
-.slide-in-from-bottom-6 { animation-name: slideInFromBottom; animation-delay: 0.1s; }
-.slide-in-from-bottom-8 { animation-name: slideInFromBottom; animation-delay: 0.2s; }
-.slide-in-from-bottom-10 { animation-name: slideInFromBottom; animation-delay: 0.3s; }
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: slideInFromBottom;
+}
+
+.slide-in-from-bottom-6 {
+  animation-name: slideInFromBottom;
+  animation-delay: 0.1s;
+}
+
+.slide-in-from-bottom-8 {
+  animation-name: slideInFromBottom;
+  animation-delay: 0.2s;
+}
+
+.slide-in-from-bottom-10 {
+  animation-name: slideInFromBottom;
+  animation-delay: 0.3s;
+}
 
 /* Professional Custom Scrollbar */
 ::-webkit-scrollbar {
@@ -155,7 +197,7 @@ body {
 }
 
 /* Hide scrollbar utility - for specific cases where you want it hidden */
-.no-scrollbar::-webkit-scrollbar { 
+.no-scrollbar::-webkit-scrollbar {
   display: block !important;
   width: 6px !important;
   height: 6px !important;

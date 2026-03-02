@@ -34,6 +34,8 @@ class User extends Authenticatable
         'manager_id',
     ];
 
+    protected $appends = ['employee_id'];
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -89,6 +91,22 @@ class User extends Authenticatable
     public function employeeProfile()
     {
         return $this->hasOne(\App\Models\Employee::class, 'user_id');
+    }
+
+    /**
+     * Alias for employeeProfile
+     */
+    public function employee()
+    {
+        return $this->employeeProfile();
+    }
+
+    /**
+     * Accessor for employee_id
+     */
+    public function getEmployeeIdAttribute()
+    {
+        return $this->employeeProfile->id ?? null;
     }
 
     /**
@@ -163,4 +181,36 @@ class User extends Authenticatable
         }
         $this->roles()->sync($syncData);
     }
+    /**
+     * Get permission scope for a specific permission
+     * Returns the most permissive scope from all user roles
+     */
+    public function getPermissionScope(string $permission): ?string
+    {
+        $scopes = [];
+
+        foreach ($this->roles as $role) {
+            $scope = $role->getPermissionScope($permission);
+            if ($scope) {
+                $scopes[] = $scope;
+            }
+        }
+
+        if (empty($scopes)) {
+            return null;
+        }
+
+        // Return most permissive scope
+        // Order: all > branch > department > team > self
+        $scopeHierarchy = ['all', 'branch', 'department', 'team', 'self'];
+
+        foreach ($scopeHierarchy as $hierarchyScope) {
+            if (in_array($hierarchyScope, $scopes)) {
+                return $hierarchyScope;
+            }
+        }
+
+        return $scopes[0];
+    }
+
 }

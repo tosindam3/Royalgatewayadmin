@@ -24,14 +24,15 @@ class AttendanceScopeService
                 'can_view_all' => false,
                 'can_manage_settings' => false,
                 'can_approve_corrections' => false,
+                'can_export' => false,
             ];
         }
 
-        // Check roles
+        // Check roles - using existing role names
         $roles = $user->roles->pluck('name')->toArray();
         
-        // HR Admin - Full access
-        if (in_array('HR Admin', $roles) || in_array('Super Admin', $roles)) {
+        // Super Admin / Admin - Full access
+        if (in_array('super_admin', $roles) || in_array('admin', $roles) || in_array('hr_manager', $roles)) {
             return [
                 'scope' => 'all',
                 'employee_ids' => Employee::where('status', 'active')->pluck('id')->toArray(),
@@ -44,8 +45,27 @@ class AttendanceScopeService
             ];
         }
         
-        // Department Manager - Department access
-        if (in_array('Manager', $roles) || in_array('Department Manager', $roles)) {
+        // Branch Manager - Branch access
+        if (in_array('branch_manager', $roles)) {
+            $branchEmployees = Employee::where('status', 'active')
+                ->where('branch_id', $employee->branch_id)
+                ->pluck('id')
+                ->toArray();
+            
+            return [
+                'scope' => 'branch',
+                'employee_ids' => $branchEmployees,
+                'department_ids' => [],
+                'branch_ids' => [$employee->branch_id],
+                'can_view_all' => false,
+                'can_manage_settings' => false,
+                'can_approve_corrections' => true,
+                'can_export' => true,
+            ];
+        }
+        
+        // Department Head - Department access
+        if (in_array('department_head', $roles)) {
             $departmentEmployees = Employee::where('status', 'active')
                 ->where('department_id', $employee->department_id)
                 ->pluck('id')
@@ -63,22 +83,25 @@ class AttendanceScopeService
             ];
         }
         
-        // Branch Manager - Branch access
-        if (in_array('Branch Manager', $roles)) {
-            $branchEmployees = Employee::where('status', 'active')
-                ->where('branch_id', $employee->branch_id)
+        // Team Lead - Team access (direct reports)
+        if (in_array('team_lead', $roles)) {
+            $teamEmployees = Employee::where('status', 'active')
+                ->where('manager_id', $employee->id)
                 ->pluck('id')
                 ->toArray();
             
+            // Include self
+            $teamEmployees[] = $employee->id;
+            
             return [
-                'scope' => 'branch',
-                'employee_ids' => $branchEmployees,
+                'scope' => 'team',
+                'employee_ids' => $teamEmployees,
                 'department_ids' => [],
-                'branch_ids' => [$employee->branch_id],
+                'branch_ids' => [],
                 'can_view_all' => false,
                 'can_manage_settings' => false,
                 'can_approve_corrections' => true,
-                'can_export' => true,
+                'can_export' => false,
             ];
         }
         

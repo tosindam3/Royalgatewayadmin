@@ -13,11 +13,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Using token-based authentication (Sanctum tokens) instead of stateful API
-        // $middleware->statefulApi();
+        // Removed stateful middleware to avoid CSRF token requirements
         
         // Register custom middleware aliases
         $middleware->alias([
             'attendance.access' => \App\Http\Middleware\AttendanceAccessMiddleware::class,
+            'performance.access' => \App\Http\Middleware\PerformanceAccessMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -19,6 +19,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             EmployeeSeeder::class,
             AttendanceSeeder::class,
+            PerformanceSystemSeeder::class,
+            PerformanceScoresSeeder::class,
         ]);
     }
 }

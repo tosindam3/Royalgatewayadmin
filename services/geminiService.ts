@@ -6,9 +6,16 @@ import { GoogleGenAI, Type } from "@google/genai";
  * Optimized for Gemini 3 Flash/Pro models.
  */
 
-// Fixed: Corrected initialization to use process.env.API_KEY directly as per strictly enforced guidelines.
+// Fixed: Corrected initialization to use import.meta.env for Vite compatibility
 const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY || (process as any).env.API_KEY;
+
+  if (!apiKey || apiKey.includes('AQ.Ab8RN')) {
+    console.warn("Gemini API Key missing or invalid. AI features will be limited.");
+    return null;
+  }
+
+  return new GoogleGenAI({ apiKey });
 };
 
 // Internal standard configuration for RoyalgatewayAdmin platform
@@ -120,6 +127,8 @@ export const generateHRAssistantResponse = async (prompt: string, context: strin
 export const summarizePerformance = async (kpis: any[]) => {
   try {
     const ai = getAI();
+    if (!ai) return "AI Summary unavailable (Invalid Key).";
+
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: `Synthesize a 2-sentence performance summary for this dataset: ${JSON.stringify(kpis)}`,
@@ -130,6 +139,7 @@ export const summarizePerformance = async (kpis: any[]) => {
     });
     return response.text;
   } catch (error) {
+    console.error("Gemini Summary Error:", error);
     return "Insufficient data for strategic synthesis.";
   }
 };

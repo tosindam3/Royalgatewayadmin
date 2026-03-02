@@ -17,11 +17,17 @@ class AttendanceSummaryService
 
     public function getMonthKpis(string $month, array $filters = [], ?\App\Models\User $user = null): array
     {
-        $cacheKey = $this->getCacheKey('kpis', $month, $filters);
+        $cacheKey = $this->getCacheKey('kpis', $month, $filters, $user?->id);
         
-        return Cache::remember($cacheKey, 180, function () use ($month, $filters) {
+        return Cache::remember($cacheKey, 180, function () use ($month, $filters, $user) {
             $query = AttendanceRecord::forMonth($month);
             $query = $this->applyFilters($query, $filters);
+            
+            // Apply scope filtering
+            if ($user) {
+                $query = $this->scopeService->applyScopeToQuery($query, $user);
+            }
+            
             $records = $query->get();
             
             $employeeQuery = Employee::where('status', 'active');
@@ -31,6 +37,15 @@ class AttendanceSummaryService
             if (!empty($filters['branch_id'])) {
                 $employeeQuery->where('branch_id', $filters['branch_id']);
             }
+            
+            // Apply scope to employee count
+            if ($user) {
+                $scope = $this->scopeService->getAccessScope($user);
+                if ($scope['scope'] !== 'all') {
+                    $employeeQuery->whereIn('id', $scope['employee_ids']);
+                }
+            }
+            
             $totalEmployees = $employeeQuery->count();
             
             $presentDaysTotal = $records->whereIn('status', ['present', 'on_time', 'partial'])->count();
@@ -57,11 +72,11 @@ class AttendanceSummaryService
         });
     }
 
-    public function getSummaryTable(string $month, array $filters = [], int $page = 1, int $pageSize = 50): array
+    public function getSummaryTable(string $month, array $filters = [], int $page = 1, int $pageSize = 50, ?\App\Models\User $user = null): array
     {
-        $cacheKey = $this->getCacheKey('page', $month, $filters, $page, $pageSize);
+        $cacheKey = $this->getCacheKey('page', $month, $filters, $page, $pageSize, $user?->id);
         
-        return Cache::remember($cacheKey, 180, function () use ($month, $filters, $page, $pageSize) {
+        return Cache::remember($cacheKey, 180, function () use ($month, $filters, $page, $pageSize, $user) {
             $startDate = Carbon::parse($month . '-01');
             $endDate = $startDate->copy()->endOfMonth();
             $workingDays = $startDate->diffInDaysFiltered(function (Carbon $date) {
@@ -80,11 +95,19 @@ class AttendanceSummaryService
             if (!empty($filters['search'])) {
                 $search = $filters['search'];
                 $employeeQuery->where(function ($q) use ($search) {
-                    $q->where('staff_id', 'like', "%{$search}%")
+                    $q->where('employee_code', 'like', "%{$search}%")
                       ->orWhereHas('user', function ($uq) use ($search) {
                           $uq->where('name', 'like', "%{$search}%");
                       });
                 });
+            }
+            
+            // Apply scope filtering
+            if ($user) {
+                $scope = $this->scopeService->getAccessScope($user);
+                if ($scope['scope'] !== 'all') {
+                    $employeeQuery->whereIn('id', $scope['employee_ids']);
+                }
             }
             
             $employees = $employeeQuery->paginate($pageSize, ['*'], 'page', $page);
@@ -351,7 +374,7 @@ class AttendanceSummaryService
     private function getCacheKey(string $type, string $month, array $filters = [], ...$extra): string
     {
         $filtersHash = md5(json_encode($filters));
-        $extraStr = implode(':', $extra);
+        $extraStr = implode(':', array_filter($extra, fn($v) => $v !== null));
         return "att:summary:{$type}:{$month}:{$filtersHash}" . ($extraStr ? ":{$extraStr}" : '');
     }
     

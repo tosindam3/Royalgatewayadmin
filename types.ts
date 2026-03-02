@@ -128,67 +128,140 @@ export interface AttendanceAuditLog {
 
 // --- Payroll Domain Types ---
 
-export type PayrollRunStatus = 'DRAFT' | 'COMPUTED' | 'UNDER_REVIEW' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'LOCKED' | 'PAID';
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+export type PayrollRunStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface PayrollPeriod {
-  id: string;
+  id: number;
   name: string; // e.g. "April 2024"
-  startDate: string;
-  endDate: string;
-  status: 'OPEN' | 'CLOSED' | 'PROCESSING';
+  year: number;
+  month: number;
+  start_date: string;
+  end_date: string;
+  working_days: number;
+  status: 'open' | 'closed';
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PayrollRun {
-  id: string;
-  periodId: string;
-  periodName: string;
+  id: number;
+  period_id: number;
+  period_name: string;
+  scope_type: 'all' | 'department' | 'branch' | 'custom';
+  scope_ref_id?: number;
   status: PayrollRunStatus;
-  branchScope: string;
-  deptScope: string;
-  totalGross: number;
-  totalNet: number;
-  anomalyCount: number;
-  submittedBy?: string;
-  submittedAt?: string;
-  approvalChain: ApprovalStep[];
+  prepared_by: string;
+  prepared_by_user_id: number;
+  approver: string;
+  approver_user_id: number;
+  submitted_at?: string;
+  approved_at?: string;
+  rejected_at?: string;
+  rejection_comment?: string; // NEW - shown when rejected
+  total_gross: number;
+  total_deductions: number;
+  total_net: number;
+  employee_count: number;
+  note?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface ApprovalStep {
-  id: string;
-  role: string;
-  approverName?: string;
-  status: ApprovalStatus;
-  updatedAt?: string;
-  comment?: string;
+export interface PayrollRunEmployee {
+  id: number;
+  employee: {
+    id: number;
+    name: string;
+    staff_id: string;
+    department?: string;
+    branch?: string;
+  };
+  base_salary_snapshot: number;
+  absent_days: number;
+  late_minutes: number;
+  overtime_hours: number;
+  performance_score: number;
+  gross_pay: number;
+  total_deductions: number;
+  net_pay: number;
 }
 
-export interface PayrollLine {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  avatar: string;
-  department: string;
-  branch: string;
-  baseSalary: number;
-  allowances: number;
-  deductions: number;
-  latePenalty: number;
-  overtimePay: number;
-  performanceBonus: number;
-  grossPay: number;
-  netPay: number;
-  variance: number; // vs previous period
-  hasAnomalies: boolean;
-  isOnHold: boolean;
-}
-
-export interface PayItem {
-  id: string;
-  type: 'ALLOWANCE' | 'DEDUCTION' | 'BONUS' | 'REIMBURSEMENT';
+export interface SalaryStructure {
+  id: number;
   name: string;
-  amount: number;
-  isTaxable: boolean;
+  description: string;
+  earnings_components: any[];
+  deductions_components: any[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeSalary {
+  id: number;
+  employee_id: number;
+  salary_structure_id: number;
+  base_salary: number;
+  effective_date: string;
+  is_active: boolean;
+  employee?: any;
+  salary_structure?: SalaryStructure;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PayrollEmployeeBreakdown {
+  earnings: Array<{ code: string; label: string; amount: number }>;
+  deductions: Array<{ code: string; label: string; amount: number }>;
+  snapshot: {
+    base_salary: number;
+    absent_days: number;
+    late_minutes: number;
+    overtime_hours: number;
+    performance_score: number;
+  };
+}
+
+export interface PayrollItem {
+  id: number;
+  name: string;
+  code: string;
+  type: 'earning' | 'deduction';
+  method: 'fixed' | 'percent_of_base';
+  default_value: number;
+  active: boolean;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovalRequest {
+  id: number;
+  request_number: string;
+  entity_type: string;
+  entity_id: number;
+  requester: string;
+  requester_id: number;
+  status: ApprovalStatus;
+  current_step: number;
+  requester_comment?: string;
+  rejection_comment?: string;
+  submitted_at: string;
+  completed_at?: string;
+  entity_summary?: {
+    total_net: number;
+    employee_count: number;
+    period_name: string;
+  };
+  created_at: string;
+}
+
+export interface PaginationMeta {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
 }
 
 export interface AttendanceSummary {
@@ -435,4 +508,345 @@ export interface OnboardingTask {
   due_date: string;
   status: OnboardingTaskStatus;
   priority: OnboardingPriority;
+}
+
+// --- Leave Management Types ---
+
+export type LeaveRequestStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type LeaveAccrualMethod = 'upfront' | 'monthly' | 'pro_rata' | 'per_incident';
+export type HolidayType = 'global' | 'branch_specific';
+
+export interface LeaveType {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  default_days_per_year: number;
+  accrual_method: LeaveAccrualMethod;
+  accrual_rate?: number;
+  is_carry_forward: boolean;
+  max_carry_forward_days?: number;
+  requires_approval: boolean;
+  requires_document: boolean;
+  min_notice_days: number;
+  max_consecutive_days?: number;
+  is_paid: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeaveBalance {
+  id: number;
+  employee_id: number;
+  leave_type_id: number;
+  year: number;
+  total_allocated: number;
+  used: number;
+  pending: number;
+  available: number;
+  carried_forward: number;
+  expiry_date?: string;
+  employee?: {
+    id: number;
+    full_name: string;
+    employee_code: string;
+    department?: { name: string };
+    branch?: { name: string };
+  };
+  leave_type?: LeaveType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeaveRequest {
+  id: number;
+  request_number: string;
+  employee_id: number;
+  leave_type_id: number;
+  start_date: string;
+  end_date: string;
+  total_days: number;
+  reason: string;
+  contact_during_leave?: string;
+  document_path?: string;
+  status: LeaveRequestStatus;
+  approved_by?: number;
+  approved_at?: string;
+  approval_notes?: string;
+  rejection_reason?: string;
+  cancelled_by?: number;
+  cancelled_at?: string;
+  cancellation_reason?: string;
+  employee?: {
+    id: number;
+    full_name: string;
+    employee_code: string;
+    department?: { name: string };
+    branch?: { name: string };
+    avatar?: string;
+  };
+  leave_type?: LeaveType;
+  approver?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Holiday {
+  id: number;
+  name: string;
+  date: string;
+  year: number;
+  type: HolidayType;
+  branch_id?: number;
+  description?: string;
+  is_mandatory: boolean;
+  is_recurring: boolean;
+  branch?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeaveDashboardStats {
+  on_leave_today: number;
+  pending_requests: number;
+  approved_this_month: number;
+  rejected_this_month: number;
+  upcoming_leaves: number;
+}
+
+// --- Performance Management Types ---
+
+export interface EvaluationSession {
+  id: string;
+  title: string;
+  description?: string;
+  fields: FormField[];
+  order: number;
+}
+
+export interface EvaluationTemplate {
+  id: string;
+  title: string;
+  description?: string;
+  sessions: EvaluationSession[];
+  metadata?: Record<string, any>;
+  created_by: number;
+  cloned_from?: number;
+  status: 'draft' | 'published' | 'archived';
+  published_at?: string;
+  version: number;
+  total_questions?: number;
+  is_editable?: boolean;
+  can_be_cloned?: boolean;
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvaluationResponse {
+  id: number;
+  template_id: number;
+  employee_id: number;
+  evaluator_id: number;
+  cycle_id?: number;
+  answers: Record<string, any>;
+  status: 'draft' | 'submitted_to_manager' | 'submitted_to_admin' | 'approved' | 'rejected' | 'returned';
+  submitted_to?: number;
+  submitted_at?: string;
+  approved_at?: string;
+  approved_by?: number;
+  feedback?: string;
+  approval_chain?: ApprovalChainItem[];
+  calculated_score?: number;
+  status_label?: string;
+  can_edit?: boolean;
+  can_submit?: boolean;
+  template?: EvaluationTemplate;
+  employee?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    employee_code: string;
+    department?: {
+      id: number;
+      name: string;
+    };
+  };
+  evaluator?: {
+    id: number;
+    name: string;
+  };
+  submitted_to_user?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApprovalChainItem {
+  submitted_to?: number;
+  submitted_at?: string;
+  approved_by?: number;
+  approved_at?: string;
+  rejected_by?: number;
+  rejected_at?: string;
+  returned_by?: number;
+  returned_at?: string;
+  status: string;
+  feedback?: string;
+}
+
+export interface SubmissionTarget {
+  id: number;
+  name: string;
+  designation: string;
+  type: 'manager' | 'department_head' | 'branch_manager' | 'hr_admin';
+  priority: number;
+}
+
+export interface PendingEvaluation {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  employee_code: string;
+  department: string;
+  status: string;
+  cycle_id?: number;
+}
+
+export interface UserPermissions {
+  is_hr_admin: boolean;
+  is_manager: boolean;
+  is_employee: boolean;
+  employee_id: number;
+  department_id?: number;
+  branch_id?: number;
+}
+
+export interface PerformanceDashboardKPIs {
+  org_health_score: number;
+  completion_rate: number;
+  top_performers: number;
+  top_performers_percentage: number;
+  turnover_risk: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface TeamPerformanceData {
+  name: string;
+  kpi: number;
+  behavioral: number;
+  attendance: number;
+  avg: number;
+}
+
+export interface ReviewCycle {
+  id: number;
+  name: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  status: 'draft' | 'active' | 'closed';
+  template_id?: number;
+  completion_rate?: number;
+  total_participants?: number;
+  completed_count?: number;
+  template?: {
+    id: number;
+    title: string;
+    description?: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CycleParticipant {
+  id: number;
+  cycle_id: number;
+  employee_id: number;
+  evaluator_id?: number;
+  status: 'pending' | 'in_progress' | 'completed';
+  completed_at?: string;
+  employee?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    employee_code: string;
+    department?: {
+      id: number;
+      name: string;
+    };
+  };
+  evaluator?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Goal {
+  id: number;
+  title: string;
+  description?: string;
+  owner_id: number;
+  parent_goal_id?: number;
+  type: 'company' | 'department' | 'team' | 'individual';
+  start_date: string;
+  end_date: string;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  progress: number;
+  owner?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  parent?: {
+    id: number;
+    title: string;
+  };
+  children?: Goal[];
+  key_results?: PerformanceKeyResult[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PerformanceKeyResult {
+  id: number;
+  goal_id: number;
+  description: string;
+  target_value: number;
+  current_value: number;
+  unit: string;
+  weight: number;
+  progress_percentage?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoalUpdate {
+  id: number;
+  goal_id: number;
+  key_result_id?: number;
+  updated_by: number;
+  previous_value?: number;
+  new_value: number;
+  notes?: string;
+  updater?: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
 }

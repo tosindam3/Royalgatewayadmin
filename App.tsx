@@ -26,7 +26,6 @@ const Branches = lazy(() => import('./pages/Branches'));
 const Departments = lazy(() => import('./pages/Departments'));
 const Designations = lazy(() => import('./pages/Designations'));
 const Leave = lazy(() => import('./pages/Leave'));
-const Goals = lazy(() => import('./pages/Goals'));
 const TalentManagement = lazy(() => import('./pages/TalentManagement'));
 const Settings = lazy(() => import('./pages/Settings'));
 const MemoSystem = lazy(() => import('./pages/Memo'));
@@ -56,13 +55,13 @@ const SIDEBAR_CONFIG = [
   { label: 'Departments', icon: <ICONS.Goals />, route: '/departments', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { label: 'Designations', icon: <ICONS.TalentManagement />, route: '/designations', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { label: 'OPERATIONS', isHeader: true },
-  { label: 'Attendance', icon: <ICONS.Attendance />, route: '/attendance', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE] },
+  { label: 'My Attendance', icon: <ICONS.Attendance />, route: '/me/attendance', roles: [UserRole.EMPLOYEE] },
+  { label: 'Attendance', icon: <ICONS.Attendance />, route: '/attendance', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
   { label: 'Leave', icon: <ICONS.Leave />, route: '/leave' },
   { label: 'My Approvals', icon: <ICONS.Performance />, route: '/approvals' },
   { label: 'Payroll', icon: <ICONS.Payroll />, route: '/payroll', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { label: 'TALENT', isHeader: true },
   { label: 'Performance', icon: <ICONS.Performance />, route: '/performance' },
-  { label: 'Goals & OKRs', icon: <ICONS.Automation />, route: '/goals' },
   { label: 'Talent Management', icon: <ICONS.Talent />, route: '/talent' },
   { label: 'COMMUNICATION', isHeader: true },
   { label: 'Team Chat', icon: <ICONS.Chat />, route: '/communication/chat', badge: 12 },
@@ -138,10 +137,15 @@ const MainApp: React.FC<{
             <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+
+                {/* My Attendance - Available to all users */}
+                <Route path="/me/attendance" element={<MyAttendance />} />
+
                 {currentUserRole !== UserRole.EMPLOYEE && (
                   <>
                     <Route path="/employees" element={<Employees />} />
                     <Route path="/employees/:id" element={<EmployeeProfile />} />
+                    <Route path="/attendance" element={<AttendanceWorkspace />} />
                   </>
                 )}
                 {currentUserRole === UserRole.SUPER_ADMIN || currentUserRole === UserRole.ADMIN ? (
@@ -150,15 +154,12 @@ const MainApp: React.FC<{
                     <Route path="/branches" element={<Branches />} />
                     <Route path="/departments" element={<Departments />} />
                     <Route path="/designations" element={<Designations />} />
-                    <Route path="/me/attendance" element={<MyAttendance />} />
                     <Route path="/payroll" element={<Payroll />} />
                   </>
                 ) : null}
                 <Route path="/performance" element={<Performance onNotify={(t, m, type) => addNotification(t, m, type)} />} />
-                <Route path="/goals" element={<Goals />} />
                 <Route path="/identity" element={<Identity />} />
                 <Route path="/communication/chat" element={<Communication />} />
-                <Route path="/attendance" element={<AttendanceWorkspace />} />
                 <Route path="/leave" element={<Leave />} />
                 <Route path="/talent" element={<TalentManagement />} />
 

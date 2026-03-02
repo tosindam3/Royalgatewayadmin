@@ -44,11 +44,57 @@ class Employee extends Model
         'allow_mobile_checkin' => 'boolean',
     ];
 
-    protected $appends = ['full_name'];
+    protected $appends = ['full_name', 'staff_id'];
 
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * Accessor for staff_id (returns employee_code)
+     * This provides compatibility with frontend expecting staff_id
+     */
+    public function getStaffIdAttribute(): string
+    {
+        return $this->employee_code ?? '';
+    }
+
+    /**
+     * Auto-generate employee_code on creation
+     */
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($employee) {
+            if (empty($employee->employee_code)) {
+                $employee->employee_code = self::generateEmployeeCode();
+            }
+        });
+    }
+
+    /**
+     * Generate unique employee code
+     * Format: RG-YYYY-NNNN (e.g., RG-2024-0001)
+     */
+    private static function generateEmployeeCode(): string
+    {
+        $year = date('Y');
+        
+        // Get the last employee code for this year
+        $lastEmployee = self::withTrashed()
+            ->where('employee_code', 'like', "RG-{$year}-%")
+            ->orderBy('employee_code', 'desc')
+            ->first();
+        
+        if ($lastEmployee && preg_match('/RG-\d{4}-(\d{4})/', $lastEmployee->employee_code, $matches)) {
+            $number = intval($matches[1]) + 1;
+        } else {
+            $number = 1;
+        }
+        
+        return "RG-{$year}-" . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 
     public function branch()
@@ -99,5 +145,15 @@ class Employee extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function leaveBalances()
+    {
+        return $this->hasMany(LeaveBalance::class);
+    }
+
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
     }
 }

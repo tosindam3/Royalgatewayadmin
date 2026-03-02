@@ -9,16 +9,6 @@ const apiClient = axios.create({
     },
 });
 
-// Helper to fetch CSRF cookie
-export const ensureCsrf = async () => {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-    const csrfUrl = baseUrl.replace('/api/v1', '/sanctum/csrf-cookie');
-    
-    return await axios.get(csrfUrl, {
-        withCredentials: true
-    });
-};
-
 // Request Interceptor
 apiClient.interceptors.request.use(
     (config) => {
@@ -36,10 +26,12 @@ apiClient.interceptors.response.use(
     (response) => {
         // If response has the standard API wrapper format {status, message, data}
         // unwrap it to just return the data
-        if (response.data && response.data.status === 'success' && response.data.data !== undefined) {
-            return response.data.data;
+        if (response.data && response.data.status === 'success') {
+            // Return the data field, or empty object if undefined
+            return response.data.data !== undefined ? response.data.data : {};
         }
-        return response.data;
+        // Return response.data or empty object
+        return response.data || {};
     },
     (error) => {
         const message = error.response?.data?.message || 'A transmission error occurred in the intelligence hub.';

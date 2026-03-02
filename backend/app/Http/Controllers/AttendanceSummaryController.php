@@ -12,7 +12,8 @@ class AttendanceSummaryController extends Controller
     use ApiResponse;
 
     public function __construct(
-        private AttendanceSummaryService $summaryService
+        private AttendanceSummaryService $summaryService,
+        private \App\Services\AttendanceScopeService $scopeService
     ) {}
 
     /**
@@ -29,10 +30,11 @@ class AttendanceSummaryController extends Controller
             'anomalies' => 'nullable|string',
         ]);
 
+        $user = $request->user();
         $month = $request->input('month');
         $filters = $request->only(['department_id', 'branch_id', 'search', 'anomalies']);
 
-        $kpis = $this->summaryService->getMonthKpis($month, $filters);
+        $kpis = $this->summaryService->getMonthKpis($month, $filters, $user);
 
         return $this->success($kpis, 'Month KPIs retrieved successfully.');
     }
@@ -53,12 +55,13 @@ class AttendanceSummaryController extends Controller
             'anomalies' => 'nullable|string',
         ]);
 
+        $user = $request->user();
         $month = $request->input('month');
         $page = $request->input('page', 1);
         $pageSize = $request->input('pageSize', 50);
         $filters = $request->only(['department_id', 'branch_id', 'search', 'anomalies']);
 
-        $result = $this->summaryService->getSummaryTable($month, $filters, $page, $pageSize);
+        $result = $this->summaryService->getSummaryTable($month, $filters, $page, $pageSize, $user);
 
         return $this->success($result, 'Summary table retrieved successfully.');
     }
@@ -72,6 +75,13 @@ class AttendanceSummaryController extends Controller
         $request->validate([
             'month' => 'required|date_format:Y-m',
         ]);
+
+        $user = $request->user();
+        
+        // Check if user can view this employee
+        if (!$this->scopeService->canViewEmployee($user, $employeeId)) {
+            return $this->error('You do not have permission to view this employee\'s attendance', 403);
+        }
 
         $month = $request->input('month');
 

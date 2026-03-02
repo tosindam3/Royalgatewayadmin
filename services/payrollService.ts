@@ -1,102 +1,200 @@
-
-import { 
-  PayrollPeriod, 
-  PayrollRun, 
-  PayrollLine, 
-  ApprovalStep,
-  PayrollRunStatus
+import apiClient from './apiClient';
+import {
+  PayrollPeriod,
+  PayrollRun,
+  PayrollRunEmployee,
+  PayrollEmployeeBreakdown,
+  PayrollItem,
+  ApprovalRequest,
+  PaginationMeta,
+  PayrollRunStatus,
+  SalaryStructure,
+  EmployeeSalary
 } from '../types';
 
-// Mock Data Generators
-export const generateMockPeriods = (): PayrollPeriod[] => [
-  { id: 'p-1', name: 'April 2024', startDate: '2024-04-01', endDate: '2024-04-30', status: 'PROCESSING' },
-  { id: 'p-2', name: 'March 2024', startDate: '2024-03-01', endDate: '2024-03-31', status: 'CLOSED' },
-  { id: 'p-3', name: 'May 2024', startDate: '2024-05-01', endDate: '2024-05-31', status: 'OPEN' },
-];
-
-export const generateMockRuns = (periodId: string): PayrollRun[] => [
-  {
-    id: 'run-101',
-    periodId,
-    periodName: 'April 2024',
-    status: 'UNDER_REVIEW',
-    branchScope: 'Main HQ',
-    deptScope: 'All Departments',
-    totalGross: 450200,
-    totalNet: 412000,
-    anomalyCount: 12,
-    submittedBy: 'Emily Johnson',
-    submittedAt: '2024-04-20T14:30:00Z',
-    approvalChain: [
-      { id: 's1', role: 'HR Director', approverName: 'Alex Rivera', status: 'APPROVED', updatedAt: '2024-04-21T09:00:00Z' },
-      { id: 's2', role: 'Finance Head', approverName: 'Sarah Mitchell', status: 'PENDING' },
-      { id: 's3', role: 'CEO', status: 'PENDING' },
-    ]
-  }
-];
-
-export const generateMockLines = (count: number = 20): PayrollLine[] => {
-  const lines: PayrollLine[] = [];
-  const names = ['Ethan Parker', 'Amanda Ward', 'Douglas Baker', 'Sarah Mitchell', 'Michael Carter', 'Robert Davis', 'John Smith', 'Kelly Robinson'];
-  const depts = ['Engineering', 'Marketing', 'Sales', 'HR', 'IT', 'Product'];
-  
-  for (let i = 0; i < count; i++) {
-    const base = 5000 + Math.random() * 5000;
-    const allowances = 500 + Math.random() * 1000;
-    const deductions = Math.random() * 300;
-    const latePenalty = Math.random() > 0.7 ? 50 : 0;
-    const otPay = Math.random() > 0.5 ? 200 + Math.random() * 500 : 0;
-    const bonus = Math.random() > 0.8 ? 1000 : 0;
-    const gross = base + allowances + otPay + bonus - deductions - latePenalty;
-    const net = gross * 0.85; // Simple tax simulation
-
-    lines.push({
-      id: `line-${i}`,
-      employeeId: `EMP-${100 + i}`,
-      employeeName: names[i % names.length],
-      avatar: `https://picsum.photos/40?sig=${i}`,
-      department: depts[i % depts.length],
-      branch: 'Main HQ',
-      baseSalary: base,
-      allowances,
-      deductions,
-      latePenalty,
-      overtimePay: otPay,
-      performanceBonus: bonus,
-      grossPay: gross,
-      netPay: net,
-      variance: (Math.random() - 0.5) * 500,
-      hasAnomalies: Math.random() > 0.9,
-      isOnHold: false
-    });
-  }
-  return lines;
-};
-
-// API Client Interface
+/**
+ * Payroll API Service
+ * 
+ * All endpoints are under /api/v1/payroll
+ * Requires authentication (Bearer token)
+ */
 export const payrollApi = {
-  getPeriods: async (): Promise<PayrollPeriod[]> => {
-    await new Promise(r => setTimeout(r, 600));
-    return generateMockPeriods();
-  },
-  
-  getRuns: async (periodId: string): Promise<PayrollRun[]> => {
-    await new Promise(r => setTimeout(r, 800));
-    return generateMockRuns(periodId);
+  // ==================== PERIODS ====================
+
+  getPeriods: async (params?: {
+    status?: 'open' | 'closed';
+    year?: number;
+  }): Promise<PayrollPeriod[]> => {
+    const response = await apiClient.get('/payroll/periods', { params });
+    return response.data || response;
   },
 
-  getLines: async (runId: string): Promise<PayrollLine[]> => {
-    await new Promise(r => setTimeout(r, 1000));
-    return generateMockLines(50);
+  getPeriod: async (id: number): Promise<PayrollPeriod> => {
+    const response = await apiClient.get(`/payroll/periods/${id}`);
+    return response.data || response;
   },
 
-  submitRun: async (runId: string): Promise<boolean> => {
-    await new Promise(r => setTimeout(r, 1200));
-    return true;
+  // ==================== RUNS ====================
+
+  getRuns: async (params?: {
+    period_id?: number;
+    status?: PayrollRunStatus;
+    page?: number;
+    per_page?: number;
+  }): Promise<{ data: PayrollRun[]; meta: PaginationMeta }> => {
+    return await apiClient.get('/payroll/runs', { params });
   },
 
-  approveRun: async (runId: string, comment?: string): Promise<boolean> => {
-    await new Promise(r => setTimeout(r, 1000));
-    return true;
-  }
+  // ==================== SALARY STRUCTURES ====================
+
+  getStructures: async (): Promise<SalaryStructure[]> => {
+    const response = await apiClient.get('/payroll/structures');
+    return response.data || response;
+  },
+
+  createStructure: async (data: Partial<SalaryStructure>): Promise<SalaryStructure> => {
+    const response = await apiClient.post('/payroll/structures', data);
+    return response.data || response;
+  },
+
+  updateStructure: async (id: number, data: Partial<SalaryStructure>): Promise<SalaryStructure> => {
+    const response = await apiClient.patch(`/payroll/structures/${id}`, data);
+    return response.data || response;
+  },
+
+  // ==================== EMPLOYEE SALARIES ====================
+
+  getEmployeeSalaries: async (params?: { employee_id?: number }): Promise<EmployeeSalary[]> => {
+    const response = await apiClient.get('/payroll/salaries', { params });
+    return response.data || response;
+  },
+
+  // ==================== EMPLOYEE SALARIES (CONTINUED) ====================
+
+  getEmployeeSalary: async (id: number): Promise<EmployeeSalary> => {
+    const response = await apiClient.get(`/payroll/salaries/${id}`);
+    return response.data?.data || response.data || response;
+  },
+
+  updateEmployeeSalaryMapping: async (id: number, data: Partial<EmployeeSalary>): Promise<EmployeeSalary> => {
+    const response = await apiClient.patch(`/payroll/salaries/${id}`, data);
+    return response.data?.data || response.data || response;
+  },
+
+  deleteEmployeeSalary: async (id: number): Promise<void> => {
+    await apiClient.delete(`/payroll/salaries/${id}`);
+  },
+
+  assignSalaryStructure: async (data: {
+    employee_id: number;
+    salary_structure_id: number;
+    base_salary: number;
+    effective_date: string;
+  }): Promise<EmployeeSalary> => {
+    const response = await apiClient.post('/payroll/salaries', data);
+    return response.data || response;
+  },
+
+  // ==================== RUNS (CONTINUED) ====================
+
+  createRun: async (data: {
+    period_id: number;
+    scope_type: 'all' | 'department' | 'branch' | 'custom';
+    scope_ref_id?: number;
+    approver_user_id: number;
+    note?: string;
+  }): Promise<PayrollRun> => {
+    const response = await apiClient.post('/payroll/runs', data);
+    return response.data || response;
+  },
+
+  getRun: async (id: number): Promise<PayrollRun> => {
+    const response = await apiClient.get(`/payroll/runs/${id}`);
+    return response.data?.data || response.data || response;
+  },
+
+  getRunEmployees: async (
+    runId: number,
+    page: number = 1,
+    perPage: number = 50
+  ): Promise<{ data: PayrollRunEmployee[]; meta: PaginationMeta }> => {
+    return await apiClient.get(`/payroll/runs/${runId}/employees`, {
+      params: { page, per_page: perPage }
+    });
+  },
+
+  getEmployeeBreakdown: async (
+    runId: number,
+    employeeId: number
+  ): Promise<PayrollEmployeeBreakdown> => {
+    const response = await apiClient.get(
+      `/payroll/runs/${runId}/employees/${employeeId}/breakdown`
+    );
+    return response.data || response;
+  },
+
+  recalculate: async (runId: number): Promise<PayrollRun> => {
+    const response = await apiClient.post(`/payroll/runs/${runId}/recalculate`);
+    return response.data || response;
+  },
+
+  submit: async (runId: number, message?: string): Promise<{ approval_request_id: number; run_status: string }> => {
+    const response = await apiClient.post(`/payroll/runs/${runId}/submit`, { message });
+    return response.data || response;
+  },
+
+  // ==================== APPROVALS ====================
+
+  getApprovalInbox: async (params?: {
+    entity_type?: string;
+    status?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<{ data: ApprovalRequest[]; meta: PaginationMeta }> => {
+    return await apiClient.get('/payroll/approvals/inbox', { params });
+  },
+
+  getApproval: async (id: number): Promise<{ approval: ApprovalRequest; run: PayrollRun | null }> => {
+    const response = await apiClient.get(`/payroll/approvals/${id}`);
+    return response.data || response;
+  },
+
+  approve: async (approvalId: number, comment?: string): Promise<void> => {
+    await apiClient.post(`/payroll/approvals/${approvalId}/approve`, { comment });
+  },
+
+  reject: async (approvalId: number, decisionNote: string): Promise<void> => {
+    await apiClient.post(`/payroll/approvals/${approvalId}/reject`, { decision_note: decisionNote });
+  },
+
+  // ==================== PAY ITEMS ====================
+
+  getPayItems: async (params?: {
+    type?: 'earning' | 'deduction';
+    active?: boolean;
+  }): Promise<PayrollItem[]> => {
+    const response = await apiClient.get('/payroll/items', { params });
+    return response.data || response;
+  },
+
+  createPayItem: async (data: Partial<PayrollItem>): Promise<PayrollItem> => {
+    const response = await apiClient.post('/payroll/items', data);
+    return response.data || response;
+  },
+
+  updatePayItem: async (id: number, data: Partial<PayrollItem>): Promise<PayrollItem> => {
+    const response = await apiClient.patch(`/payroll/items/${id}`, data);
+    return response.data || response;
+  },
+
+  // ==================== GLOBAL SETTINGS ====================
+
+  getSettings: async (prefix?: string): Promise<Record<string, any>> => {
+    const response = await apiClient.get('/payroll/settings', { params: { prefix } });
+    return response.data?.data || response.data || {};
+  },
+
+  updateSettings: async (settings: Record<string, any>): Promise<void> => {
+    await apiClient.post('/payroll/settings', { settings });
+  },
 };

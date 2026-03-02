@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Smartphone, Monitor, Navigation, Loader2 } from 'lucide-react';
+import { Smartphone, Monitor, Navigation, Loader2, Building2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { organizationService } from '../../../../services/organizationService';
 
 interface ConfigFormProps {
     data: any;
@@ -11,6 +13,12 @@ interface ConfigFormProps {
 
 export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, error, isLoading }) => {
     const [isDetecting, setIsDetecting] = useState(false);
+    
+    // Fetch branches
+    const { data: branches = [] } = useQuery({
+        queryKey: ['branches'],
+        queryFn: () => organizationService.getBranches({ per_page: 'all' }),
+    });
 
     return (
         <div className="space-y-6">
@@ -30,6 +38,40 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
                         onChange={(e) => onChange({ ...data, name: e.target.value })}
                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
                     />
+                </div>
+
+                <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">
+                        Branch Assignment
+                    </label>
+                    <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <select
+                            value={data.branch_id || ''}
+                            onChange={(e) => onChange({ 
+                                ...data, 
+                                branch_id: e.target.value === '' ? null : parseInt(e.target.value) 
+                            })}
+                            className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="">Global (All Branches)</option>
+                            {branches.map((branch: any) => (
+                                <option key={branch.id} value={branch.id}>
+                                    {branch.name}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
+                    </div>
+                    <p className="text-[9px] text-slate-500 mt-1.5">
+                        {data.branch_id 
+                            ? 'This zone applies only to employees in the selected branch' 
+                            : 'This zone applies to all employees across all branches'}
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
