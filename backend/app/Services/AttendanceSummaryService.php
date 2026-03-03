@@ -30,7 +30,7 @@ class AttendanceSummaryService
             
             $records = $query->get();
             
-            $employeeQuery = Employee::where('status', 'active');
+            $employeeQuery = Employee::operational();
             if (!empty($filters['department_id'])) {
                 $employeeQuery->where('department_id', $filters['department_id']);
             }
@@ -83,7 +83,7 @@ class AttendanceSummaryService
                 return $date->isWeekday();
             }, $endDate) + 1;
             
-            $employeeQuery = Employee::where('status', 'active')
+            $employeeQuery = Employee::operational()
                 ->with(['user:id,name', 'department:id,name', 'branch:id,name']);
             
             if (!empty($filters['department_id'])) {
@@ -135,7 +135,7 @@ class AttendanceSummaryService
                 return [
                     'employee' => [
                         'id' => $employee->id,
-                        'name' => $employee->user->name ?? 'Unknown',
+                        'name' => $employee->full_name,
                         'staff_id' => $employee->staff_id,
                         'department' => $employee->department->name ?? '—',
                         'branch' => $employee->branch->name ?? '—',
@@ -229,7 +229,7 @@ class AttendanceSummaryService
             return [
                 'employee' => [
                     'id' => $employee->id,
-                    'name' => $employee->user->name ?? 'Unknown',
+                    'name' => $employee->full_name,
                     'staff_id' => $employee->staff_id,
                     'department' => $employee->department->name ?? '—',
                     'branch' => $employee->branch->name ?? '—',
@@ -318,7 +318,7 @@ class AttendanceSummaryService
                 'id' => $record->id,
                 'employee' => [
                     'id' => $record->employee->id,
-                    'name' => $record->employee->user->name ?? 'Unknown',
+                    'name' => $record->employee->full_name,
                     'staff_id' => $record->employee->staff_id,
                 ],
                 'work_date' => $record->attendance_date->format('Y-m-d'),

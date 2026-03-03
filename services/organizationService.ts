@@ -17,6 +17,8 @@ export interface Branch {
     manager_name?: string;
     employee_count: number;
     device_count: number;
+    latitude?: number;
+    longitude?: number;
     created_at?: string;
     updated_at?: string;
 }

@@ -1,17 +1,15 @@
 
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { HashRouter, Link } from 'react-router-dom';
-import { Routes, Route, useLocation, Navigate } from 'react-router';
-import { Toaster, toast } from 'sonner';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { HashRouter } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
+import { Toaster } from 'sonner';
 import { ICONS } from './constants';
-import { UserRole, Notification, BrandSettings, UserProfile, Branch, mapBackendRoleToUserRole } from './types';
+import { UserRole, Notification, BrandSettings, UserProfile, mapBackendRoleToUserRole } from './types';
 import { authService } from './services/authService';
 
 // Layout & UI Components
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
-import NotificationCenter from './components/layout/NotificationCenter';
-import ThemeToggle from './components/layout/ThemeToggle';
 import PageSkeleton from './components/ui/PageSkeleton';
 import AttendanceClockModal from './components/attendance/AttendanceClockModal';
 
@@ -23,8 +21,6 @@ const Identity = lazy(() => import('./pages/Identity'));
 const Communication = lazy(() => import('./pages/Communication'));
 const Employees = lazy(() => import('./pages/Employees/EmployeeManagementPage'));
 const Branches = lazy(() => import('./pages/Branches'));
-const Departments = lazy(() => import('./pages/Departments'));
-const Designations = lazy(() => import('./pages/Designations'));
 const Leave = lazy(() => import('./pages/Leave'));
 const TalentManagement = lazy(() => import('./pages/TalentManagement'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -52,8 +48,6 @@ const SIDEBAR_CONFIG = [
   { label: 'Employees', icon: <ICONS.People />, route: '/employees', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
   { label: 'Role Management', icon: <ICONS.Administration />, route: '/roles', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { label: 'Branches', icon: <ICONS.Analytics />, route: '/branches', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { label: 'Departments', icon: <ICONS.Goals />, route: '/departments', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { label: 'Designations', icon: <ICONS.TalentManagement />, route: '/designations', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { label: 'OPERATIONS', isHeader: true },
   { label: 'My Attendance', icon: <ICONS.Attendance />, route: '/me/attendance', roles: [UserRole.EMPLOYEE] },
   { label: 'Attendance', icon: <ICONS.Attendance />, route: '/attendance', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
@@ -152,8 +146,6 @@ const MainApp: React.FC<{
                   <>
                     <Route path="/roles" element={<RoleManagement />} />
                     <Route path="/branches" element={<Branches />} />
-                    <Route path="/departments" element={<Departments />} />
-                    <Route path="/designations" element={<Designations />} />
                     <Route path="/payroll" element={<Payroll />} />
                   </>
                 ) : null}
@@ -187,7 +179,6 @@ const MainApp: React.FC<{
   );
 };
 
-// Fixed: Added the App component with default export to fix the "no default export" error in App.tsx
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -219,7 +210,7 @@ const App: React.FC = () => {
           if (response && response.user) {
             const user = response.user;
             setUserProfile({
-              name: user.name,
+              name: user.display_name || user.name,
               username: user.email,
               avatar: user.employee_profile?.avatar || ''
             });
@@ -241,7 +232,7 @@ const App: React.FC = () => {
     setIsAuthenticated(true);
     if (user) {
       setUserProfile({
-        name: user.name,
+        name: user.display_name || user.name,
         username: user.email,
         avatar: user.employee_profile?.avatar || ''
       });

@@ -89,8 +89,8 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{id}', [App\Http\Controllers\WorkplaceController::class, 'destroy']);
         });
 
-        // Employee Routes (No auth required for development - add auth:sanctum middleware in production)
-        Route::prefix('employees')->group(function () {
+        // Employee Routes
+        Route::prefix('employees')->middleware('auth:sanctum')->group(function () {
             Route::get('/metrics', [App\Http\Controllers\EmployeeController::class, 'metrics']);
             Route::get('/department/{departmentId}', [App\Http\Controllers\EmployeeController::class, 'byDepartment']);
             Route::get('/branch/{branchId}', [App\Http\Controllers\EmployeeController::class, 'byBranch']);
@@ -103,8 +103,8 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{id}', [App\Http\Controllers\EmployeeController::class, 'destroy']);
         });
 
-        // Branch Routes (No auth required for development - add auth:sanctum middleware in production)
-        Route::prefix('branches')->group(function () {
+        // Branch Routes
+        Route::prefix('branches')->middleware('auth:sanctum')->group(function () {
             Route::get('/', [App\Http\Controllers\BranchController::class, 'index']);
             Route::post('/', [App\Http\Controllers\BranchController::class, 'store']);
             Route::get('/{id}', [App\Http\Controllers\BranchController::class, 'show']);
@@ -114,10 +114,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/{id}/employees', [App\Http\Controllers\BranchController::class, 'employees']);
             Route::get('/{id}/statistics', [App\Http\Controllers\BranchController::class, 'statistics']);
             Route::patch('/{id}/update-counts', [App\Http\Controllers\BranchController::class, 'updateCounts']);
+            Route::get('/{id}/geofence-zones', [App\Http\Controllers\BranchController::class, 'geofenceZones']);
+            Route::get('/{id}/biometric-devices', [App\Http\Controllers\BranchController::class, 'biometricDevices']);
+            Route::get('/{id}/work-schedules', [App\Http\Controllers\BranchController::class, 'workSchedules']);
         });
 
         // Department Routes
-        Route::prefix('departments')->group(function () {
+        Route::prefix('departments')->middleware('auth:sanctum')->group(function () {
             Route::get('/', [App\Http\Controllers\DepartmentController::class, 'index']);
             Route::post('/', [App\Http\Controllers\DepartmentController::class, 'store']);
             Route::get('/{id}', [App\Http\Controllers\DepartmentController::class, 'show']);
@@ -127,7 +130,7 @@ Route::prefix('v1')->group(function () {
         });
 
         // Designation Routes
-        Route::prefix('designations')->group(function () {
+        Route::prefix('designations')->middleware('auth:sanctum')->group(function () {
             Route::get('/', [App\Http\Controllers\DesignationController::class, 'index']);
             Route::post('/', [App\Http\Controllers\DesignationController::class, 'store']);
             Route::get('/{id}', [App\Http\Controllers\DesignationController::class, 'show']);
@@ -138,7 +141,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // RBAC & Approval System Routes
-    Route::prefix('rbac')->group(function () {
+    Route::prefix('rbac')->middleware('auth:sanctum')->group(function () {
         // Roles
         Route::prefix('roles')->group(function () {
             Route::get('/', [App\Http\Controllers\RoleController::class, 'index']);
@@ -175,7 +178,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Approval Workflows
-    Route::prefix('workflows')->group(function () {
+    Route::prefix('workflows')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [App\Http\Controllers\WorkflowController::class, 'index']);
         Route::post('/', [App\Http\Controllers\WorkflowController::class, 'store']);
         Route::get('/{id}', [App\Http\Controllers\WorkflowController::class, 'show']);
@@ -186,7 +189,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Approvals
-    Route::prefix('approvals')->group(function () {
+    Route::prefix('approvals')->middleware('auth:sanctum')->group(function () {
         Route::get('/pending', [App\Http\Controllers\ApprovalController::class, 'pending']);
         Route::get('/history', [App\Http\Controllers\ApprovalController::class, 'history']);
         Route::get('/statistics', [App\Http\Controllers\ApprovalController::class, 'statistics']);
@@ -305,5 +308,54 @@ Route::prefix('v1')->group(function () {
         Route::get('/goals/{id}', [App\Http\Controllers\GoalController::class, 'show']);
         Route::patch('/goals/{id}', [App\Http\Controllers\GoalController::class, 'update']);
         Route::post('/goals/{goalId}/key-results/{krId}/update', [App\Http\Controllers\GoalController::class, 'updateKeyResult']);
+    });
+
+    // Memo System Routes
+    Route::prefix('memos')->middleware('auth:sanctum')->group(function () {
+        // Main CRUD
+        Route::get('/', [App\Http\Controllers\MemoController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\MemoController::class, 'store']);
+        Route::get('/{id}', [App\Http\Controllers\MemoController::class, 'show']);
+        Route::put('/{id}', [App\Http\Controllers\MemoController::class, 'update']);
+        Route::delete('/{id}', [App\Http\Controllers\MemoController::class, 'destroy']);
+        
+        // Actions
+        Route::post('/{id}/reply', [App\Http\Controllers\MemoController::class, 'reply']);
+        Route::post('/{id}/forward', [App\Http\Controllers\MemoController::class, 'forward']);
+        Route::post('/{id}/star', [App\Http\Controllers\MemoController::class, 'toggleStar']);
+        Route::post('/{id}/read', [App\Http\Controllers\MemoController::class, 'markAsRead']);
+        Route::post('/{id}/move', [App\Http\Controllers\MemoController::class, 'moveToFolder']);
+        
+        // Bulk operations
+        Route::post('/bulk-send', [App\Http\Controllers\MemoController::class, 'bulkSend']);
+        Route::post('/bulk-delete', [App\Http\Controllers\MemoController::class, 'bulkDelete']);
+        Route::post('/bulk-read', [App\Http\Controllers\MemoController::class, 'bulkMarkAsRead']);
+        
+        // Search & Stats
+        Route::get('/search', [App\Http\Controllers\MemoController::class, 'search']);
+        Route::get('/stats', [App\Http\Controllers\MemoController::class, 'stats']);
+        
+        // Attachments
+        Route::post('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'upload']);
+        Route::get('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'index']);
+        Route::get('/attachments/{attachmentId}/download', [App\Http\Controllers\MemoAttachmentController::class, 'download']);
+        Route::delete('/attachments/{attachmentId}', [App\Http\Controllers\MemoAttachmentController::class, 'destroy']);
+    });
+
+    // Memo Signatures
+    Route::prefix('memo-signatures')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [App\Http\Controllers\MemoSignatureController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\MemoSignatureController::class, 'store']);
+        Route::put('/{id}', [App\Http\Controllers\MemoSignatureController::class, 'update']);
+        Route::delete('/{id}', [App\Http\Controllers\MemoSignatureController::class, 'destroy']);
+        Route::post('/{id}/set-default', [App\Http\Controllers\MemoSignatureController::class, 'setDefault']);
+    });
+
+    // Memo Folders
+    Route::prefix('memo-folders')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [App\Http\Controllers\MemoFolderController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\MemoFolderController::class, 'store']);
+        Route::put('/{id}', [App\Http\Controllers\MemoFolderController::class, 'update']);
+        Route::delete('/{id}', [App\Http\Controllers\MemoFolderController::class, 'destroy']);
     });
 });

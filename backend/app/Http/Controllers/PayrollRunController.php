@@ -7,6 +7,7 @@ use App\Models\PayrollRunEmployee;
 use App\Services\PayrollRunBuilder;
 use App\Services\PayrollRunGuard;
 use App\Services\SubmitPayrollRunAction;
+use App\Services\ScopeEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -15,7 +16,8 @@ class PayrollRunController extends Controller
     public function __construct(
         private PayrollRunBuilder $builder,
         private PayrollRunGuard $guard,
-        private SubmitPayrollRunAction $submitAction
+        private SubmitPayrollRunAction $submitAction,
+        private ScopeEngine $scopeEngine
     ) {}
 
     /**
@@ -24,7 +26,45 @@ class PayrollRunController extends Controller
      */
     public function index(Request $request)
     {
+        $user = Auth::user();
+
+        // Check permission
+        if (!$user->hasPermission('payroll.view')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $scope = $this->scopeEngine->getUserScope($user, 'payroll.view');
         $query = PayrollRun::with(['period', 'preparedBy:id,name', 'approver:id,name']);
+
+        // Apply RBAC scoping to PayrollRun list
+        if ($scope !== 'all') {
+            $employee = $user->employeeProfile;
+            if (!$employee) {
+                return response()->json(['data' => [], 'meta' => ['total' => 0]], 200);
+            }
+
+            switch ($scope) {
+                case 'branch':
+                    $query->where(function ($q) use ($employee) {
+                        $q->where('scope_type', 'branch')->where('scope_ref_id', $employee->branch_id)
+                          ->orWhere('scope_type', 'department')->whereIn('scope_ref_id', function ($sub) use ($employee) {
+                              $sub->select('id')->from('departments')->where('branch_id', $employee->branch_id);
+                          });
+                    });
+                    break;
+                case 'department':
+                    $query->where('scope_type', 'department')->where('scope_ref_id', $employee->department_id);
+                    break;
+                case 'team':
+                case 'self':
+                    // Typically runs aren't created for team/self scope in the same way, 
+                    // but we restrict to what they can see.
+                    $query->whereRaw('1 = 0'); 
+                    break;
+                default:
+                    $query->whereRaw('1 = 0');
+            }
+        }
 
         // Filter by period
         if ($request->has('period_id')) {
@@ -65,6 +105,12 @@ class PayrollRunController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+
+        if (!$user->hasPermission('payroll.process')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $validated = $request->validate([
             'period_id' => 'required|exists:payroll_periods,id',
             'scope_type' => 'required|in:all,department,branch,custom',
@@ -72,6 +118,34 @@ class PayrollRunController extends Controller
             'approver_user_id' => 'required|exists:users,id',
             'note' => 'nullable|string|max:1000',
         ]);
+
+        // Validate that user has authority for this scope
+        $scope = $this->scopeEngine->getUserScope($user, 'payroll.process');
+        if ($scope !== 'all') {
+            $employee = $user->employeeProfile;
+            if (!$employee) return response()->json(['message' => 'Employee profile required'], 403);
+
+            if ($validated['scope_type'] === 'all') {
+                return response()->json(['message' => 'You do not have permission to run payroll for the entire organization'], 403);
+            }
+
+            if ($validated['scope_type'] === 'branch' && $validated['scope_ref_id'] != $employee->branch_id) {
+                return response()->json(['message' => 'You can only run payroll for your own branch'], 403);
+            }
+
+            if ($validated['scope_type'] === 'department') {
+                if ($scope === 'department' && $validated['scope_ref_id'] != $employee->department_id) {
+                    return response()->json(['message' => 'You can only run payroll for your own department'], 403);
+                }
+                // Branch managers can run for departments in their branch
+                if ($scope === 'branch') {
+                    $dept = \App\Models\Department::find($validated['scope_ref_id']);
+                    if (!$dept || $dept->branch_id != $employee->branch_id) {
+                        return response()->json(['message' => 'Department not in your branch'], 403);
+                    }
+                }
+            }
+        }
 
         $run = $this->builder->create($validated, Auth::user());
 
@@ -92,6 +166,10 @@ class PayrollRunController extends Controller
             'approver:id,name',
             'approvalRequest.actions.approver:id,name'
         ])->findOrFail($id);
+
+        if (!$this->canAccessRun($run, Auth::user())) {
+            return response()->json(['message' => 'Unauthorized access to this payroll run'], 403);
+        }
 
         $data = $this->formatRun($run);
 
@@ -115,6 +193,10 @@ class PayrollRunController extends Controller
     public function employees(Request $request, int $id)
     {
         $run = PayrollRun::findOrFail($id);
+
+        if (!$this->canAccessRun($run, Auth::user())) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         $employees = PayrollRunEmployee::where('payroll_run_id', $id)
             ->with(['employee.user:id,name', 'employee.department:id,name', 'employee.branch:id,name'])
@@ -157,6 +239,11 @@ class PayrollRunController extends Controller
      */
     public function employeeBreakdown(int $runId, int $employeeId)
     {
+        $run = PayrollRun::findOrFail($runId);
+        if (!$this->canAccessRun($run, Auth::user())) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $payrollEmployee = PayrollRunEmployee::where('payroll_run_id', $runId)
             ->where('employee_id', $employeeId)
             ->with('employee')
@@ -185,6 +272,10 @@ class PayrollRunController extends Controller
     {
         $run = PayrollRun::findOrFail($id);
 
+        if (!$this->canAccessRun($run, Auth::user())) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $this->guard->assertRecalculatable($run);
 
         $run = $this->builder->recalculate($run);
@@ -205,6 +296,10 @@ class PayrollRunController extends Controller
         ]);
 
         $run = PayrollRun::findOrFail($id);
+        
+        if (!$this->canAccessRun($run, Auth::user())) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
 
         $result = $this->submitAction->execute(
             $run,
@@ -215,6 +310,35 @@ class PayrollRunController extends Controller
         return response()->json([
             'data' => $result,
         ]);
+    }
+
+    /**
+     * Helper to check if user can access a payroll run
+     */
+    private function canAccessRun(PayrollRun $run, User $user): bool
+    {
+        $scope = $this->scopeEngine->getUserScope($user, 'payroll.view');
+
+        if ($scope === 'all') {
+            return true;
+        }
+
+        $employee = $user->employeeProfile;
+        if (!$employee) return false;
+
+        if ($run->scope_type === 'branch') {
+            return $run->scope_ref_id == $employee->branch_id;
+        }
+
+        if ($run->scope_type === 'department') {
+            if ($scope === 'branch') {
+                $dept = \App\Models\Department::find($run->scope_ref_id);
+                return $dept && $dept->branch_id == $employee->branch_id;
+            }
+            return $run->scope_ref_id == $employee->department_id;
+        }
+
+        return false;
     }
 
     /**

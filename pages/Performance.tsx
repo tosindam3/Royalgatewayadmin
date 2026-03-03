@@ -162,7 +162,7 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify }) => {
     setView('DASHBOARD');
   };
 
-  const tabs = ['Performance Dashboard', 'Review Cycles', 'Goals & OKRs', 'Evaluations', 'Appraisals', 'Reporting', 'Settings'];
+  const tabs = ['Performance Dashboard', 'Review Cycles', 'Goals & OKRs', 'Evaluations', 'Templates', 'Appraisals', 'Reporting', 'Settings'];
 
   if (view === 'BUILDER') {
     return (
@@ -415,11 +415,11 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify }) => {
                     ) : (
                       // Real data
                       pendingEvaluations.map((evaluation, i) => (
-                        <tr key={evaluation.id} className="hover:bg-white/[0.02] transition-colors group">
+                        <tr key={evaluation.id || i} className="hover:bg-white/[0.02] transition-colors group">
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-lg border border-white/10 bg-gradient-to-br from-[#8252e9] to-[#6d39e0] flex items-center justify-center text-white text-xs font-bold">
-                                {evaluation.employee_name.split(' ').map(n => n[0]).join('')}
+                                {evaluation.employee_name?.split(' ').map(n => n[0]).join('')}
                               </div>
                               <div>
                                 <p className="text-xs font-bold text-white tracking-tight">{evaluation.employee_name}</p>
@@ -439,12 +439,14 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify }) => {
                           <td className="px-6 py-5 text-right">
                             <button
                               onClick={() => {
+                                const templateToUse = templates.find(t => t.id === (evaluation as any).template_id) || templates[0];
+                                setSelectedTemplate(templateToUse as any);
                                 setActiveEmployee(evaluation.employee_name);
                                 setView('EVALUATION');
                               }}
                               className="text-[10px] font-black text-white uppercase tracking-widest bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-lg transition-all"
                             >
-                              {evaluation.status === 'completed' ? 'View Results' : 'Fill Evaluation'}
+                              {(evaluation as any).type === 'global' ? 'Start Self-Eval' : 'Fill Evaluation'}
                             </button>
                           </td>
                         </tr>
@@ -454,6 +456,61 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify }) => {
                 </table>
               </div>
             </GlassCard>
+          </div>
+
+          <div className={activeTab === 'Templates' ? 'block' : 'hidden'}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {templates.map((template) => (
+                <GlassCard key={template.id} className="relative group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4">
+                    {template.is_global && (
+                      <span className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase tracking-[0.2em] rounded-md">Global</span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-tight mb-2 pr-12">{template.title}</h3>
+                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed mb-6 line-clamp-2 uppercase tracking-wide">
+                    {template.description || 'Enterprise grade performance evaluation node with multi-vector assessment logic.'}
+                  </p>
+                  <div className="flex items-center gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-6">
+                    <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-[#8252e9]" /> v{template.version}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-emerald-500" /> {template.status}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setSelectedTemplate(template as any); setView('BUILDER'); }}
+                      className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black text-slate-300 uppercase tracking-widest hover:bg-white/10 transition-all border-b-2 border-b-transparent hover:border-b-[#8252e9]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const cloned = await performanceService.createTemplate({
+                            ...template,
+                            title: `${template.title} (Clone)`,
+                            status: 'draft',
+                            is_global: template.is_global
+                          });
+                          setTemplates([...templates, cloned as any]);
+                        } catch (e) {
+                          console.error('Clone failed', e);
+                        }
+                      }}
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black text-slate-300 uppercase tracking-widest hover:bg-white/10 transition-all"
+                    >
+                      Clone
+                    </button>
+                  </div>
+                </GlassCard>
+              ))}
+              <button
+                onClick={() => { setSelectedTemplate(null); setView('BUILDER'); }}
+                className="border-2 border-dashed border-white/5 rounded-3xl p-8 flex flex-col items-center justify-center gap-4 hover:border-[#8252e9]/50 transition-all group"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-2xl group-hover:bg-[#8252e9]/10 group-hover:text-[#8252e9] transition-all">+</div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-white transition-all">Architect New Node</p>
+              </button>
+            </div>
           </div>
 
           <div className={activeTab === 'Review Cycles' ? 'block' : 'hidden'}>

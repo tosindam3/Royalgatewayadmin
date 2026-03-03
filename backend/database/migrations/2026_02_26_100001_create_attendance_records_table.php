@@ -11,31 +11,39 @@ return new class extends Migration
         Schema::create('attendance_records', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employee_id')->constrained('employees')->cascadeOnDelete();
-            $table->date('work_date');
-            $table->timestamp('clock_in_at')->nullable();
-            $table->timestamp('clock_out_at')->nullable();
-            $table->integer('minutes_worked')->default(0);
+            $table->date('attendance_date');
+            $table->timestamp('check_in_time')->nullable();
+            $table->timestamp('check_out_time')->nullable();
+            $table->integer('work_minutes')->default(0);
             $table->integer('late_minutes')->default(0);
             $table->integer('overtime_minutes')->default(0);
-            $table->enum('source_in', ['app', 'device', 'import'])->nullable();
-            $table->enum('source_out', ['app', 'device', 'import'])->nullable();
-            $table->enum('geofence_status_in', ['pass', 'fail', 'bypass', 'na'])->default('na');
-            $table->enum('geofence_status_out', ['pass', 'fail', 'bypass', 'na'])->default('na');
-            $table->foreignId('geofence_zone_in_id')->nullable()->constrained('geofence_zones')->nullOnDelete();
-            $table->foreignId('geofence_zone_out_id')->nullable()->constrained('geofence_zones')->nullOnDelete();
-            $table->enum('status', ['present', 'absent', 'partial', 'leave', 'holiday'])->default('absent');
-            $table->foreignId('shift_id')->nullable()->constrained('work_schedules')->nullOnDelete();
-            $table->boolean('has_missing_punch')->default(false);
-            $table->boolean('is_edited')->default(false);
-            $table->boolean('has_duplicate')->default(false);
+            $table->integer('break_minutes')->default(0);
+            $table->enum('status', ['present', 'absent', 'on_time', 'partial', 'leave', 'holiday'])->default('absent');
+            $table->string('source')->default('app');
+            $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
+            $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
+            $table->enum('approval_status', ['pending', 'approved', 'rejected'])->default('pending');
+            $table->boolean('payroll_locked')->default(false);
+            
+            // Geofence data
+            $table->decimal('geo_lat', 10, 8)->nullable();
+            $table->decimal('geo_long', 11, 8)->nullable();
+            $table->float('geo_accuracy_m')->nullable();
+            $table->decimal('geofence_expected_lat', 10, 8)->nullable();
+            $table->decimal('geofence_expected_long', 11, 8)->nullable();
+            $table->integer('geofence_radius_m')->nullable();
+            $table->float('geofence_distance_m')->nullable();
+            $table->string('geofence_status')->default('na');
+            $table->text('geofence_violation_reason')->nullable();
+            
             $table->timestamps();
 
             // Indexes for performance
-            $table->index(['work_date', 'employee_id']);
-            $table->index(['employee_id', 'work_date']);
+            $table->index(['attendance_date', 'employee_id']);
+            $table->index(['employee_id', 'attendance_date']);
             $table->index('status');
-            $table->index('work_date');
-            $table->unique(['employee_id', 'work_date']);
+            $table->index('attendance_date');
+            $table->unique(['employee_id', 'attendance_date']);
         });
     }
 

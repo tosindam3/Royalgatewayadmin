@@ -23,8 +23,8 @@ class PerformanceAccessMiddleware
         }
 
         $userRoles = $user->roles->pluck('name')->toArray();
-        $isHRAdmin = in_array('hr_admin', $userRoles) || in_array('super_admin', $userRoles);
-        $isManager = in_array('manager', $userRoles) || in_array('department_head', $userRoles) || in_array('branch_manager', $userRoles);
+        $isHRAdmin = in_array('hr_manager', $userRoles) || in_array('super_admin', $userRoles) || in_array('ceo', $userRoles);
+        $isManager = in_array('department_head', $userRoles) || in_array('branch_manager', $userRoles);
         
         // Store user permissions in request for controllers to use
         $request->merge([

@@ -47,19 +47,19 @@ interface FieldEditorProps {
   totalWeight: number;
 }
 
-const FieldEditor: React.FC<FieldEditorProps> = ({ 
-  field, 
-  index, 
-  isEditing, 
-  onEdit, 
-  onUpdate, 
-  onRemove, 
+const FieldEditor: React.FC<FieldEditorProps> = ({
+  field,
+  index,
+  isEditing,
+  onEdit,
+  onUpdate,
+  onRemove,
   onWeightChange,
-  totalWeight 
+  totalWeight
 }) => {
   const isScorableField = ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(field.type);
   const fieldWeight = field.weight || 0;
-  
+
   const getFieldIcon = (type: FormFieldType) => {
     const icons = {
       'SHORT_TEXT': '✍️',
@@ -77,13 +77,13 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
 
   const addOption = () => {
     const currentOptions = field.options || [];
-    onUpdate({ 
-      options: [...currentOptions, `Option ${currentOptions.length + 1}`] 
+    onUpdate({
+      options: [...currentOptions, `Option ${currentOptions.length + 1}`]
     });
   };
 
   const updateOption = (optionIndex: number, value: string) => {
-    const updatedOptions = (field.options || []).map((opt, i) => 
+    const updatedOptions = (field.options || []).map((opt, i) =>
       i === optionIndex ? value : opt
     );
     onUpdate({ options: updatedOptions });
@@ -95,9 +95,8 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
   };
 
   return (
-    <div className={`bg-white/5 border rounded-2xl transition-all ${
-      isEditing ? 'border-[#8252e9] shadow-lg shadow-[#8252e9]/20' : 'border-white/10 hover:border-white/20'
-    }`}>
+    <div className={`bg-white/5 border rounded-2xl transition-all ${isEditing ? 'border-[#8252e9] shadow-lg shadow-[#8252e9]/20' : 'border-white/10 hover:border-white/20'
+      }`}>
       {/* Field Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -107,26 +106,25 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
             <p className="text-xs text-slate-400">{field.type.replace('_', ' ')}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           {isScorableField && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-400">Weight:</span>
-              <span className={`text-sm font-bold px-2 py-1 rounded ${
-                fieldWeight > 0 ? 'bg-[#8252e9]/20 text-[#8252e9]' : 'bg-slate-500/20 text-slate-400'
-              }`}>
+              <span className={`text-sm font-bold px-2 py-1 rounded ${fieldWeight > 0 ? 'bg-[#8252e9]/20 text-[#8252e9]' : 'bg-slate-500/20 text-slate-400'
+                }`}>
                 {fieldWeight}%
               </span>
             </div>
           )}
-          
+
           <div className="flex gap-2">
             <button
               onClick={onEdit}
               className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
             >
               <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2"/>
+                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2" />
               </svg>
             </button>
             <button
@@ -134,7 +132,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
               className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2"/>
+                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" />
               </svg>
             </button>
           </div>
@@ -193,7 +191,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                         className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 18L18 6M6 6l12 12" strokeWidth="2"/>
+                          <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" />
                         </svg>
                       </button>
                     )}
@@ -244,12 +242,11 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                 onChange={(e) => onUpdate({ required: e.target.checked })}
                 className="sr-only"
               />
-              <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${
-                field.required ? 'border-[#8252e9] bg-[#8252e9]' : 'border-white/20'
-              }`}>
+              <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${field.required ? 'border-[#8252e9] bg-[#8252e9]' : 'border-white/20'
+                }`}>
                 {field.required && (
                   <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M5 13l4 4L19 7" strokeWidth="3"/>
+                    <path d="M5 13l4 4L19 7" strokeWidth="3" />
                   </svg>
                 )}
               </div>
@@ -322,13 +319,13 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
   // Auto-adjust weights when fields are added/removed
   const autoAdjustWeights = (fields: FormField[]) => {
     if (fields.length === 0) return fields;
-    
+
     const scorableFields = fields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
     if (scorableFields.length === 0) return fields;
-    
+
     const baseWeight = Math.floor(100 / scorableFields.length);
     const remainder = 100 - (baseWeight * scorableFields.length);
-    
+
     return fields.map((field, index) => {
       if (['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(field.type)) {
         const scorableIndex = scorableFields.findIndex(f => f.id === field.id);
@@ -355,13 +352,13 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
 
     const updatedFields = [...template.fields, newField];
     const adjustedFields = autoAdjustWeights(updatedFields);
-    
+
     setTemplate(prev => ({ ...prev, fields: adjustedFields }));
     setEditingField(adjustedFields.length - 1);
   };
 
   const updateField = (index: number, updates: Partial<FormField>) => {
-    const updatedFields = template.fields.map((field, i) => 
+    const updatedFields = template.fields.map((field, i) =>
       i === index ? { ...field, ...updates } : field
     );
     setTemplate(prev => ({ ...prev, fields: updatedFields }));
@@ -376,14 +373,14 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
 
   const handleWeightChange = (index: number, newWeight: number) => {
     if (newWeight < 0 || newWeight > 100) return;
-    
+
     updateField(index, { weight: newWeight });
-    
+
     // Show warning if total exceeds 100
-    const newTotal = template.fields.reduce((sum, field, i) => 
+    const newTotal = template.fields.reduce((sum, field, i) =>
       sum + (i === index ? newWeight : (field.weight || 0)), 0
     );
-    
+
     if (newTotal > 100) {
       setShowWeightWarning(true);
       setTimeout(() => setShowWeightWarning(false), 3000);
@@ -407,9 +404,10 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
       const savedTemplate = await performanceService.createTemplate({
         title: template.title,
         description: template.description,
-        fields: template.fields
+        fields: template.fields,
+        is_global: template.isGlobal
       });
-      
+
       onSave(savedTemplate);
     } catch (error) {
       console.error('Failed to save template:', error);
@@ -425,11 +423,11 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
       const result = await generateFormTemplate(aiPrompt);
       if (result && result.fields) {
         const adjustedFields = autoAdjustWeights(result.fields);
-        setTemplate({ 
-          ...template, 
-          title: result.title || template.title, 
-          description: result.description || template.description, 
-          fields: adjustedFields 
+        setTemplate({
+          ...template,
+          title: result.title || template.title,
+          description: result.description || template.description,
+          fields: adjustedFields
         });
         setShowAiModal(false);
         setAiPrompt('');
@@ -447,19 +445,30 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
           <input type="text" value={template.title} onChange={(e) => setTemplate({ ...template, title: e.target.value })} className="text-4xl font-black text-slate-900 dark:text-white bg-transparent outline-none border-b-2 border-transparent focus:border-[#8252e9] w-full transition-all" placeholder="Template Title" />
         </div>
         <div className="flex gap-3 ml-8">
+          <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-white/10 px-4 py-2 rounded-xl hover:bg-white/10 transition-all">
+            <input
+              type="checkbox"
+              checked={template.isGlobal || false}
+              onChange={(e) => setTemplate({ ...template, isGlobal: e.target.checked })}
+              className="sr-only"
+            />
+            <div className={`w-10 h-5 rounded-full transition-all relative ${template.isGlobal ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+              <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${template.isGlobal ? 'left-6' : 'left-1'}`} />
+            </div>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Global Form</span>
+          </label>
           <button onClick={() => setShowAiModal(true)} className="px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-emerald-500/20 transition-all flex items-center gap-2">✨ AI Architect</button>
-          <button 
+          <button
             onClick={handleSave}
             disabled={!isWeightValid && template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))}
-            className={`px-8 py-3 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-xl transition-all flex items-center gap-2 ${
-              isWeightValid || !template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))
-                ? 'bg-[#8252e9] shadow-purple-500/20 hover:bg-[#6d39e0] active:scale-95' 
-                : 'bg-slate-500 cursor-not-allowed opacity-50'
-            }`}>
+            className={`px-8 py-3 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-xl transition-all flex items-center gap-2 ${isWeightValid || !template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))
+              ? 'bg-[#8252e9] shadow-purple-500/20 hover:bg-[#6d39e0] active:scale-95'
+              : 'bg-slate-500 cursor-not-allowed opacity-50'
+              }`}>
             {!isWeightValid && template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type)) ? (
               <>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2"/>
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2" />
                 </svg>
                 Fix Weights
               </>
@@ -496,18 +505,17 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
                   {totalWeight}%
                 </span>
               </div>
-              
+
               <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-3">
-                <div 
-                  className={`h-full transition-all duration-500 ${
-                    isWeightValid ? 'bg-emerald-500' : 
-                    totalWeight > 100 ? 'bg-red-500' : 
-                    'bg-yellow-500'
-                  }`}
+                <div
+                  className={`h-full transition-all duration-500 ${isWeightValid ? 'bg-emerald-500' :
+                    totalWeight > 100 ? 'bg-red-500' :
+                      'bg-yellow-500'
+                    }`}
                   style={{ width: `${Math.min(100, weightProgress)}%` }}
                 />
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <p className="text-[9px] text-slate-400">
                   {isWeightValid ? 'Perfect!' : totalWeight > 100 ? 'Over limit' : 'Incomplete'}
@@ -563,7 +571,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
         <div className="fixed top-4 right-4 z-50 bg-red-500/90 backdrop-blur-md text-white px-6 py-3 rounded-xl shadow-lg animate-in slide-in-from-right duration-300">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2"/>
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2" />
             </svg>
             <span className="font-bold text-sm">
               {totalWeight > 100 ? 'Total weight exceeds 100%' : 'Total weight must equal 100%'}
@@ -582,7 +590,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSa
                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2"><span className="text-2xl">✨</span> AI Form Architect</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Describe the evaluation requirements for strategy synthesis.</p>
               </div>
-              <button onClick={() => setShowAiModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3"/></svg></button>
+              <button onClick={() => setShowAiModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" /></svg></button>
             </div>
             <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="e.g. Build a performance evaluation for senior developers focusing on system architecture..." className="w-full h-40 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] p-6 text-sm text-slate-900 dark:text-white outline-none focus:border-emerald-500/50 transition-all mb-6 resize-none" />
             <div className="flex gap-3">

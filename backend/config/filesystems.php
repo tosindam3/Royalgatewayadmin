@@ -60,6 +60,14 @@ return [
             'report' => false,
         ],
 
+        'memo_attachments' => [
+            'driver' => 'local',
+            'root' => storage_path('app/memo_attachments'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

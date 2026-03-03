@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { Smartphone, Monitor, Navigation, Loader2, Building2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { organizationService } from '../../../../services/organizationService';
+import { getRobustLocation } from '../../../../services/geolocationService';
 
 interface ConfigFormProps {
     data: any;
@@ -13,7 +15,7 @@ interface ConfigFormProps {
 
 export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, error, isLoading }) => {
     const [isDetecting, setIsDetecting] = useState(false);
-    
+
     // Fetch branches
     const { data: branches = [] } = useQuery({
         queryKey: ['branches'],
@@ -30,31 +32,29 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
 
             <div className="space-y-6">
                 <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">Zone Name</label>
-                    <input
-                        type="text"
-                        placeholder="e.g. Headquarters, North Branch..."
-                        value={data.name || ''}
-                        onChange={(e) => onChange({ ...data, name: e.target.value })}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all"
-                    />
-                </div>
-
-                <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">
-                        Branch Assignment
-                    </label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 block">Branch Zone</label>
                     <div className="relative">
                         <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <select
                             value={data.branch_id || ''}
-                            onChange={(e) => onChange({ 
-                                ...data, 
-                                branch_id: e.target.value === '' ? null : parseInt(e.target.value) 
-                            })}
+                            onChange={(e) => {
+                                const branchId = e.target.value;
+                                const selectedBranch = branches.find((b: any) => String(b.id) === branchId);
+                                if (selectedBranch) {
+                                    onChange({
+                                        ...data,
+                                        name: selectedBranch.name,
+                                        branch_id: parseInt(branchId),
+                                        latitude: selectedBranch.latitude || data.latitude,
+                                        longitude: selectedBranch.longitude || data.longitude
+                                    });
+                                } else {
+                                    onChange({ ...data, branch_id: null, name: '' });
+                                }
+                            }}
                             className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all appearance-none cursor-pointer"
                         >
-                            <option value="">Global (All Branches)</option>
+                            <option value="">Select a Branch...</option>
                             {branches.map((branch: any) => (
                                 <option key={branch.id} value={branch.id}>
                                     {branch.name}
@@ -67,12 +67,8 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
                             </svg>
                         </div>
                     </div>
-                    <p className="text-[9px] text-slate-500 mt-1.5">
-                        {data.branch_id 
-                            ? 'This zone applies only to employees in the selected branch' 
-                            : 'This zone applies to all employees across all branches'}
-                    </p>
                 </div>
+
 
                 <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -97,39 +93,39 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
                     </div>
                     <button
                         onClick={async () => {
-                            if (navigator.geolocation) {
-                                setIsDetecting(true);
-                                navigator.geolocation.getCurrentPosition(async (pos) => {
-                                    const { latitude, longitude } = pos.coords;
-                                    let nameUpdate = data.name;
+                            setIsDetecting(true);
+                            console.log("[DEBUG] ConfigForm Geolocation v2.1 triggered");
+                            try {
+                                const { latitude, longitude } = await getRobustLocation();
+                                let nameUpdate = data.name;
 
-                                    if (!data.name || data.name.trim() === '') {
-                                        try {
-                                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-                                            const geoData = await response.json();
-                                            if (geoData.display_name) {
-                                                nameUpdate = geoData.display_name.split(',')[0];
-                                            }
-                                        } catch (e) {
-                                            console.error("Reverse geocode failed", e);
+                                if (!data.name || data.name.trim() === '') {
+                                    try {
+                                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                                        const geoData = await response.json();
+                                        if (geoData.display_name) {
+                                            nameUpdate = geoData.display_name.split(',')[0];
                                         }
+                                    } catch (e) {
+                                        console.error("Reverse geocode failed", e);
                                     }
+                                }
 
-                                    onChange({
-                                        ...data,
-                                        latitude,
-                                        longitude,
-                                        name: nameUpdate
-                                    });
-                                    setIsDetecting(false);
-                                }, (err) => {
-                                    console.error("Detection failed:", err);
-                                    setIsDetecting(false);
-                                }, {
-                                    enableHighAccuracy: true,
-                                    timeout: 10000,
-                                    maximumAge: 0
+                                onChange({
+                                    ...data,
+                                    latitude,
+                                    longitude,
+                                    name: nameUpdate
                                 });
+                            } catch (err: any) {
+                                let errorMsg = "Hardware signal lost. Please check GPS permissions.";
+                                if (err.code === 1) errorMsg = "Location access denied. Please enable permissions.";
+                                if (err.code === 3) errorMsg = "Signal timeout. Please try again outside.";
+
+                                toast.error("Telemetry Link Failed", { description: errorMsg });
+                                console.error("[DEBUG] ConfigForm Geolocation Error:", err);
+                            } finally {
+                                setIsDetecting(false);
                             }
                         }}
                         disabled={isDetecting}
@@ -194,8 +190,8 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
                         <button
                             onClick={() => onChange({ ...data, allowWeb: !data.allowWeb })}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${data.allowWeb
-                                    ? 'bg-purple-500/10 border-purple-500 text-purple-500'
-                                    : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500'
+                                ? 'bg-purple-500/10 border-purple-500 text-purple-500'
+                                : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500'
                                 }`}
                         >
                             <Monitor className="w-4 h-4" />
@@ -204,8 +200,8 @@ export const ConfigForm: React.FC<ConfigFormProps> = ({ data, onChange, onSave, 
                         <button
                             onClick={() => onChange({ ...data, allowApp: !data.allowApp })}
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all ${data.allowApp
-                                    ? 'bg-purple-500/10 border-purple-500 text-purple-500'
-                                    : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500'
+                                ? 'bg-purple-500/10 border-purple-500 text-purple-500'
+                                : 'bg-transparent border-slate-200 dark:border-white/10 text-slate-500'
                                 }`}
                         >
                             <Smartphone className="w-4 h-4" />

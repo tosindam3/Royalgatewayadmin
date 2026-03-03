@@ -34,7 +34,8 @@ class User extends Authenticatable
         'manager_id',
     ];
 
-    protected $appends = ['employee_id'];
+    protected $with = ['roles.permissions', 'employeeProfile'];
+    protected $appends = ['employee_id', 'display_name'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -110,6 +111,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Accessor for display_name
+     */
+    public function getDisplayNameAttribute()
+    {
+        return $this->employeeProfile?->full_name ?? $this->name;
+    }
+
+    /**
      * Attendance logs relationship
      */
     public function attendanceLogs()
@@ -122,7 +131,8 @@ class User extends Authenticatable
      */
     public function hasRole(string $roleName): bool
     {
-        return $this->roles()->where('name', $roleName)->exists();
+        // Internal consistency: roles are saved as slugs now
+        return $this->roles->contains('name', $roleName);
     }
 
     /**
@@ -130,7 +140,7 @@ class User extends Authenticatable
      */
     public function hasAnyRole(array $roleNames): bool
     {
-        return $this->roles()->whereIn('name', $roleNames)->exists();
+        return $this->roles->whereIn('name', $roleNames)->isNotEmpty();
     }
 
     /**
@@ -138,11 +148,18 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission, string $scope = null): bool
     {
+        // 1. Super Admin & CEO Bypass
+        if ($this->hasAnyRole(['super_admin', 'ceo'])) {
+            return true;
+        }
+
+        // 2. Check explicitly assigned roles
         foreach ($this->roles as $role) {
             if ($role->hasPermission($permission, $scope)) {
                 return true;
             }
         }
+        
         return false;
     }
 
@@ -187,6 +204,11 @@ class User extends Authenticatable
      */
     public function getPermissionScope(string $permission): ?string
     {
+        // Super Admin & CEO Bypass
+        if ($this->hasAnyRole(['super_admin', 'ceo'])) {
+            return 'all';
+        }
+
         $scopes = [];
 
         foreach ($this->roles as $role) {

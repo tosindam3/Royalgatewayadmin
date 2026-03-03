@@ -339,9 +339,31 @@ class EvaluationResponseController extends Controller
 
         $evaluation->approve(auth()->id(), $request->feedback);
 
+        // Update employee performance score in the latest open period
+        $score = $evaluation->calculated_score;
+        if ($score !== null) {
+            $period = \App\Models\PayrollPeriod::open()->orderBy('end_date', 'desc')->first();
+            if ($period) {
+                \App\Models\PerformanceMonthlyScore::updateOrCreate(
+                    [
+                        'employee_id' => $evaluation->employee_id,
+                        'period_id' => $period->id,
+                    ],
+                    [
+                        'score' => $score,
+                        'notes' => 'Auto-calculated from evaluation: ' . $evaluation->template->title,
+                    ]
+                );
+                
+                // Clear performance caches
+                \Illuminate\Support\Facades\Cache::forget('performance_dashboard_kpis');
+                \Illuminate\Support\Facades\Cache::forget('performance_team_data');
+            }
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Evaluation approved successfully',
+            'message' => 'Evaluation approved and score updated successfully',
             'data' => $evaluation->fresh(),
         ]);
     }

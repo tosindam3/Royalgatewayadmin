@@ -24,7 +24,8 @@ const GeofencingSubTab: React.FC = () => {
         isActive: true,
         isStrict: true,
         allowWeb: true,
-        allowApp: true
+        allowApp: true,
+        branch_id: null as number | null
     });
 
     const handleLocationChange = (lat: number, lng: number) => {
@@ -52,11 +53,12 @@ const GeofencingSubTab: React.FC = () => {
             latitude: formData.latitude,
             longitude: formData.longitude,
             radius: formData.radius,
-            geometry_type: 'circle', // Always circle for now
+            geometry_type: 'circle',
             is_active: formData.isActive,
             is_strict: formData.isStrict,
             allow_web: formData.allowWeb,
             allow_app: formData.allowApp,
+            branch_id: formData.branch_id
         };
 
         if (selectedZone) {
@@ -90,7 +92,8 @@ const GeofencingSubTab: React.FC = () => {
             isActive: true,
             isStrict: true,
             allowWeb: true,
-            allowApp: true
+            allowApp: true,
+            branch_id: null
         });
     };
 
@@ -126,17 +129,18 @@ const GeofencingSubTab: React.FC = () => {
                                     latitude: typeof z.latitude === 'string' ? parseFloat(z.latitude) : z.latitude,
                                     longitude: typeof z.longitude === 'string' ? parseFloat(z.longitude) : z.longitude,
                                     radius: typeof z.radius === 'string' ? parseInt(z.radius) : z.radius,
-                                    isActive: z.is_active ?? true,
-                                    isStrict: z.is_strict ?? true,
-                                    allowWeb: z.allow_web ?? true,
-                                    allowApp: z.allow_app ?? true,
+                                    isActive: z.is_active ?? z.isActive ?? true,
+                                    isStrict: z.is_strict ?? z.isStrict ?? true,
+                                    allowWeb: z.allow_web ?? z.allowWeb ?? true,
+                                    allowApp: z.allow_app ?? z.allowApp ?? true,
+                                    branch_id: z.branch_id
                                 });
                             }}
                             onDelete={(id) => deleteMutation.mutate(id)}
                             onToggle={(id) => {
                                 const zone = zones.find(z => z.id === id);
                                 if (zone) {
-                                    const currentStatus = zone.is_active ?? zone.isActive;
+                                    const currentStatus = (zone as any).is_active ?? zone.isActive ?? true;
                                     updateMutation.mutate({ id, data: { is_active: !currentStatus } });
                                 }
                             }}

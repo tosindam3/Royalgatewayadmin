@@ -34,6 +34,8 @@ class UpdateBranchRequest extends FormRequest
             'status' => 'sometimes|required|in:active,inactive',
             'is_hq' => 'boolean',
             'manager_id' => 'nullable|exists:employees,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ];
     }
 

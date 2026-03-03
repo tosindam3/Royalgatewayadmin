@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../../../../components/GlassCard';
 import { MapPin, Navigation, Signal, X, CheckCircle, XCircle } from 'lucide-react';
+import { getRobustLocation } from '../../../../services/geolocationService';
 
 interface TestValidationModalProps {
     isOpen: boolean;
@@ -45,43 +46,32 @@ const TestValidationModal: React.FC<TestValidationModalProps> = ({
             }
 
             setError(null);
-            addLog(`Starting sync (${useHighAccuracy ? 'Fine' : 'Coarse'} mode)...`);
-            
-            const onSuccess = (pos: GeolocationPosition) => {
-                setCurrentPos(pos);
-                const dist = calculateDistance(
-                    pos.coords.latitude,
-                    pos.coords.longitude,
-                    Number(targetLat),
-                    Number(targetLng)
-                );
-                setDistance(dist);
-                setError(null);
-                addLog(`Lock found at ${pos.coords.accuracy.toFixed(0)}m accuracy`);
-            };
+            addLog(`Starting sync (Auto-fallback enabled)...`);
 
-            const onError = (err: GeolocationPositionError) => {
-                console.error("Geolocation error:", err);
-                addLog(`Error: ${getErrorMessage(err)}`);
-                
-                if (useHighAccuracy && (err.code === 3 || err.code === 2)) {
-                    setUseHighAccuracy(false);
-                    setError("Signal weak. Switching to coarse mode...");
-                } else {
+            const getPos = async () => {
+                try {
+                    const loc = await getRobustLocation({ enableHighAccuracy: useHighAccuracy, timeout: 15000 });
+                    setCurrentPos({ coords: loc } as any);
+                    const dist = calculateDistance(
+                        loc.latitude,
+                        loc.longitude,
+                        Number(targetLat),
+                        Number(targetLng)
+                    );
+                    setDistance(dist);
+                    setError(null);
+                    addLog(`Lock found at ${loc.accuracy.toFixed(0)}m accuracy`);
+                } catch (err: any) {
+                    console.error("Geolocation error:", err);
+                    addLog(`Error: ${getErrorMessage(err)}`);
                     setError(getErrorMessage(err));
                 }
             };
 
-            const options = {
-                enableHighAccuracy: useHighAccuracy,
-                timeout: 15000,
-                maximumAge: 2000
-            };
+            getPos();
+            const intervalId = setInterval(getPos, 5000);
 
-            navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
-            const watchId = navigator.geolocation.watchPosition(onSuccess, onError, options);
-
-            return () => navigator.geolocation.clearWatch(watchId);
+            return () => clearInterval(intervalId);
         } else {
             setCurrentPos(null);
             setDistance(null);
@@ -111,11 +101,11 @@ const TestValidationModal: React.FC<TestValidationModalProps> = ({
     const isInside = distance !== null && distance <= radius;
 
     return (
-        <div 
+        <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
             onClick={onClose}
         >
-            <div 
+            <div
                 className="w-full max-w-md bg-white dark:bg-[#0d0a1a] rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl p-6 relative overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
@@ -133,8 +123,8 @@ const TestValidationModal: React.FC<TestValidationModalProps> = ({
 
                     <div className="space-y-4">
                         <div className={`p-6 rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all ${isInside
-                                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600'
-                                : 'bg-red-500/5 border-red-500/20 text-red-500'
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600'
+                            : 'bg-red-500/5 border-red-500/20 text-red-500'
                             }`}>
                             {isInside ? <CheckCircle className="w-12 h-12" /> : <XCircle className="w-12 h-12" />}
                             <div className="text-center">
@@ -146,7 +136,7 @@ const TestValidationModal: React.FC<TestValidationModalProps> = ({
                                 </p>
                             </div>
                         </div>
- 
+
                         {/* Status Feed */}
                         <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-3 border border-slate-200 dark:border-white/10">
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">

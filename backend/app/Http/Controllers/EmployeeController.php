@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Services\EmployeeService;
+use App\Services\ScopeEngine;
 use App\Http\Requests\UpdateEmployeeRequest;
 use Illuminate\Http\Request;
 use App\Traits\ApiResponse;
@@ -13,15 +14,36 @@ class EmployeeController extends Controller
     use ApiResponse;
 
     protected $employeeService;
+    protected $scopeEngine;
 
-    public function __construct(EmployeeService $employeeService)
+    public function __construct(EmployeeService $employeeService, ScopeEngine $scopeEngine)
     {
         $this->employeeService = $employeeService;
+        $this->scopeEngine = $scopeEngine;
     }
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        
+        if (!$user) {
+            return $this->error('Unauthorized', 401);
+        }
+        
+        $user->load(['roles.permissions', 'employeeProfile']);
+
+        // Check permission
+        if (!$user->hasPermission('employees.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
+        $scope = $user->getPermissionScope('employees.view');
         $query = Employee::with(['branch', 'department', 'designation', 'manager']);
+
+        // Apply RBAC scoping
+        if ($scope !== 'all') {
+            $this->scopeEngine->applyScopeLevel($query, $user, $scope);
+        }
 
         // Search functionality
         if ($request->filled('search')) {
@@ -77,6 +99,22 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        // Get authenticated user
+        $user = $request->user();
+        
+        // Check if user is authenticated
+        if (!$user) {
+            return $this->error('Unauthorized', 401);
+        }
+
+        // Load user relationships for permission checking
+        $user->load(['roles.permissions', 'employeeProfile']);
+
+        // Check permission
+        if (!$user->hasPermission('employees.create')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         // Manual validation
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
@@ -113,6 +151,16 @@ class EmployeeController extends Controller
 
     public function show($id)
     {
+        $user = auth()->user();
+        if (!$user->hasPermission('employees.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
+        $scope = $user->getPermissionScope('employees.view');
+        if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
+            return $this->error('Unauthorized to view this employee', 403);
+        }
+
         $employee = Employee::with(['branch', 'department', 'designation', 'manager', 'subordinates'])
             ->findOrFail($id);
 
@@ -121,6 +169,16 @@ class EmployeeController extends Controller
 
     public function update(UpdateEmployeeRequest $request, $id)
     {
+        $user = auth()->user();
+        if (!$user->hasPermission('employees.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
+        $scope = $user->getPermissionScope('employees.update');
+        if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
+            return $this->error('Unauthorized to update this employee', 403);
+        }
+
         try {
             $employee = Employee::findOrFail($id);
             $employee = $this->employeeService->updateEmployee($employee, $request->validated());
@@ -132,12 +190,50 @@ class EmployeeController extends Controller
 
     public function destroy($id)
     {
+        $user = auth()->user();
+        if (!$user->hasPermission('employees.delete')) {
+            return $this->error('Unauthorized', 403);
+        }
+
+        $scope = $user->getPermissionScope('employees.delete');
+        if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
+            return $this->error('Unauthorized to delete this employee', 403);
+        }
+
         try {
             $employee = Employee::findOrFail($id);
             $this->employeeService->deleteEmployee($employee);
             return $this->success(null, 'Employee deleted successfully');
         } catch (\Exception $e) {
             return $this->error('Failed to delete employee: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Helper method to check if user can access employee
+     */
+    protected function canAccessEmployee(int $employeeId, string $scope, $user): bool
+    {
+        if ($scope === 'all') {
+            return true;
+        }
+
+        $employee = Employee::find($employeeId);
+        if (!$employee || !$user->employeeProfile) {
+            return false;
+        }
+
+        switch ($scope) {
+            case 'branch':
+                return $employee->branch_id === $user->employeeProfile->branch_id;
+            case 'department':
+                return $employee->department_id === $user->employeeProfile->department_id;
+            case 'team':
+                return $employee->manager_id === $user->employeeProfile->id;
+            case 'self':
+                return $employee->id === $user->employeeProfile->id;
+            default:
+                return false;
         }
     }
 

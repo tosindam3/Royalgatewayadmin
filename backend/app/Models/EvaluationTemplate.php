@@ -18,6 +18,7 @@ class EvaluationTemplate extends Model
         'created_by',
         'cloned_from',
         'status',
+        'is_global',
         'published_at',
         'version',
     ];
@@ -25,6 +26,7 @@ class EvaluationTemplate extends Model
     protected $casts = [
         'sessions' => 'array',
         'metadata' => 'array',
+        'is_global' => 'boolean',
         'published_at' => 'datetime',
         'version' => 'integer',
     ];
@@ -63,6 +65,11 @@ class EvaluationTemplate extends Model
     public function scopePublished($query)
     {
         return $query->where('status', 'published');
+    }
+
+    public function scopeGlobal($query)
+    {
+        return $query->where('is_global', true)->where('status', 'published');
     }
 
     public function scopeDraft($query)

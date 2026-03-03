@@ -90,6 +90,14 @@ class BranchController extends Controller
         try {
             DB::beginTransaction();
 
+            // Validate HQ constraint: Only one branch can be HQ
+            if ($request->is_hq) {
+                $existingHQ = Branch::where('is_hq', true)->exists();
+                if ($existingHQ) {
+                    return $this->error('Only one branch can be designated as headquarters. Please unset the current HQ first.', 422);
+                }
+            }
+
             $branch = Branch::create($request->validated());
 
             // Update employee count
@@ -125,8 +133,14 @@ class BranchController extends Controller
      */
     public function show($id)
     {
-        $branch = Branch::with(['manager', 'departments', 'employees'])
-            ->findOrFail($id);
+        $branch = Branch::with([
+            'manager', 
+            'departments', 
+            'employees',
+            'geofenceZones',
+            'biometricDevices',
+            'workSchedules'
+        ])->findOrFail($id);
 
         return $this->success($branch);
     }
@@ -141,6 +155,16 @@ class BranchController extends Controller
 
             $branch = Branch::findOrFail($id);
             $oldData = $branch->toArray();
+
+            // Validate HQ constraint: Only one branch can be HQ
+            if ($request->has('is_hq') && $request->is_hq) {
+                $existingHQ = Branch::where('is_hq', true)
+                    ->where('id', '!=', $id)
+                    ->exists();
+                if ($existingHQ) {
+                    return $this->error('Only one branch can be designated as headquarters. Please unset the current HQ first.', 422);
+                }
+            }
 
             $branch->update($request->validated());
 
@@ -180,6 +204,22 @@ class BranchController extends Controller
             if ($branch->employees()->count() > 0) {
                 return $this->error(
                     'Cannot delete branch with active employees. Please reassign employees first.',
+                    422
+                );
+            }
+
+            // Check if branch has departments
+            if ($branch->departments()->count() > 0) {
+                return $this->error(
+                    'Cannot delete branch with departments. Please delete or reassign departments first.',
+                    422
+                );
+            }
+
+            // Prevent deletion of HQ
+            if ($branch->is_hq) {
+                return $this->error(
+                    'Cannot delete the headquarters branch. Please designate another branch as HQ first.',
                     422
                 );
             }
@@ -265,12 +305,22 @@ class BranchController extends Controller
         $activeEmployees = $branch->employees()->where('status', 'active')->count();
         $probationEmployees = $branch->employees()->where('status', 'probation')->count();
         $totalDepartments = $branch->departments()->count();
+        $totalGeofenceZones = $branch->geofenceZones()->count();
+        $activeGeofenceZones = $branch->geofenceZones()->where('is_active', true)->count();
+        $totalBiometricDevices = $branch->biometricDevices()->count();
+        $activeBiometricDevices = $branch->biometricDevices()->where('is_active', true)->count();
+        $totalWorkSchedules = $branch->workSchedules()->count();
 
         $stats = [
             'total_employees' => $totalEmployees,
             'active_employees' => $activeEmployees,
             'probation_employees' => $probationEmployees,
             'total_departments' => $totalDepartments,
+            'total_geofence_zones' => $totalGeofenceZones,
+            'active_geofence_zones' => $activeGeofenceZones,
+            'total_biometric_devices' => $totalBiometricDevices,
+            'active_biometric_devices' => $activeBiometricDevices,
+            'total_work_schedules' => $totalWorkSchedules,
             'attendance_today' => [
                 'present' => 0, // Will be implemented with attendance module
                 'late' => 0,
@@ -295,5 +345,67 @@ class BranchController extends Controller
         } catch (\Exception $e) {
             return $this->error('Failed to update counts: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Get geofence zones for a specific branch
+     */
+    public function geofenceZones($id)
+    {
+        $branch = Branch::findOrFail($id);
+        
+        $zones = $branch->geofenceZones()
+            ->orderBy('is_active', 'desc')
+            ->orderBy('name')
+            ->get();
+
+        return $this->success([
+            'branch' => $branch,
+            'geofence_zones' => $zones,
+            'total' => $zones->count(),
+            'active' => $zones->where('is_active', true)->count()
+        ]);
+    }
+
+    /**
+     * Get biometric devices for a specific branch
+     */
+    public function biometricDevices($id)
+    {
+        $branch = Branch::findOrFail($id);
+        
+        $devices = $branch->biometricDevices()
+            ->with('workplace')
+            ->orderBy('is_active', 'desc')
+            ->orderBy('device_name')
+            ->get();
+
+        return $this->success([
+            'branch' => $branch,
+            'biometric_devices' => $devices,
+            'total' => $devices->count(),
+            'active' => $devices->where('is_active', true)->count()
+        ]);
+    }
+
+    /**
+     * Get work schedules for a specific branch
+     */
+    public function workSchedules($id)
+    {
+        $branch = Branch::findOrFail($id);
+        
+        $schedules = $branch->workSchedules()
+            ->withCount('employees')
+            ->orderBy('is_active', 'desc')
+            ->orderBy('name')
+            ->get();
+
+        return $this->success([
+            'branch' => $branch,
+            'work_schedules' => $schedules,
+            'total' => $schedules->count(),
+            'active' => $schedules->where('is_active', true)->count()
+        ]);
     }
 }

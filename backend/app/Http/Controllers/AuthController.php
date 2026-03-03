@@ -17,7 +17,7 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::with(['roles', 'employeeProfile'])
+        $user = User::with(['roles.permissions', 'employeeProfile', 'primaryRole.permissions'])
             ->where('email', $credentials['email'])
             ->first();
 
@@ -30,9 +30,15 @@ class AuthController extends Controller
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        // Flatten permissions from all roles
+        $permissions = $user->roles->flatMap(function ($role) {
+            return $role->permissions;
+        })->unique('id')->values();
+
         return response()->json([
             'message' => 'Login successful',
             'user' => $user,
+            'permissions' => $permissions,
             'token' => $token
         ]);
     }
@@ -47,14 +53,24 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['employeeProfile', 'roles', 'primaryRole']);
+        $user = $request->user()->load([
+            'employeeProfile', 
+            'roles.permissions', 
+            'primaryRole.permissions'
+        ]);
 
         // Check if password change is required
         $passwordChangeRequired = $user->employeeProfile &&
             $user->employeeProfile->password_change_required;
 
+        // Flatten permissions from all roles
+        $permissions = $user->roles->flatMap(function ($role) {
+            return $role->permissions;
+        })->unique('id')->values();
+
         return response()->json([
             'user' => $user,
+            'permissions' => $permissions,
             'password_change_required' => $passwordChangeRequired,
         ]);
     }

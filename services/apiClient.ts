@@ -57,7 +57,7 @@ apiClient.interceptors.response.use(
             }
         } else if (status === 403) {
             toast.error('Access Restricted', {
-                description: 'Your identity role does not possess the required clearance.',
+                description: message || 'Your identity role does not possess the required clearance.',
             });
         } else if (status === 422) {
             // Validation error

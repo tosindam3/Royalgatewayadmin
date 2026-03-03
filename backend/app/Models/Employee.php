@@ -44,11 +44,16 @@ class Employee extends Model
         'allow_mobile_checkin' => 'boolean',
     ];
 
-    protected $appends = ['full_name', 'staff_id'];
+    protected $appends = ['full_name', 'staff_id', 'name'];
 
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    public function getNameAttribute(): string
+    {
+        return $this->full_name;
     }
 
     /**
@@ -61,41 +66,9 @@ class Employee extends Model
     }
 
     /**
-     * Auto-generate employee_code on creation
+     * Note: Employee code generation is handled by EmployeeService
+     * to avoid transaction conflicts with lockForUpdate
      */
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($employee) {
-            if (empty($employee->employee_code)) {
-                $employee->employee_code = self::generateEmployeeCode();
-            }
-        });
-    }
-
-    /**
-     * Generate unique employee code
-     * Format: RG-YYYY-NNNN (e.g., RG-2024-0001)
-     */
-    private static function generateEmployeeCode(): string
-    {
-        $year = date('Y');
-        
-        // Get the last employee code for this year
-        $lastEmployee = self::withTrashed()
-            ->where('employee_code', 'like', "RG-{$year}-%")
-            ->orderBy('employee_code', 'desc')
-            ->first();
-        
-        if ($lastEmployee && preg_match('/RG-\d{4}-(\d{4})/', $lastEmployee->employee_code, $matches)) {
-            $number = intval($matches[1]) + 1;
-        } else {
-            $number = 1;
-        }
-        
-        return "RG-{$year}-" . str_pad($number, 4, '0', STR_PAD_LEFT);
-    }
 
     public function branch()
     {
@@ -155,5 +128,14 @@ class Employee extends Model
     public function leaveRequests()
     {
         return $this->hasMany(LeaveRequest::class);
+    }
+
+    /**
+     * Scope for employees who should be visible in operations
+     * (e.g. Attendance, Payroll)
+     */
+    public function scopeOperational($query)
+    {
+        return $query->whereIn('status', ['active', 'probation']);
     }
 }

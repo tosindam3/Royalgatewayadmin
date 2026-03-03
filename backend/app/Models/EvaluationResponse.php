@@ -92,6 +92,11 @@ class EvaluationResponse extends Model
     /**
      * Helpers
      */
+    public function getCalculatedScoreAttribute()
+    {
+        return $this->calculateScore();
+    }
+
     public function calculateScore()
     {
         $template = $this->template;
@@ -106,16 +111,35 @@ class EvaluationResponse extends Model
             foreach ($session['fields'] ?? [] as $field) {
                 $weight = $field['weight'] ?? 0;
                 $fieldId = $field['id'];
+                $answer = $this->answers[$fieldId] ?? null;
 
-                if ($field['type'] === 'RATING' && isset($this->answers[$fieldId])) {
-                    $rating = (int) $this->answers[$fieldId];
+                if ($answer === null || $answer === '') continue;
+
+                if ($field['type'] === 'RATING') {
+                    $rating = (int) $answer;
                     $totalWeight += $weight;
-                    $weightedScore += ($rating / 5) * 100 * $weight;
+                    $weightedScore += ($rating / 5) * 100 * ($weight / 100);
+                } elseif ($field['type'] === 'KPI') {
+                    $value = (float) $answer;
+                    $totalWeight += $weight;
+                    $weightedScore += min(100, $value) * ($weight / 100);
+                } elseif ($field['type'] === 'MULTIPLE_CHOICE') {
+                    // Similar to frontend: first option = 100%, last = 0%
+                    $options = $field['options'] ?? [];
+                    if (!empty($options)) {
+                        $optionIndex = array_search($answer, $options);
+                        if ($optionIndex !== false) {
+                            $totalOptions = count($options);
+                            $fieldScore = (($totalOptions - $optionIndex) / $totalOptions) * 100;
+                            $totalWeight += $weight;
+                            $weightedScore += $fieldScore * ($weight / 100);
+                        }
+                    }
                 }
             }
         }
 
-        return $totalWeight > 0 ? round($weightedScore / $totalWeight, 2) : null;
+        return $totalWeight > 0 ? round(($weightedScore / ($totalWeight / 100)), 2) : null;
     }
 
     public function submitTo(int $userId, string $role = 'manager')

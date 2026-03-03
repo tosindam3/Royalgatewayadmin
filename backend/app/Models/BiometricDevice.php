@@ -13,6 +13,7 @@ class BiometricDevice extends Model
         'ip_address',
         'port',
         'location',
+        'branch_id',
         'workplace_id',
         'is_active',
         'last_sync',
@@ -27,5 +28,10 @@ class BiometricDevice extends Model
     public function workplace(): BelongsTo
     {
         return $this->belongsTo(Workplace::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

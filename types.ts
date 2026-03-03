@@ -9,10 +9,10 @@ export enum UserRole {
 export const mapBackendRoleToUserRole = (roles?: { name: string }[]): UserRole => {
   if (!roles || roles.length === 0) return UserRole.EMPLOYEE;
 
-  const roleNames = roles.map(r => r.name);
+  const roleNames = roles.map(r => r.name.toLowerCase().replace(/\s+/g, '_'));
   if (roleNames.includes('super_admin')) return UserRole.SUPER_ADMIN;
-  if (roleNames.includes('admin')) return UserRole.ADMIN;
-  if (roleNames.includes('hr_manager') || roleNames.includes('branch_manager') || roleNames.includes('department_head') || roleNames.includes('team_lead')) return UserRole.MANAGER;
+  if (roleNames.includes('admin') || roleNames.includes('hr_admin')) return UserRole.ADMIN;
+  if (roleNames.includes('hr_manager') || roleNames.includes('branch_manager') || roleNames.includes('department_head') || roleNames.includes('team_lead') || roleNames.includes('manager')) return UserRole.MANAGER;
 
   return UserRole.EMPLOYEE;
 };
@@ -299,6 +299,8 @@ export interface Branch {
   manager_name?: string;
   employee_count: number;
   device_count: number;
+  latitude?: number;
+  longitude?: number;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -376,6 +378,7 @@ export interface FormTemplate {
   description: string;
   fields: FormField[];
   createdAt: string;
+  isGlobal?: boolean;
 }
 
 export interface BrandSettings {
@@ -646,6 +649,7 @@ export interface EvaluationTemplate {
   total_questions?: number;
   is_editable?: boolean;
   can_be_cloned?: boolean;
+  is_global?: boolean;
   creator?: {
     id: number;
     name: string;

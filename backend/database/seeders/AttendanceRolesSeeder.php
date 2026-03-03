@@ -17,7 +17,7 @@ class AttendanceRolesSeeder extends Seeder
         $this->command->info('🔍 Checking existing roles...');
         
         // Verify roles exist
-        $requiredRoles = ['super_admin', 'hr_manager', 'branch_manager', 'department_head', 'team_lead', 'employee'];
+        $requiredRoles = ['super_admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head', 'employee'];
         $existingRoles = Role::whereIn('name', $requiredRoles)->pluck('name')->toArray();
         
         if (count($existingRoles) < count($requiredRoles)) {

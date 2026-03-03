@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class EmployeeService
@@ -18,27 +19,25 @@ class EmployeeService
      */
     public function generateEmployeeCode(int $branchId): string
     {
-        return DB::transaction(function () use ($branchId) {
-            // Get the last employee code (numeric only)
-            $lastEmployee = Employee::withTrashed()
-                ->whereRaw('employee_code REGEXP \'^[0-9]+$\'')
-                ->orderByRaw('CAST(employee_code AS UNSIGNED) DESC')
-                ->lockForUpdate()
-                ->first();
+        // NOTE: Always call this from within an outer DB::transaction (e.g. createEmployee).
+        // Do NOT wrap in its own transaction — nested transactions with lockForUpdate
+        // cause a PDO conflict on MySQL, which was causing the 500 error on employee creation.
+        $lastEmployee = Employee::withTrashed()
+            ->whereRaw("employee_code REGEXP '^[0-9]+$'")
+            ->orderByRaw('CAST(employee_code AS UNSIGNED) DESC')
+            ->lockForUpdate()
+            ->first();
 
-            if ($lastEmployee) {
-                $lastCode = (int) $lastEmployee->employee_code;
-                $nextCode = $lastCode + 1;
-            } else {
-                // Start from 1001 for first employee
-                $nextCode = 1001;
-            }
+        if ($lastEmployee) {
+            $lastCode = (int) $lastEmployee->employee_code;
+            $nextCode = $lastCode + 1;
+        } else {
+            // Start from 1001 for first employee
+            $nextCode = 1001;
+        }
 
-            // Format as 4-digit zero-padded number
-            $employeeCode = sprintf('%04d', $nextCode);
-
-            return $employeeCode;
-        });
+        // Format as 4-digit zero-padded number
+        return sprintf('%04d', $nextCode);
     }
 
     /**
@@ -47,6 +46,14 @@ class EmployeeService
     public function createEmployee(array $data): Employee
     {
         return DB::transaction(function () use ($data) {
+            // Sanitize empty strings to null for nullable fields
+            $nullableFields = ['manager_id', 'blood_group', 'genotype', 'academics'];
+            foreach ($nullableFields as $field) {
+                if (isset($data[$field]) && $data[$field] === '') {
+                    $data[$field] = null;
+                }
+            }
+
             // Generate employee code if not provided
             if (!isset($data['employee_code'])) {
                 $data['employee_code'] = $this->generateEmployeeCode($data['branch_id']);
@@ -67,7 +74,7 @@ class EmployeeService
                     'status' => 'active',
                     'branch_id' => $data['branch_id'] ?? null,
                     'department_id' => $data['department_id'] ?? null,
-                    'manager_id' => $data['manager_id'] ?? null,
+                    'manager_id' => $data['manager_id'],
                     'primary_role_id' => $primaryRoleId,
                 ]);
 
@@ -95,17 +102,22 @@ class EmployeeService
 
             $employee = Employee::create($data);
 
-            // Log audit trail
-            if (class_exists(\App\Services\AuditLogger::class)) {
-                app(\App\Services\AuditLogger::class)->log(
-                    'employee_created',
-                    $employee,
-                    null,
-                    array_merge($employee->toArray(), [
-                        'user_account_created' => $user !== null,
-                        'employee_code' => $employee->employee_code,
-                    ])
-                );
+            // Log audit trail (wrapped in try/catch so a logging failure never rolls back the creation)
+            try {
+                if (class_exists(\App\Services\AuditLogger::class)) {
+                    \App\Services\AuditLogger::log(
+                        'employee_created',
+                        $employee,
+                        null,
+                        array_merge($employee->toArray(), [
+                            'user_account_created' => $user !== null,
+                            'employee_code' => $employee->employee_code,
+                        ])
+                    );
+                }
+            } catch (\Exception $auditEx) {
+                // Audit logging failed — log to error channel but don't abort the transaction
+                \Illuminate\Support\Facades\Log::error('Audit log failed for employee_created: ' . $auditEx->getMessage());
             }
 
             return $employee->load(['branch', 'department', 'designation', 'manager', 'user']);

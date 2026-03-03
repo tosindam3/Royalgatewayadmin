@@ -18,7 +18,7 @@ export const employeeService = {
         return apiClient.post('/hr-core/employees', data);
     },
 
-    update: async (id: string, data: any): Promise<Employee> => {
+    update: async (id: string | number, data: any): Promise<Employee> => {
         return apiClient.put(`/hr-core/employees/${id}`, data);
     },
 

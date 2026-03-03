@@ -17,6 +17,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getRobustLocation } from '../../services/geolocationService';
 
 interface AttendanceClockModalProps {
     isOpen: boolean;
@@ -73,34 +74,30 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
         }
 
         // 2. Geofence Validation
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
-                    setPosition({ lat, lng, accuracy: pos.coords.accuracy });
-                    setLocationAllowed(true);
+        try {
+            const loc = await getRobustLocation();
+            const lat = loc.latitude;
+            const lng = loc.longitude;
+            setPosition({ lat, lng, accuracy: loc.accuracy });
+            setLocationAllowed(true);
 
-                    const matchedZone = geofences.find(zone => {
-                        const dist = calculateDistance(lat, lng, Number(zone.latitude), Number(zone.longitude));
-                        return dist <= Number(zone.radius);
-                    });
+            const matchedZone = geofences.find(zone => {
+                const dist = calculateDistance(lat, lng, Number(zone.latitude), Number(zone.longitude));
+                return dist <= Number(zone.radius);
+            });
 
-                    if (!matchedZone && geofences.length > 0) {
-                        setRestrictionSource('GEOFENCE');
-                        setErrorMsg('Boundary: Outside Operations Zone.');
-                    }
-                    setIsValidating(false);
-                },
-                (err) => {
-                    setLocationAllowed(false);
-                    setErrorMsg('Hardware: Signal Lock Required.');
-                    setIsValidating(false);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        } else {
-            setErrorMsg('Hardware: Geolocation Null.');
+            if (!matchedZone && geofences.length > 0) {
+                setRestrictionSource('GEOFENCE');
+                setErrorMsg('Boundary: Outside Operations Zone.');
+            }
+        } catch (err: any) {
+            setLocationAllowed(false);
+            if (err.code === 1) {
+                setErrorMsg('Hardware: Location Access Denied.');
+            } else {
+                setErrorMsg('Hardware: Signal Lock Required.');
+            }
+        } finally {
             setIsValidating(false);
         }
     };
@@ -157,7 +154,7 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
                 <div className="w-full max-w-md bg-white dark:bg-[#0a0a0f] rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-2xl dark:shadow-[0_0_50px_rgba(0,0,0,0.5)] relative overflow-hidden group my-auto">
                     {/* Cyber Scanline Effect - only visible in dark mode to maintain professional light mode */}
                     <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.03] bg-[linear-gradient(rgba(18,16,33,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(0,0,0,0.02),rgba(0,0,0,0.01),rgba(0,0,0,0.02))] dark:bg-[linear-gradient(rgba(18,16,33,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]" />
-                    
+
                     {/* Dynamic Ambient Glow */}
                     <div className={`absolute -top-32 -right-32 w-80 h-80 blur-[100px] rounded-full opacity-20 dark:opacity-30 transition-all duration-1000 ${isBlocked ? 'bg-red-500 animate-pulse' : isCheckedIn ? 'bg-amber-500' : 'bg-purple-500'}`} />
                     <div className={`absolute -bottom-32 -left-32 w-80 h-80 blur-[100px] rounded-full opacity-10 dark:opacity-20 transition-all duration-1000 ${isCheckedIn ? 'bg-orange-500' : 'bg-indigo-500'}`} />
@@ -183,12 +180,12 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
                             <div className="absolute inset-0 bg-purple-500/5 blur-3xl opacity-50" />
                             <div className="relative flex flex-col items-center justify-center py-8 md:py-10 bg-slate-50 dark:bg-white/5 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-inner dark:shadow-2xl backdrop-blur-md overflow-hidden">
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(130,82,233,0.05),transparent)] dark:bg-[radial-gradient(circle_at_center,rgba(130,82,233,0.1),transparent)] pointer-events-none" />
-                                
+
                                 <div className="flex items-center gap-1.5 mb-2">
                                     <Clock className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-500">Current Time</span>
                                 </div>
-                                
+
                                 <div className="flex items-baseline gap-1">
                                     <span className="text-5xl md:text-6xl font-black tracking-tighter tabular-nums text-slate-900 dark:text-white drop-shadow-sm dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
                                         {currentTime.getHours().toString().padStart(2, '0')}:{currentTime.getMinutes().toString().padStart(2, '0')}
@@ -197,7 +194,7 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
                                         {currentTime.getSeconds().toString().padStart(2, '0')}
                                     </span>
                                 </div>
-                                
+
                                 <div className="mt-4 px-4 py-1.5 bg-white dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
                                     <p className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 italic">
                                         {currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
@@ -249,8 +246,8 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
                                     onClick={handleClockAction}
                                     disabled={isValidating || checkInMutation.isPending || checkOutMutation.isPending}
                                     className={`w-full py-6 md:py-7 rounded-[2.5rem] text-white font-black uppercase tracking-[0.2em] md:tracking-[0.3em] text-base md:text-lg shadow-2xl transition-all relative overflow-hidden group/btn ${isCheckedIn
-                                            ? 'bg-amber-600 shadow-amber-500/20 hover:bg-amber-500'
-                                            : 'bg-purple-600 shadow-purple-500/20 hover:bg-purple-500 hover:scale-[1.02]'
+                                        ? 'bg-amber-600 shadow-amber-500/20 hover:bg-amber-500'
+                                        : 'bg-purple-600 shadow-purple-500/20 hover:bg-purple-500 hover:scale-[1.02]'
                                         } active:scale-95 disabled:opacity-50 disabled:grayscale`}
                                 >
                                     <div className="relative flex items-center justify-center gap-3 md:gap-4 z-10">
@@ -280,8 +277,9 @@ const AttendanceClockModal: React.FC<AttendanceClockModalProps> = ({ isOpen, onC
                     </div>
                 </div>
             </div>
-            
-            <style dangerouslySetInnerHTML={{ __html: `
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @keyframes shimmer {
                     100% { transform: translateX(100%); }
                 }

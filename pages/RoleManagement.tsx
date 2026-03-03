@@ -29,7 +29,7 @@ const RoleManagement: React.FC = () => {
     const { data: permissionMatrix, isLoading: isPermissionsLoading } = useQuery({
         queryKey: ['permission-matrix'],
         queryFn: () => rbacService.getPermissionMatrix(),
-        enabled: activeTab === 'permissions'
+        enabled: activeTab === 'permissions' || isPermissionModalOpen
     });
 
     const { data: rolePermissions, isLoading: isRolePermsLoading } = useQuery({
@@ -106,7 +106,7 @@ const RoleManagement: React.FC = () => {
 
     const handleSavePermissions = () => {
         if (!selectedRole) return;
-        
+
         const permissions = Object.entries(selectedPermissions).map(([permId, scope]) => ({
             permission_id: parseInt(permId),
             scope_level: scope
@@ -152,12 +152,12 @@ const RoleManagement: React.FC = () => {
             );
             if (!confirmed) return;
         }
-        
+
         const finalConfirm = confirm(
             `Are you sure you want to delete the role "${role.display_name}"?\n\n` +
             `This action cannot be undone.`
         );
-        
+
         if (finalConfirm) {
             deleteMutation.mutate(role.id);
         }
@@ -200,11 +200,10 @@ const RoleManagement: React.FC = () => {
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key as any)}
-                        className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] relative transition-all flex items-center gap-2 ${
-                            activeTab === tab.key 
-                                ? 'text-slate-900 dark:text-white' 
+                        className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] relative transition-all flex items-center gap-2 ${activeTab === tab.key
+                                ? 'text-slate-900 dark:text-white'
                                 : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                        }`}
+                            }`}
                     >
                         {tab.label}
                         {tab.count !== null && (
@@ -268,11 +267,10 @@ const RoleManagement: React.FC = () => {
                                         </div>
                                         <div>
                                             <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Status</p>
-                                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${
-                                                role.is_active
+                                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase border ${role.is_active
                                                     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                     : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                                            }`}>
+                                                }`}>
                                                 {role.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </div>
@@ -339,8 +337,8 @@ const RoleManagement: React.FC = () => {
                                 <div>
                                     <h4 className="text-sm font-black text-purple-500 uppercase mb-1">System Permissions</h4>
                                     <p className="text-xs text-slate-400">
-                                        These are all available permissions in the system. To assign permissions to a role, go to the Roles tab, 
-                                        select a role, and click the "Permissions" button. Each permission can be assigned with different scope levels 
+                                        These are all available permissions in the system. To assign permissions to a role, go to the Roles tab,
+                                        select a role, and click the "Permissions" button. Each permission can be assigned with different scope levels
                                         (All, Branch, Department, Team, or Self).
                                     </p>
                                 </div>

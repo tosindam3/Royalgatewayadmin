@@ -22,6 +22,10 @@ class ScopeEngine
      */
     public function getUserScope(User $user, string $permission): string
     {
+        if ($user->hasAnyRole(['super_admin', 'ceo'])) {
+            return 'all';
+        }
+
         $scopes = [];
         
         foreach ($user->roles as $role) {

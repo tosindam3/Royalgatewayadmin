@@ -233,7 +233,7 @@ class AttendanceController extends Controller
                 return [
                     'id'            => $checkIn?->id ?? $checkOut?->id,
                     'employee_id'   => $emp?->id,
-                    'employee_name' => $emp?->user?->name ?? 'Unknown',
+                    'employee_name' => $emp?->full_name ?? 'Unknown',
                     'status'        => $checkOut ? 'checked_out' : ($checkIn ? 'present' : 'absent'),
                     'check_in'      => $checkIn?->timestamp?->format('H:i:s'),
                     'check_out'     => $checkOut?->timestamp?->format('H:i:s'),
@@ -251,7 +251,7 @@ class AttendanceController extends Controller
     public function overview()
     {
         $today = now()->toDateString();
-        $totalEmployees = \App\Models\Employee::where('status', 'active')->count();
+        $totalEmployees = \App\Models\Employee::operational()->count();
 
         $todayLogs = \App\Models\AttendanceLog::whereDate('timestamp', $today)->get();
         $presentIds = $todayLogs->where('check_type', 'check_in')->pluck('employee_id')->unique();
@@ -284,7 +284,7 @@ class AttendanceController extends Controller
     public function dailySummary(Request $request)
     {
         $date = $request->get('date', now()->toDateString());
-        $totalEmployees = \App\Models\Employee::where('status', 'active')->count();
+        $totalEmployees = \App\Models\Employee::operational()->count();
 
         $logs = \App\Models\AttendanceLog::with(['employee' => function ($q) {
             $q->with(['user:id,name', 'department:id,name']);
@@ -313,7 +313,7 @@ class AttendanceController extends Controller
             return [
                 'id'            => $checkIn?->id ?? $checkOut?->id,
                 'employee_id'   => $emp?->id,
-                'employee_name' => $emp?->user?->name ?? 'Unknown',
+                'employee_name' => $emp?->full_name ?? 'Unknown',
                 'department'    => $emp?->department?->name ?? '—',
                 'check_in'      => $checkIn?->timestamp?->format('H:i:s'),
                 'check_out'     => $checkOut?->timestamp?->format('H:i:s'),
@@ -370,7 +370,7 @@ class AttendanceController extends Controller
             $results[] = [
                 'id'             => $checkIn->id,
                 'employee_id'    => $emp?->id,
-                'employee_name'  => $emp?->user?->name ?? 'Unknown',
+                'employee_name'  => $emp?->full_name ?? 'Unknown',
                 'date'           => $checkIn->timestamp->toDateString(),
                 'regular_hours'  => $scheduledHours,
                 'overtime_hours' => $overtimeHours,

@@ -6,11 +6,20 @@ use Illuminate\Database\Seeder;
 use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
+        // Disable foreign key checks to truncate safely
+        Schema::disableForeignKeyConstraints();
+        DB::table('role_permissions')->truncate();
+        DB::table('user_roles')->truncate();
+        DB::table('permissions')->truncate();
+        DB::table('roles')->truncate();
+        Schema::enableForeignKeyConstraints();
+
         DB::transaction(function () {
             // Create Permissions
             $permissions = $this->createPermissions();
@@ -27,7 +36,7 @@ class RolePermissionSeeder extends Seeder
     {
         $modules = [
             'employees' => ['view', 'create', 'update', 'delete', 'export'],
-            'attendance' => ['view', 'clock', 'correct', 'approve-correction', 'export'],
+            'attendance' => ['view', 'clock', 'correct', 'approve-correction', 'export', 'settings'],
             'leave' => ['view', 'apply', 'approve', 'reject', 'cancel', 'export'],
             'payroll' => ['view', 'process', 'approve', 'export'],
             'performance' => ['view', 'create', 'update', 'approve', 'export'],
@@ -87,11 +96,11 @@ class RolePermissionSeeder extends Seeder
                 'is_system' => true,
                 'is_active' => true,
             ]),
-            
-            'admin' => Role::create([
-                'name' => 'admin',
-                'display_name' => 'Administrator',
-                'description' => 'Organization-wide administrative access',
+
+            'ceo' => Role::create([
+                'name' => 'ceo',
+                'display_name' => 'CEO',
+                'description' => 'Executive level oversight and organizational reporting',
                 'default_scope' => 'all',
                 'is_system' => true,
                 'is_active' => true,
@@ -124,15 +133,6 @@ class RolePermissionSeeder extends Seeder
                 'is_active' => true,
             ]),
             
-            'team_lead' => Role::create([
-                'name' => 'team_lead',
-                'display_name' => 'Team Lead',
-                'description' => 'Team management and direct reports',
-                'default_scope' => 'team',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
-            
             'employee' => Role::create([
                 'name' => 'employee',
                 'display_name' => 'Employee',
@@ -146,83 +146,51 @@ class RolePermissionSeeder extends Seeder
 
     private function assignPermissions(array $roles, array $permissions): void
     {
-        // Super Admin - All permissions with 'all' scope
-        $superAdminPerms = [];
+        // Super Admin & CEO - All permissions with 'all' scope
+        $fullAccessPerms = [];
         foreach ($permissions as $permission) {
-            $superAdminPerms[$permission->id] = ['scope_level' => 'all'];
+            $fullAccessPerms[$permission->id] = ['scope_level' => 'all'];
         }
-        $roles['super_admin']->permissions()->sync($superAdminPerms);
+        $roles['super_admin']->permissions()->sync($fullAccessPerms);
+        $roles['ceo']->permissions()->sync($fullAccessPerms);
 
-        // Admin - Most permissions with 'all' scope
-        $adminPerms = [];
+        // HR Manager - Full HR scope
+        $hrPerms = [];
         foreach ($permissions as $key => $permission) {
-            if (!str_starts_with($key, 'roles.') && !str_starts_with($key, 'workflows.')) {
-                $adminPerms[$permission->id] = ['scope_level' => 'all'];
+            // HR Managers usually shouldn't delete roles or workflows unless they are also admins
+            $scope = str_contains($key, 'delete') ? 'branch' : 'all';
+            if (str_starts_with($key, 'roles.') || str_starts_with($key, 'workflows.')) {
+                $scope = 'none';
+            }
+            
+            if ($scope !== 'none') {
+                $hrPerms[$permission->id] = ['scope_level' => 'all'];
             }
         }
-        $roles['admin']->permissions()->sync($adminPerms);
-
-        // HR Manager
-        $hrPerms = [
-            'employees.view' => 'all',
-            'employees.create' => 'all',
-            'employees.update' => 'all',
-            'employees.export' => 'all',
-            'attendance.view' => 'all',
-            'attendance.approve-correction' => 'all',
-            'leave.view' => 'all',
-            'leave.approve' => 'all',
-            'leave.reject' => 'all',
-            'payroll.view' => 'all',
-            'performance.view' => 'all',
-            'performance.approve' => 'all',
-            'onboarding.view' => 'all',
-            'onboarding.create' => 'all',
-            'onboarding.assign-tasks' => 'all',
-            'reports.view' => 'all',
-            'analytics.view' => 'all',
-        ];
-        $this->syncPermissions($roles['hr_manager'], $permissions, $hrPerms);
+        $roles['hr_manager']->permissions()->sync($hrPerms);
 
         // Branch Manager
-        $branchPerms = [
-            'employees.view' => 'branch',
-            'employees.update' => 'branch',
-            'attendance.view' => 'branch',
-            'attendance.approve-correction' => 'branch',
-            'leave.view' => 'branch',
-            'leave.approve' => 'branch',
-            'leave.reject' => 'branch',
-            'performance.view' => 'branch',
-            'performance.approve' => 'branch',
-            'reports.view' => 'branch',
-        ];
-        $this->syncPermissions($roles['branch_manager'], $permissions, $branchPerms);
+        $branchPerms = [];
+        foreach ($permissions as $key => $permission) {
+            $module = explode('.', $key)[0];
+            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports', 'payroll'])) {
+                $branchPerms[$permission->id] = ['scope_level' => 'branch'];
+            }
+        }
+        $roles['branch_manager']->permissions()->sync($branchPerms);
 
         // Department Head
-        $deptPerms = [
-            'employees.view' => 'department',
-            'attendance.view' => 'department',
-            'leave.view' => 'department',
-            'leave.approve' => 'department',
-            'performance.view' => 'department',
-            'reports.view' => 'department',
-        ];
-        $this->syncPermissions($roles['department_head'], $permissions, $deptPerms);
-
-        // Team Lead
-        $teamPerms = [
-            'employees.view' => 'team',
-            'attendance.view' => 'team',
-            'leave.view' => 'team',
-            'leave.approve' => 'team',
-            'performance.view' => 'team',
-            'performance.create' => 'team',
-        ];
-        $this->syncPermissions($roles['team_lead'], $permissions, $teamPerms);
+        $deptPerms = [];
+        foreach ($permissions as $key => $permission) {
+            $module = explode('.', $key)[0];
+            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports'])) {
+                $deptPerms[$permission->id] = ['scope_level' => 'department'];
+            }
+        }
+        $roles['department_head']->permissions()->sync($deptPerms);
 
         // Employee
-        $employeePerms = [
+        $employeeModules = [
             'employees.view' => 'self',
             'attendance.view' => 'self',
             'attendance.clock' => 'self',
@@ -231,7 +199,13 @@ class RolePermissionSeeder extends Seeder
             'leave.apply' => 'self',
             'performance.view' => 'self',
         ];
-        $this->syncPermissions($roles['employee'], $permissions, $employeePerms);
+        $empPerms = [];
+        foreach ($employeeModules as $key => $scope) {
+            if (isset($permissions[$key])) {
+                $empPerms[$permissions[$key]->id] = ['scope_level' => $scope];
+            }
+        }
+        $roles['employee']->permissions()->sync($empPerms);
     }
 
     private function syncPermissions(Role $role, array $allPermissions, array $permissionMap): void

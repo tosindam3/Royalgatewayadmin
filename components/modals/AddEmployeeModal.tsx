@@ -128,9 +128,43 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
 
     const createMutation = useMutation({
         mutationFn: async (data: typeof formData) => {
+            // Transform string IDs to numbers and clean up empty strings
+            const cleanedData = {
+                ...data,
+                branch_id: data.branch_id ? parseInt(data.branch_id.toString()) : null,
+                department_id: data.department_id ? parseInt(data.department_id.toString()) : null,
+                designation_id: data.designation_id ? parseInt(data.designation_id.toString()) : null,
+                manager_id: data.manager_id ? parseInt(data.manager_id.toString()) : null,
+                primary_role_id: data.primary_role_id ? parseInt(data.primary_role_id.toString()) : null,
+                // Clean up empty strings for nullable fields
+                blood_group: data.blood_group || null,
+                genotype: data.genotype || null,
+                academics: data.academics || null,
+                // Remove password fields for edit mode
+                ...(isEditMode ? {
+                    password: undefined,
+                    password_confirmation: undefined,
+                    create_user_account: undefined,
+                    role_ids: undefined,
+                    primary_role_id: undefined,
+                } : {}),
+            };
+
+            // Debug logging
+            console.log('Original form data:', data);
+            console.log('Cleaned data being sent to API:', cleanedData);
+            console.log('Is edit mode:', isEditMode);
+            console.log('Employee ID:', employee?.id);
+
             if (isEditMode && employee) {
-                // Update employee
-                const updatedEmployee = await employeeService.update(employee.id, data);
+                // Update employee - remove undefined fields
+                const updateData = Object.fromEntries(
+                    Object.entries(cleanedData).filter(([_, value]) => value !== undefined)
+                );
+                
+                console.log('Final update data:', updateData);
+                
+                const updatedEmployee = await employeeService.update(employee.id.toString(), updateData);
                 
                 // Update roles if user account exists
                 if (employee.user_id && data.role_ids.length > 0) {
@@ -145,7 +179,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
             }
             
             // Create new employee
-            const newEmployee = await employeeService.hire(data);
+            const newEmployee = await employeeService.hire(cleanedData);
             
             // Assign roles if user account was created
             if (data.create_user_account && newEmployee.user_id && data.role_ids.length > 0) {
@@ -170,9 +204,40 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
             if (!isEditMode) resetForm();
         },
         onError: (error: any) => {
+            console.error('Employee creation error:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            console.error('Error config:', error.config);
+            
+            let errorMessage = 'Failed to add employee';
+            let validationErrors: Record<string, string[]> = {};
+            
+            if (error.response?.status === 422) {
+                // Handle validation errors
+                if (error.response.data?.errors) {
+                    validationErrors = error.response.data.errors;
+                    setErrors(Object.fromEntries(
+                        Object.entries(validationErrors).map(([key, messages]) => [
+                            key, 
+                            Array.isArray(messages) ? messages[0] : messages
+                        ])
+                    ));
+                    errorMessage = 'Please check the form for validation errors';
+                } else if (error.response.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.response?.data?.errors) {
+                const allErrors = Object.values(error.response.data.errors).flat();
+                errorMessage = allErrors.join(', ');
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
             toast.error(
                 isEditMode ? 'Failed to update employee' : 'Failed to add employee', 
-                { description: error.message }
+                { description: errorMessage }
             );
         }
     });
@@ -260,13 +325,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
             if (!formData.designation_id) {
                 newErrors.designation_id = 'Designation is required';
             }
-            if (!formData.hire_date) {
-                newErrors.hire_date = 'Hire date is required';
-            }
         }
 
         if (currentStep === 4) {
             // Step 4: Details validation
+            if (!formData.hire_date) {
+                newErrors.hire_date = 'Hire date is required';
+            }
             if (!formData.dob) {
                 newErrors.dob = 'Date of birth is required';
             } else {
@@ -692,44 +757,83 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Branch</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                                        Branch <span className="text-red-500">*</span>
+                                    </label>
                                     <select
                                         value={formData.branch_id}
-                                        onChange={(e) => setFormData({ ...formData, branch_id: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all"
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, branch_id: e.target.value });
+                                            if (errors.branch_id) setErrors({ ...errors, branch_id: '' });
+                                        }}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.branch_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
                                     >
                                         <option value="">Select Branch</option>
                                         {branches.map((b: any) => (
                                             <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
+                                    {errors.branch_id && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {errors.branch_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Department</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                                        Department <span className="text-red-500">*</span>
+                                    </label>
                                     <select
                                         value={formData.department_id}
-                                        onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all"
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, department_id: e.target.value });
+                                            if (errors.department_id) setErrors({ ...errors, department_id: '' });
+                                        }}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.department_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
                                     >
                                         <option value="">Select Department</option>
                                         {departments.map((d: any) => (
                                             <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
                                     </select>
+                                    {errors.department_id && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {errors.department_id}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Designation</label>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                                    Designation <span className="text-red-500">*</span>
+                                </label>
                                 <select
                                     value={formData.designation_id}
-                                    onChange={(e) => setFormData({ ...formData, designation_id: e.target.value })}
-                                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all"
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, designation_id: e.target.value });
+                                        if (errors.designation_id) setErrors({ ...errors, designation_id: '' });
+                                    }}
+                                    className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.designation_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
                                 >
                                     <option value="">Select Designation</option>
                                     {designations.map((d: any) => (
                                         <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
                                 </select>
+                                {errors.designation_id && (
+                                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        {errors.designation_id}
+                                    </p>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
@@ -761,26 +865,52 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                     )}
 
 
-                    {step === 3 && (
+                    {step === 4 && (
                         <div className="space-y-6 animate-in fade-in duration-500">
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Hire Date</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                                        Hire Date <span className="text-red-500">*</span>
+                                    </label>
                                     <input
                                         type="date"
                                         value={formData.hire_date}
-                                        onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all"
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, hire_date: e.target.value });
+                                            if (errors.hire_date) setErrors({ ...errors, hire_date: '' });
+                                        }}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.hire_date ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all`}
                                     />
+                                    {errors.hire_date && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {errors.hire_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Date of Birth</label>
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">
+                                        Date of Birth <span className="text-red-500">*</span>
+                                    </label>
                                     <input
                                         type="date"
                                         value={formData.dob}
-                                        onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all"
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, dob: e.target.value });
+                                            if (errors.dob) setErrors({ ...errors, dob: '' });
+                                        }}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.dob ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all`}
                                     />
+                                    {errors.dob && (
+                                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                            {errors.dob}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-6">

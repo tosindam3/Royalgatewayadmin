@@ -15,9 +15,9 @@ class PerformanceSystemSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::where('role', 'admin')->first() ?? User::first();
+        $admin = User::first();
         if (!$admin) {
-            $this->command->error('No admin user found to attribute templates to.');
+            $this->command->error('No users found.');
             return;
         }
 
@@ -76,12 +76,12 @@ class PerformanceSystemSeeder extends Seeder
             'template_id' => $standardTemplate->id,
         ]);
 
-        $employees = Employee::where('status', 'active')->limit(10)->get();
+        $employees = Employee::with('user')->where('status', 'active')->limit(10)->get();
         
         $this->command->info('Seeding Participants and Responses for ' . $employees->count() . ' employees...');
 
         foreach ($employees as $employee) {
-            $evaluator = $employee->user->manager_id ?? $admin->id;
+            $evaluator = $employee->user?->manager_id ?? $admin->id;
 
             // Create Participant
             $participant = CycleParticipant::create([

@@ -12,9 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Using token-based authentication (Sanctum tokens) instead of stateful API
-        // Removed stateful middleware to avoid CSRF token requirements
-        
+        // Global middleware
+        $middleware->use([
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
         // Register custom middleware aliases
         $middleware->alias([
             'attendance.access' => \App\Http\Middleware\AttendanceAccessMiddleware::class,

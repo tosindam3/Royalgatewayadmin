@@ -28,11 +28,11 @@ class AttendanceScopeService
             ];
         }
 
-        // Check roles - using existing role names
+        // Check roles - using standardized slugs
         $roles = $user->roles->pluck('name')->toArray();
         
-        // Super Admin / Admin - Full access
-        if (in_array('super_admin', $roles) || in_array('admin', $roles) || in_array('hr_manager', $roles)) {
+        // Super Admin / CEO / HR Manager - Full access
+        if (in_array('super_admin', $roles) || in_array('ceo', $roles) || in_array('hr_manager', $roles)) {
             return [
                 'scope' => 'all',
                 'employee_ids' => Employee::where('status', 'active')->pluck('id')->toArray(),

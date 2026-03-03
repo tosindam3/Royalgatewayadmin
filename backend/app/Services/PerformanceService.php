@@ -149,7 +149,7 @@ class PerformanceService
             )
             ->get();
 
-        return $participants->map(function ($p) {
+        $evaluations = $participants->map(function ($p) {
             return [
                 'id' => $p->id,
                 'employee_id' => $p->employee_id,
@@ -158,8 +158,36 @@ class PerformanceService
                 'department' => $p->department_name ?? 'N/A',
                 'status' => $p->status,
                 'cycle_id' => $p->cycle_id,
+                'type' => 'cycle',
             ];
         })->toArray();
+
+        // Add global templates that have no response from this employee
+        $globalTemplates = \App\Models\EvaluationTemplate::global()->get();
+        foreach ($globalTemplates as $template) {
+            $hasResponded = \App\Models\EvaluationResponse::where('template_id', $template->id)
+                ->where('employee_id', $user->employee_id)
+                ->where('evaluator_id', $userId)
+                ->exists();
+
+            if (!$hasResponded) {
+                $employee = $user->employee;
+                $evaluations[] = [
+                    'id' => 'global_' . $template->id,
+                    'template_id' => $template->id,
+                    'employee_id' => $user->employee_id,
+                    'employee_name' => 'Self-Evaluation',
+                    'employee_code' => $employee->employee_code,
+                    'department' => $employee->department->name ?? 'N/A',
+                    'status' => 'pending',
+                    'cycle_id' => null,
+                    'type' => 'global',
+                    'title' => $template->title,
+                ];
+            }
+        }
+
+        return $evaluations;
     }
 
     /**
