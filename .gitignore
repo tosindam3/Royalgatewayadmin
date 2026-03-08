@@ -7,10 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output (generated, not source)
 dist
 dist-ssr
+build
+
+# Environment files (contain secrets)
 *.local
+.env.local
+.env.production
+.env.*.local
 
 # Editor directories and files
 .vscode/*
@@ -23,13 +32,20 @@ dist-ssr
 *.sln
 *.sw?
 
-# Documentation and test files (exclude from production)
-*.md
-!README.md
-*test*.php
-*verify*.php
-*cleanup*.php
-*delete*.php
-*fix*.php
+# Debug and temporary files (NOT needed for production)
+debug_*.txt
+*_dump.json
+*_out.json
 *.backup
-*.example
+*.cache
+
+# Scripts (NOT needed for production)
+scripts/
+/scripts/
+
+# Debug components
+components/debug/
+
+# Documentation
+/docs/
+docs/

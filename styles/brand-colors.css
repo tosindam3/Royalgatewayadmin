@@ -1,0 +1,166 @@
+/* Brand Color System - Global CSS Variables */
+
+:root {
+  /* Primary brand color - dynamically set from settings */
+  --brand-primary: #8252e9;
+  --brand-primary-rgb: 130, 82, 233;
+  
+  /* Brand color variations */
+  --brand-primary-light: color-mix(in srgb, var(--brand-primary) 80%, white);
+  --brand-primary-dark: color-mix(in srgb, var(--brand-primary) 80%, black);
+  
+  /* Opacity variations */
+  --brand-primary-10: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  --brand-primary-20: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  --brand-primary-30: color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  --brand-primary-50: color-mix(in srgb, var(--brand-primary) 50%, transparent);
+  --brand-primary-80: color-mix(in srgb, var(--brand-primary) 80%, transparent);
+}
+
+/* Utility classes for brand colors */
+.bg-brand-primary {
+  background-color: var(--brand-primary);
+}
+
+.text-brand-primary {
+  color: var(--brand-primary);
+}
+
+.border-brand-primary {
+  border-color: var(--brand-primary);
+}
+
+.shadow-brand-primary {
+  box-shadow: 0 20px 25px -5px var(--brand-primary-20), 
+              0 8px 10px -6px var(--brand-primary-20);
+}
+
+.hover\:bg-brand-primary:hover {
+  background-color: var(--brand-primary);
+}
+
+.hover\:text-brand-primary:hover {
+  color: var(--brand-primary);
+}
+
+.focus\:border-brand-primary:focus {
+  border-color: var(--brand-primary);
+}
+
+.focus\:ring-brand-primary:focus {
+  --tw-ring-color: var(--brand-primary);
+}
+
+/* Button variants */
+.btn-brand-primary {
+  background-color: var(--brand-primary);
+  color: white;
+  box-shadow: 0 20px 25px -5px var(--brand-primary-20), 
+              0 8px 10px -6px var(--brand-primary-20);
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-brand-primary:hover {
+  transform: scale(1.02);
+}
+
+.btn-brand-primary:active {
+  transform: scale(0.95);
+}
+
+/* Active states */
+.sidebar-active {
+  color: var(--brand-primary);
+  background: var(--brand-primary-10);
+}
+
+/* Tab indicators */
+.tab-indicator {
+  background-color: var(--brand-primary);
+  box-shadow: 0 0 8px var(--brand-primary);
+}
+
+/* Progress bars */
+.progress-bar {
+  background-color: var(--brand-primary);
+}
+
+/* Badges */
+.badge-brand {
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+/* Links */
+.link-brand {
+  color: var(--brand-primary);
+}
+
+.link-brand:hover {
+  color: var(--brand-primary-dark);
+}
+
+/* Focus rings */
+.focus-ring-brand:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Gradients */
+.gradient-brand {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+}
+
+/* Animations */
+@keyframes pulse-brand {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-brand {
+  animation: pulse-brand 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Glow effects */
+.glow-brand {
+  box-shadow: 0 0 20px var(--brand-primary-30);
+}
+
+.glow-brand-strong {
+  box-shadow: 0 0 30px var(--brand-primary-50);
+}
+
+/* Shimmer effect for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 1000px 100%;
+}

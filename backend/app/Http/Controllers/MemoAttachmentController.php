@@ -20,18 +20,27 @@ class MemoAttachmentController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
         
+        $maxSize = config('memo.max_attachment_size', 10485760); // 10MB default
+        $allowedMimes = config('memo.allowed_mime_types', []);
+        
         $request->validate([
             'file' => [
                 'required',
                 'file',
-                'max:' . (config('memo.max_attachment_size') / 1024),
-                'mimes:' . implode(',', array_map(function ($mime) {
-                    return explode('/', $mime)[1];
-                }, config('memo.allowed_mime_types'))),
+                'max:' . ($maxSize / 1024), // Convert to KB
             ],
         ]);
         
         $file = $request->file('file');
+        
+        // Validate MIME type
+        if (!empty($allowedMimes) && !in_array($file->getMimeType(), $allowedMimes)) {
+            return response()->json([
+                'message' => 'Invalid file type. Allowed types: PDF, Word, Excel, PowerPoint, Images, Text files.',
+                'errors' => ['file' => ['The file type is not allowed.']]
+            ], 422);
+        }
+        
         $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
         $path = $file->storeAs('', $filename, 'memo_attachments');
         

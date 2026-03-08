@@ -176,6 +176,16 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
 
       {/* Hero Section */}
       <section id="home" className="relative z-10 pt-48 pb-32 px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
+        {/* Hero Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/HR360_bg.jpg" 
+            alt="HR360 Background" 
+            className="w-full h-full object-cover opacity-20 dark:opacity-10"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white/30 to-white dark:from-[#0d0a1a]/50 dark:via-[#0d0a1a]/30 dark:to-[#0d0a1a]" />
+        </div>
+
         <div className="max-w-6xl mx-auto text-center relative z-20">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />

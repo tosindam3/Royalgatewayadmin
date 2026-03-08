@@ -247,6 +247,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
               <Button
                 type="submit"
                 isLoading={isAuthenticating}
+                loadingText="Authenticating..."
                 className="w-full mt-10 py-5 rounded-full"
                 style={{ backgroundColor: brand.primaryColor, boxShadow: `0 12px 32px -8px ${brand.primaryColor}80` }}
               >

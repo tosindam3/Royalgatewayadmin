@@ -235,4 +235,21 @@ class User extends Authenticatable
         return $scopes[0];
     }
 
+    /**
+     * Chat channels relationship
+     */
+    public function chatChannels(): BelongsToMany
+    {
+        return $this->belongsToMany(ChatChannel::class, 'chat_channel_members', 'user_id', 'channel_id')
+            ->withPivot(['role', 'is_pinned', 'is_muted', 'last_read_at'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Chat messages relationship
+     */
+    public function chatMessages()
+    {
+        return $this->hasMany(ChatMessage::class, 'user_id');
+    }
 }

@@ -184,7 +184,13 @@ class MemoController extends Controller
         $memo = Memo::findOrFail($id);
         $userId = Auth::id();
         
-        $recipient = $memo->recipients()->where('recipient_id', $userId)->firstOrFail();
+        // Only recipients can mark memos as read, not senders
+        $recipient = $memo->recipients()->where('recipient_id', $userId)->first();
+        
+        if (!$recipient) {
+            return response()->json(['message' => 'You are not a recipient of this memo'], 400);
+        }
+        
         $recipient->markAsRead();
         
         return response()->json(['message' => 'Marked as read']);

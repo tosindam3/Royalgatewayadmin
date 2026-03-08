@@ -11,6 +11,9 @@ Route::prefix('v1')->group(function () {
     Route::get('/user', [App\Http\Controllers\AuthController::class, 'user'])->middleware('auth:sanctum');
     Route::post('/change-password', [App\Http\Controllers\AuthController::class, 'changePassword'])->middleware('auth:sanctum');
 
+    // Broadcasting Auth
+    Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
+
     // HR Core Module Routes
     Route::prefix('hr-core')->group(function () {
         // Attendance System (ZKTeco + Mobile)
@@ -270,48 +273,50 @@ Route::prefix('v1')->group(function () {
 
     // Performance Management Routes
     Route::prefix('performance')->middleware('auth:sanctum')->group(function () {
-        // Dashboard & Analytics
-        Route::get('/dashboard', [App\Http\Controllers\PerformanceController::class, 'dashboard']);
-        Route::get('/team-performance', [App\Http\Controllers\PerformanceController::class, 'teamPerformance']);
-        Route::get('/insights', [App\Http\Controllers\PerformanceController::class, 'insights']);
-        Route::get('/employees/{employeeId}/stats', [App\Http\Controllers\PerformanceController::class, 'employeeStats']);
+        // Submissions
+        Route::get('/submissions', [App\Http\Controllers\PerformanceController::class, 'index']);
+        Route::post('/submissions', [App\Http\Controllers\PerformanceController::class, 'store']);
 
-        // Evaluation Templates
-        Route::get('/templates', [App\Http\Controllers\EvaluationTemplateController::class, 'index']);
-        Route::post('/templates', [App\Http\Controllers\EvaluationTemplateController::class, 'store']);
-        Route::get('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'show']);
-        Route::patch('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'update']);
-        Route::delete('/templates/{id}', [App\Http\Controllers\EvaluationTemplateController::class, 'destroy']);
+        // Drafts
+        Route::get('/drafts/my-draft', [App\Http\Controllers\PerformanceController::class, 'getDraft']);
+        Route::post('/drafts/save', [App\Http\Controllers\PerformanceController::class, 'saveDraft']);
 
-        // Evaluation Responses
-        Route::get('/evaluations', [App\Http\Controllers\EvaluationResponseController::class, 'index']);
-        Route::get('/evaluations/pending', [App\Http\Controllers\EvaluationResponseController::class, 'pending']);
-        Route::get('/evaluations/pending-review', [App\Http\Controllers\EvaluationResponseController::class, 'pendingReview']);
-        Route::post('/evaluations', [App\Http\Controllers\EvaluationResponseController::class, 'store']);
-        Route::get('/evaluations/{id}', [App\Http\Controllers\EvaluationResponseController::class, 'show']);
-        Route::patch('/evaluations/{id}', [App\Http\Controllers\EvaluationResponseController::class, 'update']);
-        Route::post('/evaluations/{id}/submit', [App\Http\Controllers\EvaluationResponseController::class, 'submit']);
-        Route::post('/evaluations/{id}/approve', [App\Http\Controllers\EvaluationResponseController::class, 'approve']);
-        Route::post('/evaluations/{id}/reject', [App\Http\Controllers\EvaluationResponseController::class, 'reject']);
+        // Analytics & Leaderboard
+        Route::get('/analytics/personal', [App\Http\Controllers\PerformanceController::class, 'personalAnalytics']);
+        Route::get('/analytics/branch', [App\Http\Controllers\PerformanceController::class, 'branchAnalytics']);
+        Route::get('/leaderboard', [App\Http\Controllers\PerformanceController::class, 'leaderboard']);
+        Route::get('/department-summaries', [App\Http\Controllers\PerformanceController::class, 'departmentSummaries']);
+        Route::get('/analytics', [App\Http\Controllers\PerformanceController::class, 'analytics']);
 
-        // Review Cycles
-        Route::get('/cycles', [App\Http\Controllers\ReviewCycleController::class, 'index']);
-        Route::post('/cycles', [App\Http\Controllers\ReviewCycleController::class, 'store']);
-        Route::get('/cycles/{id}', [App\Http\Controllers\ReviewCycleController::class, 'show']);
-        Route::patch('/cycles/{id}', [App\Http\Controllers\ReviewCycleController::class, 'update']);
-        Route::post('/cycles/{id}/launch', [App\Http\Controllers\ReviewCycleController::class, 'launch']);
-        Route::post('/cycles/{id}/participants', [App\Http\Controllers\ReviewCycleController::class, 'addParticipants']);
+        // Template resolution for employees (must be before /{id} routes)
+        Route::get('/configs/for-employee', [App\Http\Controllers\PerformanceController::class, 'getConfigForEmployee']);
+        Route::get('/configs/department/{departmentId}', [App\Http\Controllers\PerformanceController::class, 'getConfigByDepartment']);
 
-        // Goals & OKRs
-        Route::get('/goals', [App\Http\Controllers\GoalController::class, 'index']);
-        Route::post('/goals', [App\Http\Controllers\GoalController::class, 'store']);
-        Route::get('/goals/{id}', [App\Http\Controllers\GoalController::class, 'show']);
-        Route::patch('/goals/{id}', [App\Http\Controllers\GoalController::class, 'update']);
-        Route::post('/goals/{goalId}/key-results/{krId}/update', [App\Http\Controllers\GoalController::class, 'updateKeyResult']);
+        // Config CRUD
+        Route::get('/configs', [App\Http\Controllers\PerformanceController::class, 'getConfigs']);
+        Route::post('/configs', [App\Http\Controllers\PerformanceController::class, 'createConfig']);
+        Route::get('/configs/{id}', [App\Http\Controllers\PerformanceController::class, 'getConfig']);
+        Route::put('/configs/{id}', [App\Http\Controllers\PerformanceController::class, 'updateConfig']);
+        Route::delete('/configs/{id}', [App\Http\Controllers\PerformanceController::class, 'deleteConfig']);
+
+        // Template lifecycle actions
+        Route::post('/configs/{id}/publish', [App\Http\Controllers\PerformanceController::class, 'publishConfig']);
+        Route::post('/configs/{id}/revert', [App\Http\Controllers\PerformanceController::class, 'revertConfig']);
+        Route::post('/configs/{id}/archive', [App\Http\Controllers\PerformanceController::class, 'archiveConfig']);
+        Route::post('/configs/{id}/clone', [App\Http\Controllers\PerformanceController::class, 'cloneConfig']);
     });
 
     // Memo System Routes
     Route::prefix('memos')->middleware('auth:sanctum')->group(function () {
+        // Search & Stats (must be before /{id})
+        Route::get('/search', [App\Http\Controllers\MemoController::class, 'search']);
+        Route::get('/stats', [App\Http\Controllers\MemoController::class, 'stats']);
+        
+        // Bulk operations (must be before /{id})
+        Route::post('/bulk-send', [App\Http\Controllers\MemoController::class, 'bulkSend']);
+        Route::post('/bulk-delete', [App\Http\Controllers\MemoController::class, 'bulkDelete']);
+        Route::post('/bulk-read', [App\Http\Controllers\MemoController::class, 'bulkMarkAsRead']);
+        
         // Main CRUD
         Route::get('/', [App\Http\Controllers\MemoController::class, 'index']);
         Route::post('/', [App\Http\Controllers\MemoController::class, 'store']);
@@ -319,27 +324,18 @@ Route::prefix('v1')->group(function () {
         Route::put('/{id}', [App\Http\Controllers\MemoController::class, 'update']);
         Route::delete('/{id}', [App\Http\Controllers\MemoController::class, 'destroy']);
         
-        // Actions
+        // Actions on specific memos
         Route::post('/{id}/reply', [App\Http\Controllers\MemoController::class, 'reply']);
         Route::post('/{id}/forward', [App\Http\Controllers\MemoController::class, 'forward']);
         Route::post('/{id}/star', [App\Http\Controllers\MemoController::class, 'toggleStar']);
         Route::post('/{id}/read', [App\Http\Controllers\MemoController::class, 'markAsRead']);
         Route::post('/{id}/move', [App\Http\Controllers\MemoController::class, 'moveToFolder']);
         
-        // Bulk operations
-        Route::post('/bulk-send', [App\Http\Controllers\MemoController::class, 'bulkSend']);
-        Route::post('/bulk-delete', [App\Http\Controllers\MemoController::class, 'bulkDelete']);
-        Route::post('/bulk-read', [App\Http\Controllers\MemoController::class, 'bulkMarkAsRead']);
-        
-        // Search & Stats
-        Route::get('/search', [App\Http\Controllers\MemoController::class, 'search']);
-        Route::get('/stats', [App\Http\Controllers\MemoController::class, 'stats']);
-        
-        // Attachments
-        Route::post('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'upload']);
-        Route::get('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'index']);
+        // Attachments (specific routes before parameterized ones)
         Route::get('/attachments/{attachmentId}/download', [App\Http\Controllers\MemoAttachmentController::class, 'download']);
         Route::delete('/attachments/{attachmentId}', [App\Http\Controllers\MemoAttachmentController::class, 'destroy']);
+        Route::post('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'upload']);
+        Route::get('/{id}/attachments', [App\Http\Controllers\MemoAttachmentController::class, 'index']);
     });
 
     // Memo Signatures
@@ -357,5 +353,63 @@ Route::prefix('v1')->group(function () {
         Route::post('/', [App\Http\Controllers\MemoFolderController::class, 'store']);
         Route::put('/{id}', [App\Http\Controllers\MemoFolderController::class, 'update']);
         Route::delete('/{id}', [App\Http\Controllers\MemoFolderController::class, 'destroy']);
+    });
+
+    // Brand Settings Routes
+    Route::prefix('brand-settings')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [App\Http\Controllers\BrandSettingsController::class, 'index']);
+        Route::put('/', [App\Http\Controllers\BrandSettingsController::class, 'update']);
+        Route::post('/reset', [App\Http\Controllers\BrandSettingsController::class, 'reset']);
+        Route::get('/history', [App\Http\Controllers\BrandSettingsController::class, 'history']);
+    });
+
+    // Team Chat Routes
+    Route::prefix('chat')->middleware('auth:sanctum')->group(function () {
+        // Channels
+        Route::get('/channels', [App\Http\Controllers\ChatChannelController::class, 'index']);
+        Route::post('/channels', [App\Http\Controllers\ChatChannelController::class, 'store']);
+        Route::get('/channels/{channel}', [App\Http\Controllers\ChatChannelController::class, 'show']);
+        Route::put('/channels/{channel}', [App\Http\Controllers\ChatChannelController::class, 'update']);
+        Route::delete('/channels/{channel}', [App\Http\Controllers\ChatChannelController::class, 'destroy']);
+        Route::post('/channels/{channel}/archive', [App\Http\Controllers\ChatChannelController::class, 'toggleArchive']);
+        Route::post('/channels/{channel}/pin', [App\Http\Controllers\ChatChannelController::class, 'togglePin']);
+        Route::post('/channels/{channel}/mute', [App\Http\Controllers\ChatChannelController::class, 'toggleMute']);
+        Route::post('/channels/{channel}/read', [App\Http\Controllers\ChatChannelController::class, 'markAsRead']);
+        Route::get('/channels/{channel}/stats', [App\Http\Controllers\ChatChannelController::class, 'stats']);
+        
+        // Channel Members
+        Route::post('/channels/{channel}/members', [App\Http\Controllers\ChatChannelController::class, 'addMembers']);
+        Route::delete('/channels/{channel}/members/{userId}', [App\Http\Controllers\ChatChannelController::class, 'removeMember']);
+        Route::put('/channels/{channel}/members/{userId}/role', [App\Http\Controllers\ChatChannelController::class, 'updateMemberRole']);
+        
+        // Messages
+        Route::get('/channels/{channel}/messages', [App\Http\Controllers\ChatMessageController::class, 'index']);
+        Route::post('/channels/{channel}/messages', [App\Http\Controllers\ChatMessageController::class, 'store']);
+        Route::get('/channels/{channel}/messages/{message}', [App\Http\Controllers\ChatMessageController::class, 'show']);
+        Route::put('/channels/{channel}/messages/{message}', [App\Http\Controllers\ChatMessageController::class, 'update']);
+        Route::delete('/channels/{channel}/messages/{message}', [App\Http\Controllers\ChatMessageController::class, 'destroy']);
+        
+        // Message Reactions
+        Route::post('/channels/{channel}/messages/{message}/reactions', [App\Http\Controllers\ChatMessageController::class, 'addReaction']);
+        Route::delete('/channels/{channel}/messages/{message}/reactions/{emoji}', [App\Http\Controllers\ChatMessageController::class, 'removeReaction']);
+        
+        // Typing Indicators
+        Route::post('/channels/{channel}/typing', [App\Http\Controllers\ChatMessageController::class, 'setTyping']);
+        Route::get('/channels/{channel}/typing', [App\Http\Controllers\ChatMessageController::class, 'getTypingUsers']);
+        
+        // Admin Routes
+        Route::prefix('admin')->group(function () {
+            Route::get('/analytics', [App\Http\Controllers\ChatAdminController::class, 'analytics']);
+            Route::get('/message-activity', [App\Http\Controllers\ChatAdminController::class, 'messageActivity']);
+            Route::get('/top-channels', [App\Http\Controllers\ChatAdminController::class, 'topChannels']);
+            Route::get('/top-users', [App\Http\Controllers\ChatAdminController::class, 'topUsers']);
+            Route::get('/compliance-settings', [App\Http\Controllers\ChatAdminController::class, 'getComplianceSettings']);
+            
+            // Blocked Keywords
+            Route::get('/blocked-keywords', [App\Http\Controllers\ChatAdminController::class, 'getBlockedKeywords']);
+            Route::post('/blocked-keywords', [App\Http\Controllers\ChatAdminController::class, 'addBlockedKeyword']);
+            Route::put('/blocked-keywords/{keyword}', [App\Http\Controllers\ChatAdminController::class, 'updateBlockedKeyword']);
+            Route::delete('/blocked-keywords/{keyword}', [App\Http\Controllers\ChatAdminController::class, 'deleteBlockedKeyword']);
+        });
     });
 });

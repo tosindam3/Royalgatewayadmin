@@ -7,6 +7,9 @@ export const authService = {
         if (response.token) {
             localStorage.setItem('royalgateway_auth_token', response.token);
         }
+        if (response.user) {
+            localStorage.setItem('royalgateway_user', JSON.stringify(response.user));
+        }
         return response.user;
     },
 
@@ -23,6 +26,9 @@ export const authService = {
     getUser: async () => {
         try {
             const response: any = await apiClient.get('/user');
+            if (response && response.user) {
+                localStorage.setItem('royalgateway_user', JSON.stringify(response.user));
+            }
             return response;
         } catch (error) {
             return null;

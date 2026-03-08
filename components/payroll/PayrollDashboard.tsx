@@ -122,7 +122,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ runs, meta, onSendT
                                 <p className="text-[#10b981] text-xs font-black">N120, 245</p>
                                 <p className="text-[9px] text-slate-500 font-bold uppercase">Feb 10,2025</p>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                 <LineChart data={paymentHistoryData}>
                                     <defs>
                                         <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
@@ -156,7 +156,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ runs, meta, onSendT
                     <GlassCard title="Employee Type" action={<button className="text-slate-500">•••</button>}>
                         <div className="h-[300px] w-full mt-6 flex flex-col items-center justify-center">
                             <div className="relative w-full h-full">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                     <PieChart>
                                         <Pie
                                             data={employeeTypeData}

@@ -29,10 +29,20 @@ class OrganizationSetting extends Model
     }
 
     /**
-     * Clear cache on save
+     * Clear cache on save and delete
      */
     protected static function booted()
     {
-        static::saved(fn() => Cache::forget('settings.*'));
+        static::saved(function ($setting) {
+            Cache::forget("settings.{$setting->key}");
+            Cache::forget('brand_settings');
+            Cache::tags(['settings'])->flush();
+        });
+
+        static::deleted(function ($setting) {
+            Cache::forget("settings.{$setting->key}");
+            Cache::forget('brand_settings');
+            Cache::tags(['settings'])->flush();
+        });
     }
 }

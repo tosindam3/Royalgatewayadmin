@@ -1,608 +1,597 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import GlassCard from './GlassCard';
-import { FormField, FormFieldType, FormTemplate } from '../types';
-import { generateFormTemplate } from '../services/geminiService';
-import performanceService from '../services/performanceService';
+import { performanceService } from '../services/performanceService';
+import { toast } from 'sonner';
+import {
+  Plus, Trash2, ChevronUp, ChevronDown,
+  GripVertical, Settings2, Sparkles, Save,
+  Globe, Landmark, Building2, AlertTriangle,
+  FileText, CheckCircle2, ArrowLeft, XCircle, RefreshCw
+} from 'lucide-react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-// Add CSS for slider styling
-const sliderStyles = `
-  .slider::-webkit-slider-thumb {
-    appearance: none;
-    height: 20px;
-    width: 20px;
-    border-radius: 50%;
-    background: #8252e9;
-    cursor: pointer;
-    box-shadow: 0 0 10px rgba(130, 82, 233, 0.5);
-  }
-  
-  .slider::-moz-range-thumb {
-    height: 20px;
-    width: 20px;
-    border-radius: 50%;
-    background: #8252e9;
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 0 10px rgba(130, 82, 233, 0.5);
-  }
-`;
-
-// Inject styles
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.type = 'text/css';
-  styleSheet.innerText = sliderStyles;
-  document.head.appendChild(styleSheet);
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-interface FieldEditorProps {
-  field: FormField;
-  index: number;
-  isEditing: boolean;
-  onEdit: () => void;
-  onUpdate: (updates: Partial<FormField>) => void;
-  onRemove: () => void;
-  onWeightChange: (weight: number) => void;
-  totalWeight: number;
-}
+// --- Types ---
 
-const FieldEditor: React.FC<FieldEditorProps> = ({
-  field,
-  index,
-  isEditing,
-  onEdit,
-  onUpdate,
-  onRemove,
-  onWeightChange,
-  totalWeight
-}) => {
-  const isScorableField = ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(field.type);
-  const fieldWeight = field.weight || 0;
+type QuestionType = 'short_text' | 'paragraph' | 'rating' | 'multiple_choice' | 'checkboxes' | 'dropdown' | 'date' | 'file' | 'currency' | 'number';
 
-  const getFieldIcon = (type: FormFieldType) => {
-    const icons = {
-      'SHORT_TEXT': '✍️',
-      'PARAGRAPH': '📝',
-      'RATING': '⭐',
-      'MULTIPLE_CHOICE': '🔘',
-      'CHECKBOXES': '☑️',
-      'DROPDOWN': '📋',
-      'DATE': '📅',
-      'FILE': '📎',
-      'KPI': '📊'
-    };
-    return icons[type] || '❓';
-  };
-
-  const addOption = () => {
-    const currentOptions = field.options || [];
-    onUpdate({
-      options: [...currentOptions, `Option ${currentOptions.length + 1}`]
-    });
-  };
-
-  const updateOption = (optionIndex: number, value: string) => {
-    const updatedOptions = (field.options || []).map((opt, i) =>
-      i === optionIndex ? value : opt
-    );
-    onUpdate({ options: updatedOptions });
-  };
-
-  const removeOption = (optionIndex: number) => {
-    const updatedOptions = (field.options || []).filter((_, i) => i !== optionIndex);
-    onUpdate({ options: updatedOptions });
-  };
-
-  return (
-    <div className={`bg-white/5 border rounded-2xl transition-all ${isEditing ? 'border-[#8252e9] shadow-lg shadow-[#8252e9]/20' : 'border-white/10 hover:border-white/20'
-      }`}>
-      {/* Field Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{getFieldIcon(field.type)}</span>
-          <div>
-            <h4 className="text-sm font-bold text-white">{field.label}</h4>
-            <p className="text-xs text-slate-400">{field.type.replace('_', ' ')}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {isScorableField && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Weight:</span>
-              <span className={`text-sm font-bold px-2 py-1 rounded ${fieldWeight > 0 ? 'bg-[#8252e9]/20 text-[#8252e9]' : 'bg-slate-500/20 text-slate-400'
-                }`}>
-                {fieldWeight}%
-              </span>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={onEdit}
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
-            >
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeWidth="2" />
-              </svg>
-            </button>
-            <button
-              onClick={onRemove}
-              className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Field Editor */}
-      {isEditing && (
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-2">Question Label</label>
-            <input
-              type="text"
-              value={field.label}
-              onChange={(e) => onUpdate({ label: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-[#8252e9] transition-all"
-            />
-          </div>
-
-          {field.placeholder !== undefined && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-2">Placeholder Text</label>
-              <input
-                type="text"
-                value={field.placeholder || ''}
-                onChange={(e) => onUpdate({ placeholder: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-[#8252e9] transition-all"
-              />
-            </div>
-          )}
-
-          {/* Options for choice fields */}
-          {['MULTIPLE_CHOICE', 'CHECKBOXES', 'DROPDOWN'].includes(field.type) && (
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold text-slate-300">Options</label>
-                <button
-                  onClick={addOption}
-                  className="px-2 py-1 bg-[#8252e9] text-white text-xs font-bold rounded hover:bg-[#6d39e0] transition-all"
-                >
-                  + Add Option
-                </button>
-              </div>
-              <div className="space-y-2">
-                {(field.options || []).map((option, optionIndex) => (
-                  <div key={optionIndex} className="flex gap-2">
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => updateOption(optionIndex, e.target.value)}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#8252e9] transition-all"
-                    />
-                    {(field.options?.length || 0) > 1 && (
-                      <button
-                        onClick={() => removeOption(optionIndex)}
-                        className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Weight adjustment for scorable fields */}
-          {isScorableField && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-2">
-                Scoring Weight ({fieldWeight}%)
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={fieldWeight}
-                  onChange={(e) => onWeightChange(parseInt(e.target.value))}
-                  className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer slider"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={fieldWeight}
-                  onChange={(e) => onWeightChange(parseInt(e.target.value) || 0)}
-                  className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-sm outline-none focus:border-[#8252e9] transition-all"
-                />
-              </div>
-              {totalWeight > 100 && (
-                <p className="text-xs text-red-400 mt-1">
-                  Total weight exceeds 100%. Consider adjusting other fields.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={field.required}
-                onChange={(e) => onUpdate({ required: e.target.checked })}
-                className="sr-only"
-              />
-              <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${field.required ? 'border-[#8252e9] bg-[#8252e9]' : 'border-white/20'
-                }`}>
-                {field.required && (
-                  <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path d="M5 13l4 4L19 7" strokeWidth="3" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-xs text-slate-300">Required field</span>
-            </label>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-interface DraggableItemProps {
-  type: FormFieldType;
+interface Question {
+  id: string;
   label: string;
-  icon: string;
-  onClick: () => void;
-}
-
-const DraggableSourceItem: React.FC<DraggableItemProps> = ({ type, label, icon, onClick }) => {
-  const onDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('sourceType', type);
-    e.dataTransfer.effectAllowed = 'copy';
-  };
-
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onClick={onClick}
-      className="p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl flex items-center gap-3 cursor-pointer active:cursor-grabbing hover:bg-slate-100 dark:hover:bg-white/10 hover:border-[#8252e9]/50 transition-all group"
-    >
-      <span className="text-xl">{icon}</span>
-      <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{label}</span>
-    </div>
-  );
-};
-
-interface FormBuilderProps {
-  onBack: () => void;
-  initialTemplate?: FormTemplate;
-  onSave: (template: FormTemplate) => void;
-}
-
-interface WeightedFormField extends FormField {
+  type: QuestionType;
+  required: boolean;
+  is_scoreable: boolean;
   weight: number;
+  target?: number;
+  options?: string[];
+  placeholder?: string;
 }
 
-const FormBuilder: React.FC<FormBuilderProps> = ({ onBack, initialTemplate, onSave }) => {
-  const [template, setTemplate] = useState<FormTemplate>(initialTemplate || {
-    id: Math.random().toString(36).substr(2, 9),
-    title: 'Untitled Performance Review',
-    description: 'Provide your feedback for the current performance cycle.',
-    fields: [],
-    createdAt: new Date().toISOString()
-  });
+interface Section {
+  id: string;
+  title: string;
+  description?: string;
+  required?: boolean;
+  questions: Question[];
+  fields?: Question[]; // Alias for API compatibility
+}
 
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [editingField, setEditingField] = useState<number | null>(null);
-  const [showWeightWarning, setShowWeightWarning] = useState(false);
+// --- Question Editor Component ---
 
-  // Calculate total weight
-  const totalWeight = template.fields.reduce((sum, field) => sum + (field.weight || 0), 0);
-  const isWeightValid = totalWeight === 100;
-  const weightProgress = Math.min(100, totalWeight);
+interface QuestionEditorProps {
+  question: Question;
+  onUpdate: (updates: Partial<Question>) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+}
 
-  // Auto-adjust weights when fields are added/removed
-  const autoAdjustWeights = (fields: FormField[]) => {
-    if (fields.length === 0) return fields;
+const QuestionEditor: React.FC<QuestionEditorProps> = ({
+  question, onUpdate, onRemove, onMoveUp, onMoveDown, isFirst, isLast
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true);
 
-    const scorableFields = fields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
-    if (scorableFields.length === 0) return fields;
-
-    const baseWeight = Math.floor(100 / scorableFields.length);
-    const remainder = 100 - (baseWeight * scorableFields.length);
-
-    return fields.map((field, index) => {
-      if (['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(field.type)) {
-        const scorableIndex = scorableFields.findIndex(f => f.id === field.id);
-        return {
-          ...field,
-          weight: baseWeight + (scorableIndex < remainder ? 1 : 0)
-        };
-      }
-      return { ...field, weight: 0 };
-    });
-  };
-
-  const addField = (type: FormFieldType) => {
-    const newField: FormField = {
-      id: Math.random().toString(36).substr(2, 9),
-      type,
-      label: `${type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())} Question`,
-      required: true,
-      weight: ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(type) ? 20 : 0,
-      ...(type === 'MULTIPLE_CHOICE' && { options: ['Option 1', 'Option 2', 'Option 3'] }),
-      ...(type === 'CHECKBOXES' && { options: ['Option 1', 'Option 2', 'Option 3'] }),
-      ...(type === 'DROPDOWN' && { options: ['Option 1', 'Option 2', 'Option 3'] })
-    };
-
-    const updatedFields = [...template.fields, newField];
-    const adjustedFields = autoAdjustWeights(updatedFields);
-
-    setTemplate(prev => ({ ...prev, fields: adjustedFields }));
-    setEditingField(adjustedFields.length - 1);
-  };
-
-  const updateField = (index: number, updates: Partial<FormField>) => {
-    const updatedFields = template.fields.map((field, i) =>
-      i === index ? { ...field, ...updates } : field
-    );
-    setTemplate(prev => ({ ...prev, fields: updatedFields }));
-  };
-
-  const removeField = (index: number) => {
-    const updatedFields = template.fields.filter((_, i) => i !== index);
-    const adjustedFields = autoAdjustWeights(updatedFields);
-    setTemplate(prev => ({ ...prev, fields: adjustedFields }));
-    setEditingField(null);
-  };
-
-  const handleWeightChange = (index: number, newWeight: number) => {
-    if (newWeight < 0 || newWeight > 100) return;
-
-    updateField(index, { weight: newWeight });
-
-    // Show warning if total exceeds 100
-    const newTotal = template.fields.reduce((sum, field, i) =>
-      sum + (i === index ? newWeight : (field.weight || 0)), 0
-    );
-
-    if (newTotal > 100) {
-      setShowWeightWarning(true);
-      setTimeout(() => setShowWeightWarning(false), 3000);
-    }
-  };
-
-  const redistributeWeights = () => {
-    const adjustedFields = autoAdjustWeights(template.fields);
-    setTemplate(prev => ({ ...prev, fields: adjustedFields }));
-  };
-
-  const handleSave = async () => {
-    if (!isWeightValid && template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))) {
-      setShowWeightWarning(true);
-      setTimeout(() => setShowWeightWarning(false), 3000);
-      return;
-    }
-
-    try {
-      // Save to backend
-      const savedTemplate = await performanceService.createTemplate({
-        title: template.title,
-        description: template.description,
-        fields: template.fields,
-        is_global: template.isGlobal
-      });
-
-      onSave(savedTemplate);
-    } catch (error) {
-      console.error('Failed to save template:', error);
-      // Fallback to local save
-      onSave(template);
-    }
-  };
-
-  const handleAiGenerate = async () => {
-    if (!aiPrompt.trim()) return;
-    setIsAiGenerating(true);
-    try {
-      const result = await generateFormTemplate(aiPrompt);
-      if (result && result.fields) {
-        const adjustedFields = autoAdjustWeights(result.fields);
-        setTemplate({
-          ...template,
-          title: result.title || template.title,
-          description: result.description || template.description,
-          fields: adjustedFields
-        });
-        setShowAiModal(false);
-        setAiPrompt('');
-      }
-    } finally {
-      setIsAiGenerating(false);
+  const getQuestionIcon = (type: QuestionType) => {
+    switch (type) {
+      case 'rating': return <Sparkles className="w-4 h-4 text-amber-500" />;
+      case 'currency': return <span className="text-emerald-500 font-bold">$</span>;
+      case 'number': return <span className="text-blue-500 font-bold">#</span>;
+      default: return <FileText className="w-4 h-4 text-slate-400" />;
     }
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center">
-        <div className="flex-1">
-          <button onClick={onBack} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white mb-2 flex items-center gap-2 transition-colors"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeWidth="3" /></svg>Back</button>
-          <input type="text" value={template.title} onChange={(e) => setTemplate({ ...template, title: e.target.value })} className="text-4xl font-black text-slate-900 dark:text-white bg-transparent outline-none border-b-2 border-transparent focus:border-[#8252e9] w-full transition-all" placeholder="Template Title" />
-        </div>
-        <div className="flex gap-3 ml-8">
-          <label className="flex items-center gap-2 cursor-pointer bg-white/5 border border-white/10 px-4 py-2 rounded-xl hover:bg-white/10 transition-all">
+    <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden transition-all hover:shadow-md">
+      <div className="p-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col gap-1 pr-2 border-r border-slate-100 dark:border-white/5">
+            <button disabled={isFirst} onClick={onMoveUp} className="text-slate-400 hover:text-purple-500 disabled:opacity-20"><ChevronUp className="w-4 h-4" /></button>
+            <button disabled={isLast} onClick={onMoveDown} className="text-slate-400 hover:text-purple-500 disabled:opacity-20"><ChevronDown className="w-4 h-4" /></button>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+            {getQuestionIcon(question.type)}
+          </div>
+          <div className="flex-1 min-w-0">
             <input
-              type="checkbox"
-              checked={template.isGlobal || false}
-              onChange={(e) => setTemplate({ ...template, isGlobal: e.target.checked })}
-              className="sr-only"
+              value={question.label}
+              onChange={(e) => onUpdate({ label: e.target.value })}
+              className="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-0"
+              placeholder="Question Label..."
             />
-            <div className={`w-10 h-5 rounded-full transition-all relative ${template.isGlobal ? 'bg-emerald-500' : 'bg-slate-700'}`}>
-              <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${template.isGlobal ? 'left-6' : 'left-1'}`} />
+            <div className="flex gap-2 mt-0.5">
+              <Badge size="sm">{question.type.replace('_', ' ')}</Badge>
+              {question.required && <Badge size="sm" variant="danger">Required</Badge>}
+              {question.is_scoreable && <Badge size="sm" variant="success">Scoreable ({question.weight}%)</Badge>}
             </div>
-            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Global Form</span>
-          </label>
-          <button onClick={() => setShowAiModal(true)} className="px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-emerald-500/20 transition-all flex items-center gap-2">✨ AI Architect</button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleSave}
-            disabled={!isWeightValid && template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))}
-            className={`px-8 py-3 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-xl transition-all flex items-center gap-2 ${isWeightValid || !template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type))
-              ? 'bg-[#8252e9] shadow-purple-500/20 hover:bg-[#6d39e0] active:scale-95'
-              : 'bg-slate-500 cursor-not-allowed opacity-50'
-              }`}>
-            {!isWeightValid && template.fields.some(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type)) ? (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2" />
-                </svg>
-                Fix Weights
-              </>
-            ) : (
-              'Save Template'
-            )}
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 text-slate-400 hover:bg-slate-50 dark:hover:bg-white/10 rounded-xl transition-all"
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onRemove}
+            className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start h-[calc(100vh-280px)]">
-        <aside className="lg:col-span-3 space-y-6 h-full overflow-y-auto pr-2 no-scrollbar">
-          <div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 px-1">Question Types</p>
-            <div className="space-y-2">
-              <DraggableSourceItem type="SHORT_TEXT" label="Short Answer" icon="✍️" onClick={() => addField('SHORT_TEXT')} />
-              <DraggableSourceItem type="PARAGRAPH" label="Long Answer" icon="📝" onClick={() => addField('PARAGRAPH')} />
-              <DraggableSourceItem type="RATING" label="Star Rating" icon="⭐" onClick={() => addField('RATING')} />
-              <DraggableSourceItem type="MULTIPLE_CHOICE" label="Multiple Choice" icon="🔘" onClick={() => addField('MULTIPLE_CHOICE')} />
-              <DraggableSourceItem type="CHECKBOXES" label="Checkboxes" icon="☑️" onClick={() => addField('CHECKBOXES')} />
-              <DraggableSourceItem type="DROPDOWN" label="Dropdown" icon="📋" onClick={() => addField('DROPDOWN')} />
-              <DraggableSourceItem type="DATE" label="Date Picker" icon="📅" onClick={() => addField('DATE')} />
-              <DraggableSourceItem type="FILE" label="File Upload" icon="📎" onClick={() => addField('FILE')} />
-              <DraggableSourceItem type="KPI" label="KPI Metric" icon="📊" onClick={() => addField('KPI')} />
+      {isExpanded && (
+        <div className="px-16 pb-6 pt-2 space-y-4 animate-in slide-in-from-top-1 duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Placeholder</label>
+              <input
+                value={question.placeholder || ''}
+                onChange={(e) => onUpdate({ placeholder: e.target.value })}
+                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-2 px-3 text-xs"
+                placeholder="Hint for the employee..."
+              />
+            </div>
+            <div className="flex items-end gap-4">
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={question.required}
+                  onChange={(e) => onUpdate({ required: e.target.checked })}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Required</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={question.is_scoreable}
+                  onChange={(e) => onUpdate({ is_scoreable: e.target.checked, weight: e.target.checked ? 10 : 0 })}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Scoreable</span>
+              </label>
             </div>
           </div>
 
-          {/* Weight Summary */}
-          {template.fields.length > 0 && (
-            <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Scoring Weight</h4>
-                <span className={`text-sm font-bold ${isWeightValid ? 'text-emerald-400' : totalWeight > 100 ? 'text-red-400' : 'text-yellow-400'}`}>
-                  {totalWeight}%
-                </span>
-              </div>
-
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-3">
-                <div
-                  className={`h-full transition-all duration-500 ${isWeightValid ? 'bg-emerald-500' :
-                    totalWeight > 100 ? 'bg-red-500' :
-                      'bg-yellow-500'
-                    }`}
-                  style={{ width: `${Math.min(100, weightProgress)}%` }}
-                />
-              </div>
-
-              <div className="flex justify-between items-center">
-                <p className="text-[9px] text-slate-400">
-                  {isWeightValid ? 'Perfect!' : totalWeight > 100 ? 'Over limit' : 'Incomplete'}
-                </p>
-                {!isWeightValid && (
-                  <button
-                    onClick={redistributeWeights}
-                    className="text-[9px] font-bold text-[#8252e9] hover:text-white transition-all"
-                  >
-                    Auto-fix
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </aside>
-
-        <main className="lg:col-span-9 h-full border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[32px] p-6 overflow-y-auto no-scrollbar">
-          {template.fields.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-bold text-white mb-2">Start Building Your Form</h3>
-              <p className="text-slate-400 mb-6">Add questions from the sidebar or use AI Architect to generate a complete form</p>
-              <button
-                onClick={() => setShowAiModal(true)}
-                className="px-6 py-3 bg-[#8252e9] text-white font-bold text-sm rounded-xl hover:bg-[#6d39e0] transition-all flex items-center gap-2"
-              >
-                ✨ Use AI Architect
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {template.fields.map((field, index) => (
-                <FieldEditor
-                  key={field.id}
-                  field={field}
-                  index={index}
-                  isEditing={editingField === index}
-                  onEdit={() => setEditingField(editingField === index ? null : index)}
-                  onUpdate={(updates) => updateField(index, updates)}
-                  onRemove={() => removeField(index)}
-                  onWeightChange={(weight) => handleWeightChange(index, weight)}
-                  totalWeight={totalWeight}
-                />
-              ))}
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Weight Warning */}
-      {showWeightWarning && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500/90 backdrop-blur-md text-white px-6 py-3 rounded-xl shadow-lg animate-in slide-in-from-right duration-300">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" strokeWidth="2" />
-            </svg>
-            <span className="font-bold text-sm">
-              {totalWeight > 100 ? 'Total weight exceeds 100%' : 'Total weight must equal 100%'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* AI CENTERED MODAL */}
-      {showAiModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="absolute inset-0" onClick={() => setShowAiModal(false)} />
-          <div className="max-w-xl w-full bg-white dark:bg-[#0d0a1a] rounded-[40px] p-10 border border-slate-200 dark:border-white/10 shadow-2xl animate-in zoom-in-95 duration-300 relative z-10">
-            <div className="flex justify-between items-start mb-6">
+          {question.is_scoreable && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl">
               <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2"><span className="text-2xl">✨</span> AI Form Architect</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Describe the evaluation requirements for strategy synthesis.</p>
+                <label className="text-[10px] font-black uppercase tracking-widest text-purple-500 mb-1.5 block">Weight (%)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={question.weight}
+                    onChange={(e) => onUpdate({ weight: Number(e.target.value) })}
+                    className="flex-1 bg-white dark:bg-white/5 border border-purple-500/20 rounded-xl py-2 px-3 text-sm font-black"
+                  />
+                  <input
+                    type="range"
+                    min="0" max="100" step="5"
+                    value={question.weight}
+                    onChange={(e) => onUpdate({ weight: Number(e.target.value) })}
+                    className="flex-1 accent-purple-500"
+                  />
+                </div>
               </div>
-              <button onClick={() => setShowAiModal(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="3" /></svg></button>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-purple-500 mb-1.5 block">Target/Goal (Optional)</label>
+                <input
+                  type="number"
+                  value={question.target || ''}
+                  onChange={(e) => onUpdate({ target: Number(e.target.value) })}
+                  className="w-full bg-white dark:bg-white/5 border border-purple-500/20 rounded-xl py-2 px-3 text-sm font-black"
+                  placeholder="e.g. 5.0"
+                />
+              </div>
             </div>
-            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="e.g. Build a performance evaluation for senior developers focusing on system architecture..." className="w-full h-40 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] p-6 text-sm text-slate-900 dark:text-white outline-none focus:border-emerald-500/50 transition-all mb-6 resize-none" />
-            <div className="flex gap-3">
-              <button onClick={() => setShowAiModal(false)} className="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-slate-500 font-bold text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-200 dark:hover:bg-white/10 transition-all">Cancel</button>
-              <button onClick={handleAiGenerate} disabled={isAiGenerating || !aiPrompt.trim()} className="flex-[2] py-4 bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center justify-center gap-2">
-                {isAiGenerating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Generate Form Structure'}
-              </button>
+          )}
+
+          {['multiple_choice', 'checkboxes', 'dropdown'].includes(question.type) && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Options</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(question.options || []).map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      value={opt}
+                      onChange={(e) => {
+                        const newOpts = [...(question.options || [])];
+                        newOpts[i] = e.target.value;
+                        onUpdate({ options: newOpts });
+                      }}
+                      className="flex-1 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-1.5 px-3 text-xs"
+                    />
+                    <button
+                      onClick={() => {
+                        const newOpts = (question.options || []).filter((_, idx) => idx !== i);
+                        onUpdate({ options: newOpts });
+                      }}
+                      className="text-rose-500 p-1"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => onUpdate({ options: [...(question.options || []), 'New Option'] })}
+                  className="text-purple-500 text-xs font-bold p-2 text-left hover:bg-purple-50 dark:hover:bg-purple-500/10 rounded-xl transition-all border border-dashed border-purple-200 dark:border-purple-500/20"
+                >
+                  + Add Option
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>
+  );
+};
+
+// --- Main FormBuilder Component ---
+
+const FormBuilder: React.FC = () => {
+  const { mode, id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [templateName, setTemplateName] = useState('Untitled Template');
+  const [description, setDescription] = useState('');
+  const [scope, setScope] = useState<'global' | 'branch' | 'department'>((searchParams.get('scope') as any) || 'department');
+  const [targetId, setTargetId] = useState<number | undefined>(searchParams.get('targetId') ? Number(searchParams.get('targetId')) : undefined);
+
+  const [sections, setSections] = useState<Section[]>([
+    { id: 'sec_1', title: 'Main Assessment', questions: [] }
+  ]);
+
+  useEffect(() => {
+    if (mode === 'edit' && id) {
+      loadTemplate(Number(id));
+    }
+  }, [mode, id]);
+
+  const loadTemplate = async (templateId: number) => {
+    try {
+      setIsLoading(true);
+      const data = await performanceService.getConfig(templateId);
+      setTemplateName(data.name);
+      setDescription(data.description || '');
+      setScope(data.scope);
+      setTargetId(data.department_id || data.branch_id);
+      
+      // Transform sections: convert 'fields' to 'questions' if needed
+      const transformedSections = (data.sections || []).map((section: any) => ({
+        ...section,
+        questions: section.fields || section.questions || []
+      }));
+      
+      setSections(transformedSections.length > 0 ? transformedSections : [{ id: 'sec_1', title: 'Main Assessment', questions: [] }]);
+    } catch (error) {
+      toast.error('Failed to load template');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Actions ---
+
+  const addSection = () => {
+    setSections([...sections, {
+      id: `sec_${Date.now()}`,
+      title: 'New Section',
+      questions: []
+    }]);
+  };
+
+  const removeSection = (sectionId: string) => {
+    if (sections.length === 1) {
+      toast.error('Template must have at least one section');
+      return;
+    }
+    setSections(sections.filter(s => s.id !== sectionId));
+  };
+
+  const addQuestion = (sectionId: string, type: QuestionType) => {
+    setSections(sections.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: [...s.questions, {
+          id: `q_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          label: 'Untitled Question',
+          type,
+          required: true,
+          is_scoreable: ['rating', 'currency', 'number'].includes(type),
+          weight: ['rating', 'currency', 'number'].includes(type) ? 10 : 0,
+          target: undefined,
+          placeholder: '',
+          options: ['multiple_choice', 'checkboxes', 'dropdown'].includes(type) ? ['Option 1', 'Option 2'] : undefined
+        }]
+      };
+    }));
+  };
+
+  const updateQuestion = (sectionId: string, questionId: string, updates: Partial<Question>) => {
+    setSections(sections.map(s => {
+      if (s.id !== sectionId) return s;
+      return {
+        ...s,
+        questions: s.questions.map(q => q.id === questionId ? { ...q, ...updates } : q)
+      };
+    }));
+  };
+
+  const moveQuestion = (sectionId: string, index: number, direction: 'up' | 'down') => {
+    setSections(sections.map(s => {
+      if (s.id !== sectionId) return s;
+      const newQuestions = [...s.questions];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
+      return { ...s, questions: newQuestions };
+    }));
+  };
+
+  // --- Compute Weights ---
+
+  const totalWeight = useMemo(() => {
+    if (!sections || sections.length === 0) return 0;
+    return sections.reduce((acc, s) => {
+      if (!s || !s.questions) return acc;
+      return acc + s.questions.reduce((qAcc, q) => qAcc + (q.is_scoreable ? q.weight : 0), 0);
+    }, 0);
+  }, [sections]);
+
+  const isWeightValid = totalWeight === 100;
+
+  const handleSave = async (publishAfter = false) => {
+    if (!isWeightValid && sections.some(s => s?.questions?.some(q => q.is_scoreable))) {
+      toast.error(`Total weight must be 100%. Current: ${totalWeight}%`);
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      
+      // Transform sections: convert 'questions' to 'fields' for API
+      const transformedSections = sections.map(section => ({
+        id: section.id,
+        title: section.title,
+        description: section.description,
+        required: section.required !== undefined ? section.required : true,
+        fields: section.questions || section.fields || []
+      }));
+      
+      const payload = {
+        name: templateName,
+        description,
+        scope,
+        department_id: scope === 'department' ? targetId : null,
+        branch_id: scope === 'branch' ? targetId : null,
+        sections: transformedSections,
+        scoring_config: {
+          method: 'weighted',
+          ratingThresholds: [
+            { min: 90, max: 100, label: 'Exceptional', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-300' },
+            { min: 80, max: 89, label: 'Excellent', color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-300' },
+            { min: 70, max: 79, label: 'Very Good', color: 'text-cyan-600', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-300' },
+            { min: 60, max: 69, label: 'Good', color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' },
+            { min: 50, max: 59, label: 'Fair', color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-300' },
+            { min: 0, max: 49, label: 'Needs Improvement', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-300' },
+          ]
+        }
+      };
+
+      let config;
+      if (mode === 'edit' && id) {
+        config = await performanceService.updateConfig(Number(id), payload);
+      } else {
+        config = await performanceService.createConfig(payload as any);
+      }
+
+      if (publishAfter) {
+        await performanceService.publishConfig(config.id);
+        toast.success('Template saved and published');
+      } else {
+        toast.success('Draft saved successfully');
+      }
+
+      navigate('/performance/settings');
+    } catch (error: any) {
+      console.error('Save error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to save template');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // --- Render ---
+
+  if (isLoading) return <div className="p-20 flex justify-center"><div className="w-12 h-12 border-4 border-slate-200 border-t-purple-500 rounded-full animate-spin" /></div>;
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 lg:p-12 animate-in fade-in duration-700">
+      <div className="max-w-5xl mx-auto space-y-8">
+
+        {/* Header Ribbon */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex-1">
+            <button onClick={() => navigate('/performance/settings')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-purple-500 transition-colors mb-4">
+              <ArrowLeft className="w-3 h-3" /> Back to Templates
+            </button>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-500 text-white rounded-2xl shadow-xl shadow-purple-500/20">
+                <Plus className="w-8 h-8" />
+              </div>
+              <div>
+                <input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="text-4xl font-black text-slate-900 dark:text-white bg-transparent border-none outline-none p-0 italic tracking-tighter"
+                />
+                <div className="flex gap-2 mt-1">
+                  {scope === 'global' && <Badge variant="warning"><Globe className="w-3 h-3 mr-1" /> Global</Badge>}
+                  {scope === 'branch' && <Badge variant="info"><Landmark className="w-3 h-3 mr-1" /> Branch Specific</Badge>}
+                  {scope === 'department' && <Badge variant="primary"><Building2 className="w-3 h-3 mr-1" /> Department Specific</Badge>}
+                  {mode === 'edit' && <Badge variant="default">Editing ID: {id}</Badge>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={() => handleSave(false)} isLoading={isSaving}>Save Draft</Button>
+            <Button
+              onClick={() => handleSave(true)}
+              isLoading={isSaving}
+              className="rounded-2xl px-8 shadow-2xl shadow-purple-500/20"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" /> Save & Publish
+            </Button>
+          </div>
+        </div>
+
+        {/* Global Controls & Meta */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <GlassCard className="lg:col-span-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Description & Instructions</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm font-bold resize-none h-24"
+              placeholder="Explain how employees should fill this evaluation..."
+            />
+          </GlassCard>
+
+          <GlassCard className={cn(
+            "flex flex-col justify-center items-center text-center",
+            isWeightValid ? "border-emerald-500/20 bg-emerald-500/5" : "border-amber-500/20 bg-amber-500/5 text-amber-600 dark:text-amber-400"
+          )}>
+            <div className="relative w-20 h-20 mb-3">
+              <svg className="w-full h-full -rotate-90">
+                <circle cx="40" cy="40" r="36" fill="transparent" stroke="currentColor" strokeWidth="8" className="opacity-10" />
+                <circle cx="40" cy="40" r="36" fill="transparent" stroke="currentColor" strokeWidth="8"
+                  strokeDasharray={`${(totalWeight / 100) * 226} 226`}
+                  className={cn("transition-all duration-1000", isWeightValid ? "text-emerald-500" : "text-amber-500")}
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center font-black text-lg italic">
+                {totalWeight}%
+              </div>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest mb-1">Total Scoring Weight</p>
+            <p className="text-[11px] font-bold opacity-80">
+              {isWeightValid ? 'Weight is perfectly balanced' : `Missing ${100 - totalWeight}% more`}
+            </p>
+          </GlassCard>
+        </div>
+
+        {/* Sections List */}
+        <div className="space-y-12">
+          {sections.map((section, sIdx) => (
+            <div key={section.id} className="relative animate-in slide-in-from-left duration-500">
+              <div className="flex justify-between items-end mb-6">
+                <div>
+                  <input
+                    value={section.title}
+                    onChange={(e) => setSections(sections.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))}
+                    className="text-2xl font-black text-slate-900 dark:text-white bg-transparent border-none outline-none p-0 tracking-tight"
+                  />
+                  <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                    <span className="w-8 h-0.5 bg-slate-200 dark:bg-white/10 rounded-full" />
+                    Section {sIdx + 1} • {section.questions.length} Questions
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeSection(section.id)}
+                  className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                  title="Remove Section"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {section.questions.map((q, qIdx) => (
+                  <QuestionEditor
+                    key={q.id}
+                    question={q}
+                    onUpdate={(upd) => updateQuestion(section.id, q.id, upd)}
+                    onRemove={() => setSections(sections.map(s => s.id === section.id ? { ...s, questions: s.questions.filter(qu => qu.id !== q.id) } : s))}
+                    onMoveUp={() => moveQuestion(section.id, qIdx, 'up')}
+                    onMoveDown={() => moveQuestion(section.id, qIdx, 'down')}
+                    isFirst={qIdx === 0}
+                    isLast={qIdx === section.questions.length - 1}
+                  />
+                ))}
+
+                {/* Question Type Shortcuts */}
+                <div className="flex flex-wrap gap-2 p-6 rounded-[32px] border-2 border-dashed border-slate-200 dark:border-white/5 items-center justify-center">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-4">Add Question:</span>
+                  {(['short_text', 'paragraph', 'rating', 'multiple_choice', 'checkboxes', 'dropdown', 'date', 'file', 'currency', 'number'] as const).map(type => (
+                    <button
+                      key={type}
+                      onClick={() => addQuestion(section.id, type)}
+                      className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-purple-500 hover:text-purple-500 transition-all shadow-sm"
+                    >
+                      {type.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add Section Button */}
+          <div className="flex justify-center pt-8">
+            <button
+              onClick={addSection}
+              className="flex items-center gap-2 group px-8 py-4 rounded-[32px] bg-slate-100 dark:bg-white/5 text-slate-500 font-black uppercase tracking-[0.2em] text-[10px] hover:bg-purple-500 hover:text-white transition-all shadow-lg hover:shadow-purple-500/20"
+            >
+              <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+              Add New Section
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+// --- Helper Components ---
+
+const Badge: React.FC<{ children: React.ReactNode, variant?: any, size?: any }> = ({ children, variant = 'default', size = 'md' }) => {
+  const variants = {
+    primary: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+    success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    danger: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    info: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+    default: 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-500 border-slate-200 dark:border-white/10'
+  };
+  const sizes = { sm: 'px-1.5 py-0.5 text-[8px]', md: 'px-2.5 py-1 text-[10px]' };
+  return <span className={cn("inline-flex items-center font-black uppercase tracking-wider border rounded-lg", variants[variant as keyof typeof variants] || variants.default, sizes[size as keyof typeof sizes] || sizes.md)}>{children}</span>;
+}
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'ghost' | 'danger' | 'warning';
+  size?: 'sm' | 'md' | 'lg';
+  isLoading?: boolean;
+}
+
+const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', isLoading, className, ...props }) => {
+  const variants = {
+    primary: 'bg-purple-500 text-white hover:bg-purple-600',
+    ghost: 'bg-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5',
+    danger: 'bg-rose-500 text-white hover:bg-rose-600',
+    warning: 'bg-amber-500 text-white hover:bg-amber-600'
+  };
+  return (
+    <button
+      className={cn(
+        "px-6 py-2.5 rounded-xl font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center disabled:opacity-50",
+        variants[variant],
+        className
+      )}
+      disabled={isLoading}
+      {...props}
+    >
+      {isLoading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+      {children}
+    </button>
   );
 };
 

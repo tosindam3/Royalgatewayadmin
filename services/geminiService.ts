@@ -29,6 +29,7 @@ Always prioritize data-driven recommendations.
 export const suggestKeyResults = async (objectiveTitle: string) => {
   try {
     const ai = getAI();
+    if (!ai) return [];
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: `Generate 3 measurable Key Results for the OKR objective: "${objectiveTitle}"`,
@@ -59,6 +60,7 @@ export const suggestKeyResults = async (objectiveTitle: string) => {
 export const generateFormTemplate = async (prompt: string) => {
   try {
     const ai = getAI();
+    if (!ai) return null;
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: `Generate a performance evaluation form template based on this requirement: "${prompt}"`,
@@ -107,6 +109,7 @@ export const generateFormTemplate = async (prompt: string) => {
 export const generateHRAssistantResponse = async (prompt: string, context: string) => {
   try {
     const ai = getAI();
+    if (!ai) return "AI Assistant unavailable (Invalid Key).";
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: `CONTEXT: ${context}\nQUERY: ${prompt}`,

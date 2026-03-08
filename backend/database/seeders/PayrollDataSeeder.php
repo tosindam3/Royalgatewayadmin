@@ -102,12 +102,6 @@ class PayrollDataSeeder extends Seeder
                 $this->seedAttendanceForEmployee($employee, $period);
             }
         }
-
-        // Performance Scores - Only seed if they don't exist for the period
-        if ($period && \App\Models\PerformanceMonthlyScore::where('period_id', $period->id)->count() === 0) {
-            $this->command->info('Seeding Performance Scores...');
-            Artisan::call('db:seed', ['--class' => 'PerformanceScoresSeeder']);
-        }
     }
 
     private function seedAttendanceForEmployee($employee, $period)

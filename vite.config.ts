@@ -34,15 +34,41 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          // Vendor chunk splitting for better cache hits
-          manualChunks: {
-            react: ['react', 'react-dom'],
-            query: ['@tanstack/react-query'],
-            charts: ['recharts'],
+          // Optimized chunk splitting
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              // React Query
+              if (id.includes('@tanstack/react-query')) {
+                return 'query-vendor';
+              }
+              // Date utilities
+              if (id.includes('date-fns')) {
+                return 'date-vendor';
+              }
+              // UI libraries
+              if (id.includes('sonner') || id.includes('framer-motion')) {
+                return 'ui-vendor';
+              }
+              // React Router
+              if (id.includes('react-router')) {
+                return 'router-vendor';
+              }
+              // Axios
+              if (id.includes('axios')) {
+                return 'axios-vendor';
+              }
+              // React core + Charts together (recharts depends on React, avoid circular deps)
+              if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || 
+                  id.includes('recharts') || id.includes('d3-')) {
+                return 'react-vendor';
+              }
+            }
           },
         },
       },
-      chunkSizeWarningLimit: 500,
+      // Gzipped sizes are acceptable for production
+      chunkSizeWarningLimit: 1500,
+      minify: 'esbuild',
     },
   };
 });

@@ -23,11 +23,53 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Test and utility scripts (exclude from production)
-test-*.php
-*-test.php
+# Debug and temporary files (NOT needed for production)
+debug_*.txt
+debug_*.php
+*_dump.json
+*_out.json
+admin_out.json
+engineers.json
+engineers_dump.json
+verify_log.txt
+configs.json
+*.backup
+*.cache
+
+# Utility scripts (NOT needed for production)
+check-*.php
+diagnose-*.php
+find-*.php
+assign-*.php
+restart-*.php
+temp-*.php
+compare-*.php
 verify-*.php
 cleanup-*.php
 delete-*.php
 fix-*.php
-*.backup
+
+# Test HTML files
+public/*test*.html
+public/employee-update-test.html
+
+# Deployment scripts
+deploy-*.sh
+deploy-*.bat
+
+# Documentation (managed separately)
+README.md
+
+# Test and development seeders
+database/seeders/TestUserSeeder.php
+database/seeders/ComprehensiveMemoSeeder.php
+database/seeders/ITPerformanceConfigSeeder.php
+database/seeders/PublishedPerformanceConfigSeeder.php
+
+# Test files
+/tests/
+tests/
+
+# Documentation
+/docs/
+docs/

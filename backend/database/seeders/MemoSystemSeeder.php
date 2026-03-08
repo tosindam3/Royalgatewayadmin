@@ -18,7 +18,7 @@ class MemoSystemSeeder extends Seeder
             $this->createDefaultSignature($user);
         }
         
-        $this->command->info('Memo system initialized for ' . $users->count() . ' users');
+        // Memo system initialized for {$users->count()} users
     }
 
     protected function createSystemFolders(User $user): void

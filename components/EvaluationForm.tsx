@@ -16,15 +16,21 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ template, employeeName,
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
+  // Bridge backend EvaluationTemplate (sessions) to frontend FormTemplate (fields)
+  const flattenedFields = (template as any).fields ||
+    ((template as any).sessions ? (template as any).sessions.flatMap((s: any) => s.fields || []) : []);
+
+  const safeFields = flattenedFields || [];
+
   // Split fields into steps of 3 for multi-step experience
   const stepSize = 3;
-  const totalSteps = Math.ceil(template.fields.length / stepSize);
-  const currentFields = template.fields.slice(currentStep * stepSize, (currentStep + 1) * stepSize);
+  const totalSteps = Math.ceil(safeFields.length / stepSize);
+  const currentFields = safeFields.slice(currentStep * stepSize, (currentStep + 1) * stepSize);
 
   // Calculate completion progress
-  const requiredFields = template.fields.filter(f => f.required);
+  const requiredFields = safeFields.filter(f => f.required);
   const completedRequired = requiredFields.filter(f => answers[f.id] !== undefined && answers[f.id] !== '').length;
-  const allFields = template.fields;
+  const allFields = safeFields;
   const completedAll = allFields.filter(f => answers[f.id] !== undefined && answers[f.id] !== '').length;
 
   const requiredProgress = requiredFields.length > 0 ? (completedRequired / requiredFields.length) * 100 : 100;
@@ -32,7 +38,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ template, employeeName,
 
   // Calculate current score for scorable fields
   const calculateCurrentScore = () => {
-    const scorableFields = template.fields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
+    const scorableFields = safeFields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
     if (scorableFields.length === 0) return null;
 
     let totalWeight = 0;
@@ -65,7 +71,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({ template, employeeName,
   };
 
   const getScoringData = () => {
-    const scorableFields = template.fields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
+    const scorableFields = safeFields.filter(f => ['RATING', 'MULTIPLE_CHOICE', 'KPI'].includes(f.type));
     const totalWeight = scorableFields.reduce((acc, f) => acc + (f.weight || 0), 0);
     return {
       currentScore: calculateCurrentScore() || 0,

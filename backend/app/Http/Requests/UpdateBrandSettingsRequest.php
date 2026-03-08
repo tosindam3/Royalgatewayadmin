@@ -1,0 +1,57 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UpdateBrandSettingsRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        // Only Super Admin and Admin can update brand settings
+        return $this->user()->hasAnyRole(['Super Admin', 'Admin', 'HR Admin']);
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     */
+    public function rules(): array
+    {
+        return [
+            'companyName' => 'required|string|min:2|max:255',
+            'logoUrl' => 'nullable|string|url|max:2048',
+            'primaryColor' => 'required|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
+        ];
+    }
+
+    /**
+     * Get custom messages for validator errors.
+     */
+    public function messages(): array
+    {
+        return [
+            'companyName.required' => 'Company name is required',
+            'companyName.min' => 'Company name must be at least 2 characters',
+            'companyName.max' => 'Company name cannot exceed 255 characters',
+            'logoUrl.url' => 'Logo URL must be a valid URL',
+            'logoUrl.max' => 'Logo URL cannot exceed 2048 characters',
+            'primaryColor.required' => 'Primary color is required',
+            'primaryColor.regex' => 'Primary color must be a valid hex color code (e.g., #8252e9)',
+        ];
+    }
+
+    /**
+     * Get custom attributes for validator errors.
+     */
+    public function attributes(): array
+    {
+        return [
+            'companyName' => 'company name',
+            'logoUrl' => 'logo URL',
+            'primaryColor' => 'primary color',
+        ];
+    }
+}

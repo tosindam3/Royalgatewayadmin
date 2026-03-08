@@ -1,301 +1,169 @@
-import { 
-  EvaluationTemplate, 
-  EvaluationResponse, 
-  ReviewCycle, 
-  Goal, 
-  PerformanceKeyResult,
-  SubmissionTarget,
-  PendingEvaluation,
-  PerformanceDashboardKPIs,
-  TeamPerformanceData
-} from '../types';
+import apiClient from './apiClient';
 
-const API_BASE = '/api/v1/performance';
+const API_BASE = '/performance';
 
 class PerformanceService {
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('royalgateway_auth_token');
-    
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers,
-      },
-    });
+  // ─── Submissions ──────────────────────────────────────────────────────────
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Network error' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+  async getSubmissions(filters?: { status?: string; period?: string; per_page?: number }) {
+    const response = await apiClient.get(`${API_BASE}/submissions`, { params: filters }) as any;
+    return Array.isArray(response) ? response : (response?.data ?? response ?? []);
+  }
+
+  async createSubmission(data: {
+    period: string;
+    form_data: Record<string, any>;
+  }) {
+    const response = await apiClient.post(`${API_BASE}/submissions`, data) as any;
+    return response?.data ?? response;
+  }
+
+  // ─── Drafts ───────────────────────────────────────────────────────────────
+
+  async getDraft(departmentId: number, period: string) {
+    const response = await apiClient.get(`${API_BASE}/drafts/my-draft`, {
+      params: { department_id: departmentId, period }
+    }) as any;
+    return response?.data ?? response ?? null;
+  }
+
+  async saveDraft(data: {
+    department_id: number;
+    period: string;
+    form_data: Record<string, any>;
+  }) {
+    const response = await apiClient.post(`${API_BASE}/drafts/save`, data) as any;
+    return response?.data ?? response;
+  }
+
+  // ─── Analytics ────────────────────────────────────────────────────────────
+
+  async getLeaderboard(limit?: number, period?: string) {
+    const response = await apiClient.get(`${API_BASE}/leaderboard`, {
+      params: { limit, period }
+    }) as any;
+    return Array.isArray(response) ? response : (response?.data ?? []);
+  }
+
+  async getDepartmentSummaries(period?: string) {
+    const response = await apiClient.get(`${API_BASE}/department-summaries`, {
+      params: { period }
+    }) as any;
+    return Array.isArray(response) ? response : (response?.data ?? []);
+  }
+
+  async getAnalytics(params?: any) {
+    try {
+      const response = await apiClient.get(`${API_BASE}/analytics`, { params }) as any;
+      return response?.data ?? response ?? {};
+    } catch {
+      return {};
     }
-
-    const data = await response.json();
-    return data.data || data;
   }
 
-  // Dashboard APIs
-  async fetchDashboardKPIs(): Promise<PerformanceDashboardKPIs> {
-    return this.request<PerformanceDashboardKPIs>('/dashboard');
+  // ─── Template Resolution (Employee) ───────────────────────────────────────
+
+  /** Returns the best published template for the current authenticated employee */
+  async getConfigForEmployee() {
+    const response = await apiClient.get(`${API_BASE}/configs/for-employee`) as any;
+    return response?.data ?? response ?? null;
   }
 
-  async fetchTeamPerformance(): Promise<TeamPerformanceData[]> {
-    return this.request<TeamPerformanceData[]>('/team-performance');
+  // ─── Configs — Read ───────────────────────────────────────────────────────
+
+  async getConfigs(filters?: {
+    department_id?: number;
+    branch_id?: number;
+    status?: 'draft' | 'published' | 'archived';
+    scope?: 'department' | 'branch' | 'global';
+  }) {
+    const response = await apiClient.get(`${API_BASE}/configs`, { params: filters }) as any;
+    return Array.isArray(response) ? response : (response?.data ?? []);
   }
 
-  async fetchInsightsData(): Promise<any> {
-    return this.request<any>('/insights');
+  async getConfig(id: number) {
+    const response = await apiClient.get(`${API_BASE}/configs/${id}`) as any;
+    return response?.data ?? response;
   }
 
-  // Template APIs
-  async fetchTemplates(status?: string): Promise<EvaluationTemplate[]> {
-    const params = status ? `?status=${status}` : '';
-    return this.request<EvaluationTemplate[]>(`/templates${params}`);
+  async getConfigByDepartment(departmentId: number) {
+    const response = await apiClient.get(`${API_BASE}/configs/department/${departmentId}`) as any;
+    return response?.data ?? response;
   }
 
-  async fetchPublishedTemplates(): Promise<EvaluationTemplate[]> {
-    return this.request<EvaluationTemplate[]>('/templates/published');
-  }
+  // ─── Configs — CRUD ───────────────────────────────────────────────────────
 
-  async fetchTemplate(id: number): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>(`/templates/${id}`);
-  }
-
-  async createTemplate(template: Partial<EvaluationTemplate>): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>('/templates', {
-      method: 'POST',
-      body: JSON.stringify(template),
-    });
-  }
-
-  async updateTemplate(id: number, template: Partial<EvaluationTemplate>): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>(`/templates/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(template),
-    });
-  }
-
-  async publishTemplate(id: number): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>(`/templates/${id}/publish`, {
-      method: 'POST',
-    });
-  }
-
-  async cloneTemplate(id: number, title?: string): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>(`/templates/${id}/clone`, {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    });
-  }
-
-  async archiveTemplate(id: number): Promise<EvaluationTemplate> {
-    return this.request<EvaluationTemplate>(`/templates/${id}/archive`, {
-      method: 'POST',
-    });
-  }
-
-  async deleteTemplate(id: number): Promise<void> {
-    await this.request<void>(`/templates/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Evaluation Response APIs
-  async fetchEvaluations(filters?: {
-    status?: string;
-    employee_id?: number;
-    cycle_id?: number;
-  }): Promise<EvaluationResponse[]> {
-    const params = new URLSearchParams();
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.employee_id) params.append('employee_id', filters.employee_id.toString());
-    if (filters?.cycle_id) params.append('cycle_id', filters.cycle_id.toString());
-    
-    const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request<EvaluationResponse[]>(`/evaluations${query}`);
-  }
-
-  async fetchPendingEvaluations(): Promise<PendingEvaluation[]> {
-    return this.request<PendingEvaluation[]>('/evaluations/pending');
-  }
-
-  async fetchPendingReviews(): Promise<any[]> {
-    return this.request<any[]>('/evaluations/pending-review');
-  }
-
-  async fetchEvaluation(id: number): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}`);
-  }
-
-  async createEvaluation(evaluation: {
-    template_id: number;
-    employee_id: number;
-    cycle_id?: number;
-    answers: Record<string, any>;
-  }): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>('/evaluations', {
-      method: 'POST',
-      body: JSON.stringify(evaluation),
-    });
-  }
-
-  async updateEvaluation(id: number, answers: Record<string, any>): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ answers }),
-    });
-  }
-
-  async submitEvaluation(id: number, submittedTo: number, submissionType: string): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}/submit`, {
-      method: 'POST',
-      body: JSON.stringify({
-        submitted_to: submittedTo,
-        submission_type: submissionType,
-      }),
-    });
-  }
-
-  async approveEvaluation(id: number, feedback?: string): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}/approve`, {
-      method: 'POST',
-      body: JSON.stringify({ feedback }),
-    });
-  }
-
-  async rejectEvaluation(id: number, feedback: string): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}/reject`, {
-      method: 'POST',
-      body: JSON.stringify({ feedback }),
-    });
-  }
-
-  async returnEvaluation(id: number, feedback: string): Promise<EvaluationResponse> {
-    return this.request<EvaluationResponse>(`/evaluations/${id}/return`, {
-      method: 'POST',
-      body: JSON.stringify({ feedback }),
-    });
-  }
-
-  async deleteEvaluation(id: number): Promise<void> {
-    await this.request<void>(`/evaluations/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async fetchSubmissionTargets(employeeId: number): Promise<SubmissionTarget[]> {
-    return this.request<SubmissionTarget[]>(`/evaluations/submission-targets/${employeeId}`);
-  }
-
-  // Review Cycle APIs
-  async fetchCycles(status?: string): Promise<ReviewCycle[]> {
-    const params = status ? `?status=${status}` : '';
-    return this.request<ReviewCycle[]>(`/cycles${params}`);
-  }
-
-  async fetchCycle(id: number): Promise<ReviewCycle> {
-    return this.request<ReviewCycle>(`/cycles/${id}`);
-  }
-
-  async createCycle(cycle: {
+  async createConfig(data: {
     name: string;
     description?: string;
-    start_date: string;
-    end_date: string;
-    template_id: number;
-  }): Promise<ReviewCycle> {
-    return this.request<ReviewCycle>('/cycles', {
-      method: 'POST',
-      body: JSON.stringify(cycle),
-    });
+    scope: 'department' | 'branch' | 'global';
+    department_id?: number;
+    branch_id?: number;
+    sections: any[];
+    scoring_config: any;
+  }) {
+    const response = await apiClient.post(`${API_BASE}/configs`, data) as any;
+    return response?.data ?? response;
   }
 
-  async updateCycle(id: number, cycle: Partial<ReviewCycle>): Promise<ReviewCycle> {
-    return this.request<ReviewCycle>(`/cycles/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(cycle),
-    });
+  async updateConfig(id: number, data: any) {
+    const response = await apiClient.put(`${API_BASE}/configs/${id}`, data) as any;
+    return response?.data ?? response;
   }
 
-  async launchCycle(id: number, employeeIds: number[]): Promise<void> {
-    await this.request<void>(`/cycles/${id}/launch`, {
-      method: 'POST',
-      body: JSON.stringify({ employee_ids: employeeIds }),
-    });
+  async deleteConfig(id: number) {
+    await apiClient.delete(`${API_BASE}/configs/${id}`);
   }
 
-  async fetchCycleParticipants(id: number): Promise<any[]> {
-    return this.request<any[]>(`/cycles/${id}/participants`);
+  // ─── Lifecycle Actions ────────────────────────────────────────────────────
+
+  async publishConfig(id: number) {
+    const response = await apiClient.post(`${API_BASE}/configs/${id}/publish`) as any;
+    return response?.data ?? response;
   }
 
-  async deleteCycle(id: number): Promise<void> {
-    await this.request<void>(`/cycles/${id}`, {
-      method: 'DELETE',
-    });
+  async revertConfig(id: number) {
+    const response = await apiClient.post(`${API_BASE}/configs/${id}/revert`) as any;
+    return response?.data ?? response;
   }
 
-  // Goal/OKR APIs
-  async fetchGoals(filters?: {
-    type?: string;
-    owner_id?: number;
-    status?: string;
-  }): Promise<Goal[]> {
-    const params = new URLSearchParams();
-    if (filters?.type) params.append('type', filters.type);
-    if (filters?.owner_id) params.append('owner_id', filters.owner_id.toString());
-    if (filters?.status) params.append('status', filters.status);
-    
-    const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request<Goal[]>(`/goals${query}`);
+  async archiveConfig(id: number) {
+    const response = await apiClient.post(`${API_BASE}/configs/${id}/archive`) as any;
+    return response?.data ?? response;
   }
 
-  async fetchGoal(id: number): Promise<Goal> {
-    return this.request<Goal>(`/goals/${id}`);
+  async cloneConfig(id: number) {
+    const response = await apiClient.post(`${API_BASE}/configs/${id}/clone`) as any;
+    return response?.data ?? response;
   }
 
-  async createGoal(goal: {
-    title: string;
-    description?: string;
-    owner_id: number;
-    parent_goal_id?: number;
-    type: string;
-    start_date: string;
-    end_date: string;
-    key_results?: Array<{
-      description: string;
-      target_value: number;
-      unit: string;
-      weight?: number;
-    }>;
-  }): Promise<Goal> {
-    return this.request<Goal>('/goals', {
-      method: 'POST',
-      body: JSON.stringify(goal),
-    });
+  // ─── Export ───────────────────────────────────────────────────────────────
+
+  async exportSubmissions(params?: any) {
+    const response = await apiClient.get(`${API_BASE}/export`, {
+      params,
+      responseType: 'blob'
+    } as any);
+    return response as any;
   }
 
-  async updateGoal(id: number, goal: Partial<Goal>): Promise<Goal> {
-    return this.request<Goal>(`/goals/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(goal),
-    });
+  // ─── Added Analytics ──────────────────────────────────────────────────────
+
+  async getPersonalAnalytics(params?: { period?: string }) {
+    const response = await apiClient.get(`${API_BASE}/analytics/personal`, { params }) as any;
+    return response?.data ?? response;
   }
 
-  async updateKeyResult(goalId: number, keyResultId: number, currentValue: number, note?: string): Promise<PerformanceKeyResult> {
-    return this.request<PerformanceKeyResult>(`/goals/${goalId}/key-results/${keyResultId}/update`, {
-      method: 'POST',
-      body: JSON.stringify({
-        current_value: currentValue,
-        note,
-      }),
-    });
+  async getBranchAnalytics(params?: { period?: string }) {
+    const response = await apiClient.get(`${API_BASE}/analytics/branch`, { params }) as any;
+    return response?.data ?? response;
   }
 
-  async deleteGoal(id: number): Promise<void> {
-    await this.request<void>(`/goals/${id}`, {
-      method: 'DELETE',
-    });
-  }
+  // ─── Backward-compat aliases ──────────────────────────────────────────────
+
+  async getTemplate(id: number) { return this.getConfig(id); }
+  async createTemplate(data: any) { return this.createConfig(data); }
+  async updateTemplate(id: number, data: any) { return this.updateConfig(id, data); }
 }
 
 export const performanceService = new PerformanceService();

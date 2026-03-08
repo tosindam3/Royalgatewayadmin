@@ -81,6 +81,11 @@ class EmployeeController extends Controller
         $sortOrder = $request->get('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
 
+        if ($request->has('per_page') && $request->per_page === 'all') {
+            $employees = $query->get();
+            return $this->success($employees);
+        }
+
         $perPage = $request->get('per_page', 10);
         $employees = $query->paginate($perPage);
 

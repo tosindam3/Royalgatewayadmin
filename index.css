@@ -1,5 +1,18 @@
+@import "tailwindcss";
+
 :root {
+  /* Primary brand color - dynamically updated from settings */
   --brand-primary: #8252e9;
+  --brand-primary-rgb: 130, 82, 233;
+  
+  /* Brand color variations - auto-calculated */
+  --brand-primary-10: rgba(var(--brand-primary-rgb), 0.1);
+  --brand-primary-20: rgba(var(--brand-primary-rgb), 0.2);
+  --brand-primary-30: rgba(var(--brand-primary-rgb), 0.3);
+  --brand-primary-50: rgba(var(--brand-primary-rgb), 0.5);
+  --brand-primary-80: rgba(var(--brand-primary-rgb), 0.8);
+  
+  /* Glass morphism */
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.08);
 }
@@ -39,7 +52,7 @@ body {
 
 .gradient-text-live {
   background: linear-gradient(to right,
-      --brand-primary 20%,
+      var(--brand-primary) 20%,
       #d630ff 40%,
       #8252e9 60%,
       #4c49d8 80%);

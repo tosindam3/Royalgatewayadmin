@@ -111,8 +111,8 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 space-y-8">
               <GlassCard title="Talent Distribution" action={<button className="text-[10px] font-black text-[#8252e9] uppercase tracking-widest hover:underline">View Deep Data ›</button>}>
-                <div className="h-[300px] w-full mt-4 min-w-[300px]">
-                  <ResponsiveContainer width="99%" height="100%">
+                <div className="h-[300px] w-full mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={[
                       { name: 'Jan', val: 320 }, { name: 'Feb', val: 340 }, { name: 'Mar', val: 335 },
                       { name: 'Apr', val: 360 }, { name: 'May', val: 382 }
@@ -138,8 +138,8 @@ const Dashboard: React.FC = () => {
                   <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
                 </GlassCard>
                 <GlassCard title="Attendance Health">
-                  <div className="flex h-48 items-center w-full min-w-[200px]">
-                    <ResponsiveContainer width="99%" height="100%">
+                  <div className="flex h-48 items-center w-full">
+                    <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie data={attendanceData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                           {attendanceData.map((e, i) => <Cell key={i} fill={e.color} />)}
@@ -213,8 +213,8 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-9 space-y-8">
               <GlassCard title="Revenue vs Talent Cost Efficiency" action={<button className="text-[10px] font-black text-emerald-400 uppercase tracking-widest hover:underline">Download Executive PDF ›</button>}>
-                <div className="h-[350px] w-full mt-4 min-w-[300px]">
-                  <ResponsiveContainer width="99%" height="100%">
+                <div className="h-[350px] w-full mt-4">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={executiveTrendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />

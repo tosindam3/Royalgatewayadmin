@@ -222,7 +222,24 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                             Array.isArray(messages) ? messages[0] : messages
                         ])
                     ));
-                    errorMessage = 'Please check the form for validation errors';
+                    const firstErrorMessages = Object.values(validationErrors).flat();
+                    errorMessage = firstErrorMessages.length > 0 ? firstErrorMessages[0] : 'Please check the form for validation errors';
+
+                    // Auto-navigate to the step with the error
+                    const step1Errors = ['first_name', 'last_name', 'email', 'phone'];
+                    const step2Errors = ['password', 'password_confirmation', 'roles', 'role_ids', 'create_user_account'];
+                    const step3Errors = ['branch_id', 'department_id', 'designation_id'];
+                    
+                    const firstErrorKey = Object.keys(validationErrors)[0] || '';
+                    if (step1Errors.some(field => firstErrorKey.includes(field))) {
+                        setStep(1);
+                    } else if (step2Errors.some(field => firstErrorKey.includes(field))) {
+                        setStep(2);
+                    } else if (step3Errors.some(field => firstErrorKey.includes(field))) {
+                        setStep(3);
+                    } else {
+                        setStep(4);
+                    }
                 } else if (error.response.data?.message) {
                     errorMessage = error.response.data.message;
                 }

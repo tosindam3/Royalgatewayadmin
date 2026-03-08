@@ -6,11 +6,14 @@ import { Toaster } from 'sonner';
 import { ICONS } from './constants';
 import { UserRole, Notification, BrandSettings, UserProfile, mapBackendRoleToUserRole } from './types';
 import { authService } from './services/authService';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { updateBrandColor, initBrandColors } from './utils/brandColors';
 
 // Layout & UI Components
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import PageSkeleton from './components/ui/PageSkeleton';
+import AppLoadingSkeleton from './components/ui/AppLoadingSkeleton';
 import AttendanceClockModal from './components/attendance/AttendanceClockModal';
 
 // Lazy Loaded Pages
@@ -33,8 +36,12 @@ const MyApprovals = lazy(() => import('./pages/Approvals/MyApprovals'));
 const RoleManagement = lazy(() => import('./pages/RoleManagement'));
 const AttendanceWorkspace = lazy(() => import('./pages/Attendance/AttendanceWorkspace'));
 const MyAttendance = lazy(() => import('./pages/Attendance/MyAttendance'));
-const Login = lazy(() => import('./pages/Login'));
-const Landing = lazy(() => import('./pages/Landing'));
+const PerformanceSettings = lazy(() => import('./pages/PerformanceSettings'));
+const FormBuilder = lazy(() => import('./components/FormBuilder'));
+
+// Direct imports (not lazy) - used outside Suspense boundary
+import Login from './pages/Login';
+import Landing from './pages/Landing';
 
 const INITIAL_NOTIFICATIONS: Notification[] = [
   { id: '1', type: 'PENDING_REVIEW', title: 'Pending Evaluation', message: 'Reminder: Ethan Parker appraisal due in 2 days.', timestamp: '10 min ago', isRead: false, priority: 'HIGH' },
@@ -149,7 +156,10 @@ const MainApp: React.FC<{
                     <Route path="/payroll" element={<Payroll />} />
                   </>
                 ) : null}
-                <Route path="/performance" element={<Performance onNotify={(t, m, type) => addNotification(t, m, type)} />} />
+                <Route path="/performance" element={<Performance userRole={currentUserRole} onNotify={(t, m, type) => addNotification(t, m, type)} />} />
+                <Route path="/performance/settings" element={<PerformanceSettings userRole={currentUserRole} />} />
+                <Route path="/performance/builder/:mode/:id" element={<FormBuilder />} />
+                <Route path="/performance/builder/:mode" element={<FormBuilder />} />
                 <Route path="/identity" element={<Identity />} />
                 <Route path="/communication/chat" element={<Communication />} />
                 <Route path="/leave" element={<Leave />} />
@@ -164,7 +174,11 @@ const MainApp: React.FC<{
                   </>
                 )}
                 <Route path="/approvals" element={<MyApprovals />} />
-                <Route path="/communication/memo" element={<MemoSystem />} />
+                <Route path="/communication/memo" element={
+                  <ThemeProvider theme={theme} onToggleTheme={onToggleTheme}>
+                    <MemoSystem />
+                  </ThemeProvider>
+                } />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </Suspense>
@@ -200,6 +214,15 @@ const App: React.FC = () => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [theme]);
+
+  // Initialize and update brand color globally
+  useEffect(() => {
+    initBrandColors(brand.primaryColor);
+  }, []);
+
+  useEffect(() => {
+    updateBrandColor(brand.primaryColor);
+  }, [brand.primaryColor]);
 
   useEffect(() => {
     const initSession = async () => {
@@ -241,11 +264,7 @@ const App: React.FC = () => {
   };
 
   if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0d0a1a]">
-        <div className="w-12 h-12 border-4 border-slate-200 dark:border-white/10 border-t-purple-500 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <AppLoadingSkeleton />;
   }
 
   if (!isAuthenticated) {
