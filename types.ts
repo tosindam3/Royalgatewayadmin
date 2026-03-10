@@ -438,6 +438,7 @@ export interface Employee {
   department_id: string;
   designation_id: string;
   manager_id?: string;
+  user_id?: number;
   employment_type: EmploymentType;
   work_mode: WorkMode;
   status: EmployeeStatus;

@@ -34,29 +34,36 @@ class PerformanceSubmissionSeeder extends Seeder
             }
 
             foreach ($employees as $employee) {
-                // Generate sample data based on config
-                $formData = $this->generateSampleData($config);
+                // Generate data for multiple periods
+                foreach ($this->getPeriods() as $period) {
+                    // Generate sample data based on config
+                    $formData = $this->generateSampleData($config);
 
-                // Calculate score
-                $scoreResult = $scoringEngine->calculateScore(
-                    $formData,
-                    array_merge($config->scoring_config, ['sections' => $config->sections])
-                );
+                    // Calculate score
+                    $scoreResult = $scoringEngine->calculateScore(
+                        $formData,
+                        array_merge($config->scoring_config, ['sections' => $config->sections])
+                    );
 
-                // Create submission
-                PerformanceSubmission::create([
-                    'employee_id' => $employee->id,
-                    'department_id' => $config->department_id,
-                    'period' => $this->getCurrentPeriod(),
-                    'form_data' => $formData,
-                    'score' => $scoreResult['score'],
-                    'rating' => $scoreResult['rating'],
-                    'breakdown' => $scoreResult['breakdown'],
-                    'status' => 'submitted',
-                    'submitted_at' => now(),
-                ]);
+                    // Create submission
+                    PerformanceSubmission::updateOrCreate(
+                        [
+                            'employee_id' => $employee->id,
+                            'department_id' => $config->department_id,
+                            'period' => $period,
+                        ],
+                        [
+                            'form_data' => $formData,
+                            'score' => $scoreResult['score'],
+                            'rating' => $scoreResult['rating'],
+                            'breakdown' => $scoreResult['breakdown'],
+                            'status' => 'submitted',
+                            'submitted_at' => $this->getDateFromPeriod($period),
+                        ]
+                    );
 
-                $this->command->info("✓ Created submission for {$employee->first_name} {$employee->last_name} (Score: {$scoreResult['score']})");
+                    $this->command->info("✓ Created submission for {$employee->first_name} {$employee->last_name} ({$period}) (Score: {$scoreResult['score']})");
+                }
             }
         }
 
@@ -117,11 +124,44 @@ class PerformanceSubmissionSeeder extends Seeder
         }
     }
 
-    private function getCurrentPeriod(): string
+    private function getPeriods(): array
     {
+        $periods = [];
         $now = new \DateTime();
-        $year = $now->format('Y');
-        $week = $now->format('W');
-        return "{$year}-W{$week}";
+        
+        // Add current week
+        $periods[] = $now->format('Y') . '-W' . $now->format('W');
+        
+        // Add previous 3 weeks
+        for ($i = 1; $i <= 3; $i++) {
+            $past = clone $now;
+            $past->modify("-{$i} week");
+            $periods[] = $past->format('Y') . '-W' . $past->format('W');
+        }
+
+        // Add 6 months ago to ensure multi-month trajectory
+        for ($i = 1; $i <= 5; $i++) {
+            $past = clone $now;
+            $past->modify("-{$i} month");
+            $periods[] = $past->format('Y-m');
+        }
+        
+        return $periods;
+    }
+
+    private function getDateFromPeriod(string $period): \DateTime
+    {
+        if (str_contains($period, '-W')) {
+            $parts = explode('-W', $period);
+            $date = new \DateTime();
+            $date->setISODate((int)$parts[0], (int)$parts[1]);
+            return $date;
+        }
+
+        if (strlen($period) === 7) { // YYYY-MM
+            return \DateTime::createFromFormat('Y-m-d', $period . '-01');
+        }
+
+        return new \DateTime();
     }
 }

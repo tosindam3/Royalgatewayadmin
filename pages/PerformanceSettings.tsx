@@ -80,11 +80,15 @@ const PerformanceSettings: React.FC<PerformanceSettingsProps> = ({ userRole: ini
         setScopeModalOpen(true);
     };
 
-    const handleScopeConfirm = (scope: string, targetId?: number) => {
+    const handleScopeConfirm = (scope: string, targetIds?: number | number[]) => {
         setScopeModalOpen(false);
         const params = new URLSearchParams();
         params.set('scope', scope);
-        if (targetId) params.set('targetId', targetId.toString());
+        if (Array.isArray(targetIds)) {
+            targetIds.forEach(id => params.append('targetIds[]', id.toString()));
+        } else if (targetIds) {
+            params.set('targetId', targetIds.toString());
+        }
         navigate(`/performance/builder/create?${params.toString()}`);
     };
 
@@ -353,7 +357,7 @@ const PerformanceSettings: React.FC<PerformanceSettingsProps> = ({ userRole: ini
                                     </Button>
                                 ) : config.status === 'published' ? (
                                     <Button
-                                        variant="warning"
+                                        variant="amber"
                                         className="flex-[1.5] rounded-2xl shadow-lg shadow-amber-500/20 px-0"
                                         onClick={() => handleArchive(config.id)}
                                         isLoading={isActionLoading}

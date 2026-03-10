@@ -50,6 +50,33 @@ class PayrollPeriodController extends Controller
     }
 
     /**
+     * Create a new payroll period
+     * POST /api/v1/payroll/periods
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'year' => 'required|integer|min:2020|max:2100',
+            'month' => 'required|integer|min:1|max:12',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'working_days' => 'required|integer|min:1|max:31',
+        ]);
+
+        // Check if period already exists
+        if (PayrollPeriod::forYearMonth($validated['year'], $validated['month'])->exists()) {
+            return response()->json(['message' => 'Payroll period already exists for this month and year'], 422);
+        }
+
+        $period = PayrollPeriod::create(array_merge($validated, ['status' => 'open']));
+
+        return response()->json([
+            'data' => $this->formatPeriod($period),
+            'message' => 'Payroll period created successfully'
+        ], 201);
+    }
+
+    /**
      * Format period for API response
      */
     private function formatPeriod(PayrollPeriod $period): array

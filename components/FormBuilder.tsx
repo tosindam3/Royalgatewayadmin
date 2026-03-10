@@ -232,6 +232,7 @@ const FormBuilder: React.FC = () => {
   const [description, setDescription] = useState('');
   const [scope, setScope] = useState<'global' | 'branch' | 'department'>((searchParams.get('scope') as any) || 'department');
   const [targetId, setTargetId] = useState<number | undefined>(searchParams.get('targetId') ? Number(searchParams.get('targetId')) : undefined);
+  const [targetIds, setTargetIds] = useState<number[]>(searchParams.getAll('targetIds[]').map(Number));
 
   const [sections, setSections] = useState<Section[]>([
     { id: 'sec_1', title: 'Main Assessment', questions: [] }
@@ -251,13 +252,19 @@ const FormBuilder: React.FC = () => {
       setDescription(data.description || '');
       setScope(data.scope);
       setTargetId(data.department_id || data.branch_id);
-      
+
+      if (data.scope === 'department' && data.departments?.length > 0) {
+        setTargetIds(data.departments.map((d: any) => d.id));
+      } else if (data.scope === 'department' && data.department_id) {
+        setTargetIds([data.department_id]);
+      }
+
       // Transform sections: convert 'fields' to 'questions' if needed
       const transformedSections = (data.sections || []).map((section: any) => ({
         ...section,
         questions: section.fields || section.questions || []
       }));
-      
+
       setSections(transformedSections.length > 0 ? transformedSections : [{ id: 'sec_1', title: 'Main Assessment', questions: [] }]);
     } catch (error) {
       toast.error('Failed to load template');
@@ -344,7 +351,7 @@ const FormBuilder: React.FC = () => {
 
     try {
       setIsSaving(true);
-      
+
       // Transform sections: convert 'questions' to 'fields' for API
       const transformedSections = sections.map(section => ({
         id: section.id,
@@ -353,12 +360,13 @@ const FormBuilder: React.FC = () => {
         required: section.required !== undefined ? section.required : true,
         fields: section.questions || section.fields || []
       }));
-      
+
       const payload = {
         name: templateName,
         description,
         scope,
-        department_id: scope === 'department' ? targetId : null,
+        department_id: scope === 'department' && targetIds.length > 0 ? targetIds[0] : (scope === 'department' ? targetId : null),
+        department_ids: scope === 'department' && targetIds.length > 0 ? targetIds : undefined,
         branch_id: scope === 'branch' ? targetId : null,
         sections: transformedSections,
         scoring_config: {

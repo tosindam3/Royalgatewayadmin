@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PayrollRun;
 use App\Models\PayrollRunEmployee;
+use App\Models\User;
 use App\Services\PayrollRunBuilder;
 use App\Services\PayrollRunGuard;
 use App\Services\SubmitPayrollRunAction;
@@ -209,7 +210,7 @@ class PayrollRunController extends Controller
                     'id' => $emp->id,
                     'employee' => [
                         'id' => $emp->employee->id,
-                        'name' => $emp->employee->user->name ?? 'Unknown',
+                        'name' => $emp->employee?->user?->name ?? $emp->employee?->full_name ?? 'Unknown',
                         'staff_id' => $emp->employee->staff_id,
                         'department' => $emp->employee->department->name ?? '—',
                         'branch' => $emp->employee->branch->name ?? '—',

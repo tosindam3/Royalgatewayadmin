@@ -38,8 +38,21 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [period, setPeriod] = useState('this_month');
+  const [filters, setFilters] = useState<{
+    filterType: 'period' | 'quarter' | 'year' | 'custom_date';
+    period?: string;
+    quarter?: string;
+    year?: string;
+    start_date?: string;
+    end_date?: string;
+  }>({ filterType: 'period', period: 'this_month' });
+
+  const [availablePeriods, setAvailablePeriods] = useState<{ periods: string[], years: string[] }>({ periods: [], years: [] });
   const [roleResolved, setRoleResolved] = useState(!!initialUserRole);
+
+  useEffect(() => {
+    performanceService.getAvailablePeriods().then(setAvailablePeriods);
+  }, []);
 
   useEffect(() => {
     if (!initialUserRole) {
@@ -77,24 +90,35 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
   const loadData = async () => {
     if (!localStorage.getItem('royalgateway_auth_token')) return;
 
-    // Check if we already loaded this tab for this period
-    if (loadedPeriods[activeTab] === period) {
+    const filterHash = JSON.stringify(filters);
+    if (loadedPeriods[activeTab] === filterHash) {
       return;
     }
 
-    const backendPeriod = getPeriodFormat(period);
+    const apiFilters: any = {};
+    if (filters.filterType === 'period' && filters.period) {
+      apiFilters.period = filters.period === 'this_month' ? getPeriodFormat('This Month') : filters.period;
+    } else if (filters.filterType === 'year' && filters.year) {
+      apiFilters.year = filters.year;
+    } else if (filters.filterType === 'quarter' && filters.quarter && filters.year) {
+      apiFilters.quarter = filters.quarter;
+      apiFilters.year = filters.year;
+    } else if (filters.filterType === 'custom_date' && filters.start_date && filters.end_date) {
+      apiFilters.start_date = filters.start_date;
+      apiFilters.end_date = filters.end_date;
+    }
 
     try {
       setIsLoading(true);
       if (activeTab === 'overview') {
         const [leaderboardData, summariesData] = await Promise.all([
-          performanceService.getLeaderboard(10, backendPeriod),
-          performanceService.getDepartmentSummaries(backendPeriod)
+          performanceService.getLeaderboard(10, apiFilters),
+          performanceService.getDepartmentSummaries(apiFilters)
         ]);
         setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
         setDepartmentSummaries(Array.isArray(summariesData) ? summariesData : []);
       } else if (activeTab === 'staff') {
-        const staffData = await performanceService.getSubmissions({ period: backendPeriod });
+        const staffData = await performanceService.getSubmissions(apiFilters);
         const list = Array.isArray(staffData) ? staffData : (staffData?.data || []);
 
         // Map backend relation data to frontend table expectations
@@ -121,17 +145,16 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
           const personalData = await performanceService.getPersonalAnalytics();
           setAnalytics(personalData);
         } else {
-          const analyticsData = await performanceService.getAnalytics({ period: backendPeriod });
+          const analyticsData = await performanceService.getAnalytics(apiFilters);
           setAnalytics(analyticsData);
         }
       } else if (activeTab === 'branch') {
-        const branchData = await performanceService.getBranchAnalytics({ period: backendPeriod });
+        const branchData = await performanceService.getBranchAnalytics(apiFilters);
         setBranchAnalytics(branchData);
       }
 
-      setLoadedPeriods(prev => ({ ...prev, [activeTab]: period }));
+      setLoadedPeriods(prev => ({ ...prev, [activeTab]: filterHash }));
     } catch (error: any) {
-      // Don't show toast for 401 — apiClient already handles session expiry
       if (error?.response?.status !== 401) {
         console.error('Failed to load performance data:', error);
         if (onNotify) onNotify('Error', 'Failed to load performance data', 'error');
@@ -145,7 +168,7 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
     if (roleResolved && userRole !== UserRole.EMPLOYEE) {
       loadData();
     }
-  }, [activeTab, period, roleResolved]);
+  }, [activeTab, filters, roleResolved]);
 
   // Show spinner while role loads
   if (!roleResolved) {
@@ -270,25 +293,96 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-white/5">
-            {['This Month', 'Last quarter', 'Full Year'].map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${period === p
-                  ? 'bg-white dark:bg-white/10 text-purple-500 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  }`}
+          <div className="flex gap-2 items-center bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-white/10">
+            <select
+              className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+              value={filters.filterType}
+              onChange={(e: any) => setFilters({ filterType: e.target.value, period: '', quarter: '', year: '', start_date: '', end_date: '' })}
+            >
+              <option value="period">By Period</option>
+              <option value="quarter">By Quarter</option>
+              <option value="year">By Year</option>
+              <option value="custom_date">Custom Date</option>
+            </select>
+
+            <div className="w-px h-6 bg-slate-200 dark:bg-white/10 mx-1"></div>
+
+            {filters.filterType === 'period' && (
+              <select
+                className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                value={filters.period || ''}
+                onChange={(e) => setFilters({ ...filters, period: e.target.value })}
               >
-                {p}
-              </button>
-            ))}
+                <option value="">Select Period...</option>
+                <option value="this_month">This Month</option>
+                {availablePeriods.periods?.map((p: string) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            )}
+
+            {filters.filterType === 'quarter' && (
+              <div className="flex gap-2">
+                <select
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                  value={filters.quarter || ''}
+                  onChange={(e) => setFilters({ ...filters, quarter: e.target.value })}
+                >
+                  <option value="">Select Qtr...</option>
+                  <option value="Q1">Q1 (Jan-Mar)</option>
+                  <option value="Q2">Q2 (Apr-Jun)</option>
+                  <option value="Q3">Q3 (Jul-Sep)</option>
+                  <option value="Q4">Q4 (Oct-Dec)</option>
+                </select>
+                <select
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                  value={filters.year || ''}
+                  onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                >
+                  <option value="">Select Year...</option>
+                  {availablePeriods.years?.map((y: string) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {filters.filterType === 'year' && (
+              <select
+                className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                value={filters.year || ''}
+                onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+              >
+                <option value="">Select Year...</option>
+                {availablePeriods.years?.map((y: string) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+
+            {filters.filterType === 'custom_date' && (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="date"
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 w-[110px]"
+                  value={filters.start_date || ''}
+                  onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+                />
+                <span className="text-slate-400 text-xs">to</span>
+                <input
+                  type="date"
+                  className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 w-[110px]"
+                  value={filters.end_date || ''}
+                  onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+                />
+              </div>
+            )}
           </div>
 
           {(userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN || userRole === UserRole.MANAGER) && (
             <button
               onClick={() => navigate('/performance/settings')}
-              className="px-4 py-3 bg-white/5 hover:bg-purple-500 text-slate-400 hover:text-white rounded-xl transition-all group"
+              className="px-4 py-3 bg-white/5 hover:bg-purple-500 text-slate-400 hover:text-white rounded-xl transition-all group border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-purple-500/20"
               title="Performance Settings"
             >
               <SettingsIcon className="w-4 h-4" />
@@ -493,14 +587,18 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
                 <GlassCard title="Competency Matrix">
                   <div className="h-[250px] w-full mt-2">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                        { subject: 'Technical', A: 90, fullMark: 150 },
-                        { subject: 'Velocity', A: 85, fullMark: 150 },
-                        { subject: 'Reliability', A: 95, fullMark: 150 },
-                        { subject: 'Innovation', A: 80, fullMark: 150 },
-                        { subject: 'Collaboration', A: 88, fullMark: 150 },
-                        { subject: 'Strategy', A: 75, fullMark: 150 },
-                      ]}>
+                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={analytics?.competency_matrix?.map((b: any) => ({
+                        subject: b.subject,
+                        A: b.score,
+                        fullMark: 100,
+                      })) || [
+                          { subject: 'Technical', A: 90, fullMark: 150 },
+                          { subject: 'Velocity', A: 85, fullMark: 150 },
+                          { subject: 'Reliability', A: 95, fullMark: 150 },
+                          { subject: 'Innovation', A: 80, fullMark: 150 },
+                          { subject: 'Collaboration', A: 88, fullMark: 150 },
+                          { subject: 'Strategy', A: 75, fullMark: 150 },
+                        ]}>
                         <PolarGrid stroke="rgba(255,255,255,0.05)" />
                         <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} />
                         <Radar
@@ -532,12 +630,12 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
               <GlassCard title="Score Distribution">
                 <div className="h-[300px] w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[
-                      { category: '90-100', count: 12 },
-                      { category: '80-89', count: 25 },
-                      { category: '70-79', count: 32 },
-                      { category: '60-69', count: 18 },
-                      { category: '<60', count: 8 },
+                    <BarChart data={analytics?.distribution || [
+                      { category: '90-100', count: 0 },
+                      { category: '80-89', count: 0 },
+                      { category: '70-79', count: 0 },
+                      { category: '60-69', count: 0 },
+                      { category: '<60', count: 0 },
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                       <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} />
@@ -547,7 +645,7 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
                         itemStyle={{ fontSize: '10px', fontWeight: 900 }}
                       />
                       <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                        {[...Array(5)].map((_, index) => (
+                        {(analytics?.distribution || [0, 0, 0, 0, 0]).map((_, index) => (
                           <Cell key={`cell-${index}`} fill={index === 0 ? '#8252e9' : '#475569'} />
                         ))}
                       </Bar>

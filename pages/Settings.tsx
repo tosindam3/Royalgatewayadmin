@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import GlassCard from '../components/GlassCard';
 import { BrandSettings, UserProfile } from '../types';
 import { updateBrandColor } from '../utils/brandColors';
+import CurrencySettings from '../components/CurrencySettings';
 
 interface SettingsProps {
   brand: BrandSettings;
@@ -14,7 +15,7 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpdateProfile }) => {
   const [localBrand, setLocalBrand] = useState<BrandSettings>(brand);
   const [localProfile, setLocalProfile] = useState<UserProfile>(userProfile);
-  const [activeTab, setActiveTab] = useState<'brand' | 'profile'>('profile');
+  const [activeTab, setActiveTab] = useState<'brand' | 'profile' | 'currency'>('profile');
 
   const handleSaveBrand = () => {
     onUpdate(localBrand);
@@ -80,6 +81,17 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
         >
           Company Branding
           {activeTab === 'brand' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primaryColor }} />}
+        </button>
+        <button 
+          onClick={() => setActiveTab('currency')}
+          className={`pb-4 text-[10px] font-black uppercase tracking-widest relative transition-all ${
+            activeTab === 'currency' 
+              ? 'text-slate-900 dark:text-white' 
+              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          Currency Settings
+          {activeTab === 'currency' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primaryColor }} />}
         </button>
       </div>
 
@@ -159,6 +171,10 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                 </div>
               </div>
             </GlassCard>
+          ) : activeTab === 'currency' ? (
+            <div className="animate-in slide-in-from-bottom-2 duration-500">
+              <CurrencySettings />
+            </div>
           ) : (
             <GlassCard title="Brand Identity" className="animate-in slide-in-from-bottom-2 duration-500">
               <div className="space-y-8">

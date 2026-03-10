@@ -7,7 +7,6 @@ use App\Models\Employee;
 use App\Models\PayrollPeriod;
 use App\Models\PayrollRun;
 use App\Models\PayrollRunEmployee;
-use App\Models\PerformanceMonthlyScore;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -130,9 +129,11 @@ class PayrollRunBuilder
 
             $performanceScore = $performanceScores[$employee->id] ?? 0;
 
+            $baseSalary = $employee->salary?->base_salary ?? 0;
+
             // Calculate payroll
             $calculation = $this->calculator->calculate([
-                'base_salary' => $employee->base_salary,
+                'base_salary' => $baseSalary,
                 'absent_days' => $attendance['absent_days'],
                 'late_minutes' => $attendance['late_minutes'],
                 'overtime_hours' => $attendance['overtime_hours'],
@@ -143,7 +144,7 @@ class PayrollRunBuilder
             $employeeRows[] = [
                 'payroll_run_id' => $run->id,
                 'employee_id' => $employee->id,
-                'base_salary_snapshot' => $employee->base_salary,
+                'base_salary_snapshot' => $baseSalary,
                 'absent_days' => $attendance['absent_days'],
                 'late_minutes' => $attendance['late_minutes'],
                 'overtime_hours' => $attendance['overtime_hours'],
@@ -193,7 +194,7 @@ class PayrollRunBuilder
     private function getEmployeesByScope(string $scopeType, ?int $scopeRefId)
     {
         $query = Employee::where('status', 'active')
-            ->with(['user:id,name', 'department:id,name', 'branch:id,name']);
+            ->with(['user:id,name', 'department:id,name', 'branch:id,name', 'salary.salaryStructure']);
 
         switch ($scopeType) {
             case 'department':
@@ -207,16 +208,14 @@ class PayrollRunBuilder
                 }
                 break;
             case 'custom':
-                // For v1, custom scope is not implemented
-                // In v2, this could filter by specific employee IDs
                 break;
             case 'all':
             default:
-                // No additional filtering
                 break;
         }
 
-        return $query->get();
+        // Filter out employees with no active salary mapping (they cannot be processed)
+        return $query->get()->filter(fn ($e) => $e->salary !== null);
     }
 
     /**
@@ -259,12 +258,9 @@ class PayrollRunBuilder
      */
     private function getPerformanceScores(int $periodId, array $employeeIds): array
     {
-        $scores = PerformanceMonthlyScore::where('period_id', $periodId)
-            ->whereIn('employee_id', $employeeIds)
-            ->get()
-            ->pluck('score', 'employee_id')
-            ->toArray();
-
-        return $scores;
+        // PerformanceMonthlyScore model does not exist in this version.
+        // Returning empty array so payroll processes with score = 0 (no bonus / no penalty).
+        // Future: query performance submissions when the performance module integrates with payroll.
+        return [];
     }
 }

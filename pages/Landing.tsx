@@ -32,7 +32,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
           <p className="text-[10px] font-black text-[#8252e9] uppercase tracking-[0.4em] mb-4">Core Capabilities</p>
           <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Next-Gen HR Governance</h2>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
             { title: 'AI-Driven Strategy', desc: 'Predictive talent modeling and retention analysis powered by Gemini 3.', icon: '✨' },
@@ -58,7 +58,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-20">
           <p className="text-[10px] font-black text-[#8252e9] uppercase tracking-[0.4em] mb-4">Scalable Infrastructure</p>
-          <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Investment Tiers</h2>
+          <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Subscription Plans</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -81,7 +81,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
                   </li>
                 ))}
               </ul>
-              <button 
+              <button
                 onClick={onGetStarted}
                 className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all ${tier.highlight ? 'bg-[#8252e9] text-white shadow-xl hover:scale-[1.02]' : 'bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white hover:bg-slate-200'}`}
               >
@@ -97,12 +97,12 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
   const Contact = () => (
     <section id="contact" className="relative z-10 py-32 px-6 bg-slate-50 dark:bg-black/40">
       <div className="max-w-4xl mx-auto glass-morphism p-12 md:p-20 rounded-[48px] border border-slate-200 dark:border-white/5 text-center bg-white shadow-xl">
-        <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic mb-6">Connect with an Architect</h2>
+        <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic mb-6">Connect with our Team</h2>
         <p className="text-slate-500 dark:text-slate-400 text-lg mb-12">Ready to deploy HR360 for your global workforce? Schedule a strategy session with our team.</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <input 
-            type="email" 
-            placeholder="Enter corporate email" 
+          <input
+            type="email"
+            placeholder="Enter corporate email"
             className="px-8 py-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:border-[#8252e9] flex-1 max-w-sm shadow-inner"
           />
           <button className="px-10 py-4 gradient-bg text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.02] transition-transform">
@@ -123,47 +123,41 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 h-24 flex items-center px-8 md:px-16 glass border-b border-slate-200 dark:border-white/5 bg-white/70 backdrop-blur-3xl shadow-sm">
+      <nav className="fixed top-0 left-0 right-0 z-50 h-24 flex items-center px-8 md:px-16 glass border-b border-slate-200 dark:border-white/5 bg-white/70 backdrop-blur-3xl shadow-sm animate-in slide-in-from-top duration-700 fill-mode-both">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
-          <div 
+          <div
             onClick={() => scrollToSection('home')}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-3 cursor-pointer group animate-in fade-in zoom-in duration-500 delay-300 fill-mode-both"
           >
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform overflow-hidden"
-              style={{ backgroundColor: brand.logoUrl ? 'transparent' : 'orange' }}
-            >
-               {brand.logoUrl ? (
-                 <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Logo" />
-               ) : (
-                 <span className="text-white text-xl font-black italic">{brand.companyName.charAt(0)}</span>
-               )}
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+              <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
             </div>
             <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
-              {brand.companyName}<span className="text-orange-500 font-normal group-hover:text-orange-400 transition-colors">.</span>
+              HR360<span className="text-orange-500 font-normal group-hover:text-orange-400 transition-colors">.</span>
             </div>
           </div>
-          
-          <div className="hidden md:flex items-center gap-10">
-            {['HOME', 'FEATURES', 'PRICING', 'CONTACT'].map((item) => (
-              <button 
-                key={item} 
+
+          <div className="hidden md:flex items-center gap-10 animate-in fade-in slide-in-from-top-4 duration-700 delay-500 fill-mode-both">
+            {['HOME', 'FEATURES', 'PRICING', 'CONTACT'].map((item, index) => (
+              <button
+                key={item}
                 onClick={() => scrollToSection(item.toLowerCase())}
-                className="text-[10px] font-black text-slate-400 hover:text-slate-900 dark:text-white/50 dark:hover:text-white uppercase tracking-[0.2em] transition-all"
+                className="text-[10px] font-black text-slate-400 hover:text-slate-900 dark:text-white/50 dark:hover:text-white uppercase tracking-[0.2em] transition-all animate-in fade-in duration-500 fill-mode-both"
+                style={{ animationDelay: `${600 + index * 100}ms` }}
               >
                 {item}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-6">
-            <button 
+          <div className="flex items-center gap-6 animate-in fade-in slide-in-from-right-4 duration-700 delay-700 fill-mode-both">
+            <button
               onClick={onLogin}
               className="text-[10px] font-black text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white uppercase tracking-[0.2em] transition-all"
             >
               LOGIN
             </button>
-            <button 
+            <button
               onClick={onGetStarted}
               className="px-6 py-2.5 rounded-xl text-[10px] font-black text-white uppercase tracking-[0.2em] shadow-lg hover:scale-105 active:scale-95 transition-all shadow-purple-500/20"
               style={{ backgroundColor: brand.primaryColor }}
@@ -178,38 +172,38 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
       <section id="home" className="relative z-10 pt-48 pb-32 px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
         {/* Hero Background Image */}
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/HR360_bg.jpg" 
-            alt="HR360 Background" 
+          <img
+            src="/HR360_bg.jpg"
+            alt="HR360 Background"
             className="w-full h-full object-cover opacity-20 dark:opacity-10"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-white/30 to-white dark:from-[#0d0a1a]/50 dark:via-[#0d0a1a]/30 dark:to-[#0d0a1a]" />
         </div>
 
         <div className="max-w-6xl mx-auto text-center relative z-20">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 dark:text-white/60 italic">V3.1 Now Live: Generative Strategy Engine</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 dark:text-white/60 italic">Human Resources Operating System</span>
           </div>
-          
-          <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-in fade-in slide-in-from-bottom-6 duration-1000">
+
+          <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-400 fill-mode-both">
             <span className="block text-slate-900 dark:text-white mb-2">HUMAN CAPITAL</span>
             <span className="gradient-text-live italic">REIMAGINED.</span>
           </h1>
-          
-          <p className="max-w-2xl mx-auto text-slate-500 dark:text-slate-400 text-lg md:text-xl font-medium leading-relaxed mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200">
-            Empower your workforce with {brand.companyName}'s most advanced HR operating system. Provision identities, automate compliance, and unlock predictive intelligence.
+
+          <p className="max-w-2xl mx-auto text-slate-500 dark:text-slate-400 text-lg md:text-xl font-medium leading-relaxed mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-600 fill-mode-both">
+            Empower your workforce with HR360's most advanced HR operating system. Provision identities, automate compliance, and unlock predictive intelligence.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
-            <button 
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-800 fill-mode-both">
+            <button
               onClick={onGetStarted}
               className="w-full sm:w-auto px-10 py-5 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:scale-[1.02] active:scale-98 transition-all shadow-purple-500/30"
               style={{ backgroundColor: brand.primaryColor }}
             >
               Start Company Onboarding
             </button>
-            <button 
+            <button
               onClick={() => scrollToSection('features')}
               className="w-full sm:w-auto px-10 py-5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-600 dark:text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-slate-50 dark:hover:bg-white/10 transition-all shadow-sm"
             >
@@ -228,24 +222,17 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
         <div className="max-w-7xl mx-auto border-t border-slate-200 dark:border-white/5 pt-20">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-16 mb-20">
             <div className="col-span-1 md:col-span-2">
-               <div className="flex items-center gap-3 mb-6">
-                  <div 
-                    className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden"
-                    style={{ backgroundColor: brand.logoUrl ? 'transparent' : 'orange' }}
-                  >
-                    {brand.logoUrl ? (
-                      <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Footer Logo" />
-                    ) : (
-                      <span className="text-white font-black italic">{brand.companyName.charAt(0)}</span>
-                    )}
-                  </div>
-                  <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
-                    {brand.companyName}<span className="text-orange-500 font-normal">.</span>
-                  </div>
-               </div>
-               <p className="text-slate-500 max-w-sm leading-relaxed text-sm mb-8 font-medium">
-                 The enterprise management suite for companies that demand data integrity and strategic excellence. Part of the {brand.companyName} Intelligence Network.
-               </p>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
+                  <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
+                </div>
+                <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
+                  HR360<span className="text-orange-500 font-normal">.</span>
+                </div>
+              </div>
+              <p className="text-slate-500 max-w-sm leading-relaxed text-sm mb-8 font-medium">
+                The enterprise management suite for companies that demand data integrity and strategic excellence. Part of the HR360 Intelligence Network.
+              </p>
             </div>
             <div>
               <h4 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-6">Ecosystem</h4>
@@ -266,9 +253,9 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
               </ul>
             </div>
           </div>
-          
+
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 pt-10 border-t border-slate-200 dark:border-white/5">
-             <p className="text-[9px] font-black text-slate-400 dark:text-slate-700 uppercase tracking-[0.3em]">© 2024 {brand.companyName} SYSTEMS INTELLIGENCE • ALL RIGHTS RESERVED</p>
+            <p className="text-[9px] font-black text-slate-400 dark:text-slate-700 uppercase tracking-[0.3em]">© 2024 HR360 SYSTEMS INTELLIGENCE • ALL RIGHTS RESERVED</p>
           </div>
         </div>
       </footer>

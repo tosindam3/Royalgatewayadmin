@@ -130,6 +130,31 @@ class Employee extends Model
         return $this->hasMany(LeaveRequest::class);
     }
 
+    public function salary()
+    {
+        return $this->hasOne(EmployeeSalary::class)->where('is_active', true);
+    }
+
+    public function salaries()
+    {
+        return $this->hasMany(EmployeeSalary::class);
+    }
+
+    public function attendanceRecords()
+    {
+        return $this->hasMany(AttendanceRecord::class);
+    }
+
+    public function performanceSubmissions()
+    {
+        return $this->hasMany(PerformanceSubmission::class);
+    }
+
+    public function payrollRunEmployees()
+    {
+        return $this->hasMany(PayrollRunEmployee::class);
+    }
+
     /**
      * Scope for employees who should be visible in operations
      * (e.g. Attendance, Payroll)

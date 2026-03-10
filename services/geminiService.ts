@@ -10,8 +10,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 const getAI = () => {
   const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY || (process as any).env.API_KEY;
 
-  if (!apiKey || apiKey.includes('AQ.Ab8RN')) {
-    console.warn("Gemini API Key missing or invalid. AI features will be limited.");
+  if (!apiKey) {
+    console.warn("Gemini API Key missing. AI features will be limited.");
     return null;
   }
 

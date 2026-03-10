@@ -14,6 +14,9 @@ Route::prefix('v1')->group(function () {
     // Broadcasting Auth
     Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
+    // Dashboard Routes
+    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware('auth:sanctum');
+
     // HR Core Module Routes
     Route::prefix('hr-core')->group(function () {
         // Attendance System (ZKTeco + Mobile)
@@ -81,6 +84,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/{id}/test', [App\Http\Controllers\BiometricDeviceController::class, 'testConnection']);
             Route::post('/{id}/sync', [App\Http\Controllers\BiometricDeviceController::class, 'sync']);
             Route::post('/sync-all', [App\Http\Controllers\BiometricDeviceController::class, 'syncAll']);
+        });
+
+        // Attendance Import Management
+        Route::prefix('attendance')->group(function () {
+            Route::post('/import', [App\Http\Controllers\AttendanceImportController::class, 'import']);
+            Route::get('/import/history', [App\Http\Controllers\AttendanceImportController::class, 'history']);
         });
 
         // Workplaces Management
@@ -205,8 +214,12 @@ Route::prefix('v1')->group(function () {
 
     // Payroll Module Routes
     Route::prefix('payroll')->middleware('auth:sanctum')->group(function () {
+        // Dashboard Metrics
+        Route::get('/metrics', [App\Http\Controllers\PayrollDashboardController::class, 'metrics']);
+
         // Payroll Periods
         Route::get('/periods', [App\Http\Controllers\PayrollPeriodController::class, 'index']);
+        Route::post('/periods', [App\Http\Controllers\PayrollPeriodController::class, 'store']);
         Route::get('/periods/{id}', [App\Http\Controllers\PayrollPeriodController::class, 'show']);
 
         // Payroll Runs
@@ -241,6 +254,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'index']);
         Route::get('/settings/{key}', [App\Http\Controllers\OrganizationSettingController::class, 'show']);
         Route::post('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'update']);
+        
+        // Currency Settings
+        Route::get('/currency/settings', [App\Http\Controllers\OrganizationSettingController::class, 'getCurrencySettings']);
+        Route::get('/currency/list', [App\Http\Controllers\OrganizationSettingController::class, 'getCurrencyList']);
+        Route::post('/currency/settings', [App\Http\Controllers\OrganizationSettingController::class, 'updateCurrencySettings']);
     });
 
     // Payroll Approval Routes
@@ -276,6 +294,7 @@ Route::prefix('v1')->group(function () {
         // Submissions
         Route::get('/submissions', [App\Http\Controllers\PerformanceController::class, 'index']);
         Route::post('/submissions', [App\Http\Controllers\PerformanceController::class, 'store']);
+        Route::get('/available-periods', [App\Http\Controllers\PerformanceController::class, 'getAvailablePeriods']);
 
         // Drafts
         Route::get('/drafts/my-draft', [App\Http\Controllers\PerformanceController::class, 'getDraft']);

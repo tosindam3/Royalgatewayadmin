@@ -14,9 +14,9 @@ function cn(...inputs: ClassValue[]) {
 interface TemplateScopeModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (scope: 'global' | 'branch' | 'department', targetId?: number) => void;
+    onConfirm: (scope: 'global' | 'branch' | 'department', targetIds?: number | number[]) => void;
     initialScope?: 'global' | 'branch' | 'department';
-    initialTargetId?: number;
+    initialTargetIds?: number | number[];
 }
 
 const TemplateScopeModal: React.FC<TemplateScopeModalProps> = ({
@@ -24,16 +24,16 @@ const TemplateScopeModal: React.FC<TemplateScopeModalProps> = ({
     onClose,
     onConfirm,
     initialScope = 'department',
-    initialTargetId
+    initialTargetIds
 }) => {
     const [scope, setScope] = React.useState<'global' | 'branch' | 'department'>(initialScope);
     const [branches, setBranches] = React.useState<Branch[]>([]);
     const [departments, setDepartments] = React.useState<Department[]>([]);
     const [selectedBranchId, setSelectedBranchId] = React.useState<number | undefined>(
-        initialScope === 'branch' ? initialTargetId : undefined
+        initialScope === 'branch' && !Array.isArray(initialTargetIds) ? initialTargetIds : undefined
     );
-    const [selectedDeptId, setSelectedDeptId] = React.useState<number | undefined>(
-        initialScope === 'department' ? initialTargetId : undefined
+    const [selectedDeptIds, setSelectedDeptIds] = React.useState<number[]>(
+        initialScope === 'department' ? (Array.isArray(initialTargetIds) ? initialTargetIds : (initialTargetIds ? [initialTargetIds] : [])) : []
     );
     const [isLoading, setIsLoading] = React.useState(false);
 
@@ -60,17 +60,23 @@ const TemplateScopeModal: React.FC<TemplateScopeModalProps> = ({
     };
 
     const handleConfirm = () => {
-        let targetId: number | undefined;
-        if (scope === 'department') targetId = selectedDeptId;
-        if (scope === 'branch') targetId = selectedBranchId;
+        let targets: number | number[] | undefined;
+        if (scope === 'department') targets = selectedDeptIds;
+        if (scope === 'branch') targets = selectedBranchId;
 
-        onConfirm(scope, targetId);
+        onConfirm(scope, targets);
+    };
+
+    const toggleDepartment = (id: number) => {
+        setSelectedDeptIds(prev =>
+            prev.includes(id) ? prev.filter(reqId => reqId !== id) : [...prev, id]
+        );
     };
 
     const isValid =
         scope === 'global' ||
         (scope === 'branch' && selectedBranchId) ||
-        (scope === 'department' && selectedDeptId);
+        (scope === 'department' && selectedDeptIds.length > 0);
 
     return (
         <Modal
@@ -84,7 +90,7 @@ const TemplateScopeModal: React.FC<TemplateScopeModalProps> = ({
                     <Button
                         disabled={!isValid || isLoading}
                         onClick={handleConfirm}
-                        className="rounded-xl px-8 shadow-lg shadow-purple-500/20"
+                        className="rounded-xl px-8 shadow-lg shadow-purple-500/20 bg-purple-600 hover:bg-purple-700 text-white"
                     >
                         Continue to Editor
                     </Button>
@@ -183,23 +189,53 @@ const TemplateScopeModal: React.FC<TemplateScopeModalProps> = ({
                                 "font-black uppercase tracking-tight text-sm",
                                 scope === 'department' ? "text-purple-600 dark:text-purple-400" : "text-slate-900 dark:text-white"
                             )}>Department Specific</h4>
-                            <p className="text-xs text-slate-500 font-bold leading-relaxed mt-0.5">Highest priority. Only visible to the selected department.</p>
+                            <p className="text-xs text-slate-500 font-bold leading-relaxed mt-0.5">Highest priority. Can be assigned to multiple departments.</p>
                         </div>
                         {scope === 'department' && <Check className="w-5 h-5 text-purple-500" />}
                     </button>
 
                     {scope === 'department' && (
                         <div className="pl-16 pr-4 pb-2 animate-in slide-in-from-top-2 duration-300">
-                            <select
-                                className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                                value={selectedDeptId || ''}
-                                onChange={(e) => setSelectedDeptId(Number(e.target.value))}
-                            >
-                                <option value="">Select a department...</option>
-                                {departments.map(d => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </select>
+                            <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-2 max-h-[200px] overflow-y-auto space-y-1">
+                                {departments.map(d => {
+                                    const deptId = Number(d.id);
+                                    const isSelected = selectedDeptIds.includes(deptId);
+                                    return (
+                                        <label key={d.id} className={cn(
+                                            "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                                            isSelected ? "bg-purple-500/10" : "hover:bg-slate-200/50 dark:hover:bg-white/5"
+                                        )}>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={isSelected}
+                                                onChange={() => {
+                                                    if (isSelected) {
+                                                        setSelectedDeptIds(selectedDeptIds.filter(id => id !== deptId));
+                                                    } else {
+                                                        setSelectedDeptIds([...selectedDeptIds, deptId]);
+                                                    }
+                                                }}
+                                            />
+                                            <div className={cn(
+                                                "w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors",
+                                                isSelected ? "bg-purple-500 border-purple-500 text-white" : "border-slate-300 dark:border-white/20"
+                                            )}>
+                                                {isSelected && <Check className="w-3 h-3" />}
+                                            </div>
+                                            <span className={cn(
+                                                "text-sm font-bold flex-1",
+                                                isSelected ? "text-purple-600 dark:text-purple-400" : "text-slate-700 dark:text-slate-300"
+                                            )}>
+                                                {d.name}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                                {departments.length === 0 && !isLoading && (
+                                    <p className="text-xs text-slate-500 text-center py-4">No departments found</p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

@@ -8,61 +8,91 @@ import { SalaryStructure, EmployeeSalary, Employee, PayrollItem } from '../../ty
 
 const SalaryManagementTab: React.FC = () => {
     const queryClient = useQueryClient();
+    const [activeSubTab, setActiveSubTab] = useState<'Mappings' | 'Structures'>('Mappings');
+    const [isStructureModalOpen, setIsStructureModalOpen] = useState(false);
+    const [isConfigureModalOpen, setIsConfigureModalOpen] = useState(false);
+    const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     const [selectedMappingId, setSelectedMappingId] = useState<number | null>(null);
     const [viewMode, setViewMode] = useState<'view' | 'edit' | null>(null);
-    const [activeSubTab, setActiveSubTab] = useState<'Structures' | 'Mappings'>('Mappings');
-    const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
-    const [isConfigureModalOpen, setIsConfigureModalOpen] = useState(false);
     const [selectedStructure, setSelectedStructure] = useState<SalaryStructure | null>(null);
+
+    // Form States
+    const [structureForm, setStructureForm] = useState<Partial<SalaryStructure>>({
+        name: '',
+        description: '',
+        earnings_components: [],
+        deductions_components: []
+    });
+
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
     const [selectedStructureId, setSelectedStructureId] = useState<number | null>(null);
-    const [baseSalary, setBaseSalary] = useState<number>(0);
-    const [effectiveDate, setEffectiveDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [baseSalary, setBaseSalary] = useState(0);
+    const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Queries
-    const { data: structures = [], isLoading: isLoadingStructures } = useQuery({
+    const { data: structures } = useQuery({
         queryKey: ['payroll-structures'],
-        queryFn: () => payrollApi.getStructures()
+        queryFn: () => payrollApi.getStructures(),
+        initialData: []
     });
 
-    const { data: mappings = [], isLoading: isLoadingMappings } = useQuery({
+    const { data: mappings } = useQuery({
         queryKey: ['employee-salaries'],
-        queryFn: () => payrollApi.getEmployeeSalaries()
+        queryFn: () => payrollApi.getEmployeeSalaries(),
+        initialData: []
     });
 
-    const { data: selectedMapping } = useQuery({
-        queryKey: ['employee-salary', selectedMappingId],
-        queryFn: () => payrollApi.getEmployeeSalary(selectedMappingId!),
-        enabled: !!selectedMappingId
+    const { data: payrollItems } = useQuery({
+        queryKey: ['payroll-items'],
+        queryFn: () => payrollApi.getPayItems(),
+        initialData: []
     });
 
     const { data: employeesResponse } = useQuery({
-        queryKey: ['employees-list'],
-        queryFn: () => employeeService.getDirectory()
+        queryKey: ['employees'],
+        queryFn: () => employeeService.getDirectory(),
     });
-
-    const { data: payrollItems = [] } = useQuery({
-        queryKey: ['payroll-items'],
-        queryFn: () => payrollApi.getPayItems()
-    });
-
-    // Mock attendance/performance for the detailed view
-    // In a real app, these would be useQuery hooks calling the respective services
-    const attendanceStats = {
-        late_minutes: 45,
-        absent_days: 2,
-        penalty_amount: 150
-    };
-
-    const performanceStats = {
-        score: 4.2,
-        bonus_multiplier: 0.05,
-        adjustment_amount: 250
-    };
-
     const employees = employeesResponse?.data || [];
 
+    const selectedMapping = mappings.find(m => m.id === selectedMappingId);
+
+    // Mock data for integrated preview (should ideally come from backend)
+    const attendanceStats = { penalty_amount: 150, late_minutes: 45, absent_days: 1 };
+    const performanceStats = { adjustment_amount: 250, score: 4.2, bonus_multiplier: 0.1 };
+
     // Mutations
+    const structureMutation = useMutation({
+        mutationFn: (data: Partial<SalaryStructure>) =>
+            data.id ? payrollApi.updateStructure(data.id, data) : payrollApi.createStructure(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['payroll-structures'] });
+            setIsStructureModalOpen(false);
+            setIsConfigureModalOpen(false);
+            setStructureForm({ name: '', description: '', earnings_components: [], deductions_components: [] });
+        }
+    });
+
+    const deleteStructureMutation = useMutation({
+        mutationFn: (id: number) => payrollApi.deleteStructure(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['payroll-structures'] });
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.error || 'Failed to delete structure. It might be assigned to employees.');
+        }
+    });
+
+    const toggleComponent = (type: 'earnings' | 'deductions', id: number) => {
+        const field = type === 'earnings' ? 'earnings_components' : 'deductions_components';
+        setStructureForm(prev => {
+            const current = (prev[field] as number[]) || [];
+            const updated = current.includes(id)
+                ? current.filter(cid => cid !== id)
+                : [...current, id];
+            return { ...prev, [field]: updated };
+        });
+    };
+
     const assignMutation = useMutation({
         mutationFn: (data: { employee_id: number; salary_structure_id: number; base_salary: number; effective_date: string }) =>
             payrollApi.assignSalaryStructure(data),
@@ -195,7 +225,15 @@ const SalaryManagementTab: React.FC = () => {
                     {structures.map((s) => (
                         <GlassCard key={s.id} className="!p-6 relative group overflow-hidden">
                             <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#8252e9]/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
-                            <h4 className="text-lg font-black text-white italic mb-2">{s.name}</h4>
+                            <div className="flex justify-between items-start mb-2">
+                                <h4 className="text-lg font-black text-white italic">{s.name}</h4>
+                                <button
+                                    onClick={() => { if (confirm('Delete structure?')) deleteStructureMutation.mutate(s.id); }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-rose-500 hover:text-rose-400 p-1"
+                                >
+                                    🗑️
+                                </button>
+                            </div>
                             <p className="text-[10px] text-slate-500 font-bold mb-6 line-clamp-2">{s.description || 'No description provided.'}</p>
 
                             <div className="space-y-4 mb-8">
@@ -214,6 +252,7 @@ const SalaryManagementTab: React.FC = () => {
                                 className="w-full"
                                 onClick={() => {
                                     setSelectedStructure(s);
+                                    setStructureForm(s);
                                     setIsConfigureModalOpen(true);
                                 }}
                             >
@@ -221,10 +260,139 @@ const SalaryManagementTab: React.FC = () => {
                             </Button>
                         </GlassCard>
                     ))}
-                    <button className="h-full min-h-[200px] border-2 border-dashed border-white/10 rounded-[32px] flex flex-col items-center justify-center gap-4 hover:border-[#8252e9]/50 hover:bg-[#8252e9]/5 transition-all group">
+                    <button
+                        onClick={() => {
+                            setStructureForm({ name: '', description: '', earnings_components: [], deductions_components: [] });
+                            setIsStructureModalOpen(true);
+                        }}
+                        className="h-full min-h-[200px] border-2 border-dashed border-white/10 rounded-[32px] flex flex-col items-center justify-center gap-4 hover:border-[#8252e9]/50 hover:bg-[#8252e9]/5 transition-all group"
+                    >
                         <span className="text-4xl grayscale group-hover:grayscale-0 transition-all">➕</span>
                         <span className="text-[10px] font-black text-slate-500 group-hover:text-white uppercase tracking-widest">New Structure</span>
                     </button>
+                </div>
+            )}
+
+            {/* Structure Add/Edit Modal */}
+            {isStructureModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                    <div className="absolute inset-0" onClick={() => setIsStructureModalOpen(false)} />
+                    <div className="w-full max-w-lg bg-[#0d0a1a] border border-white/10 rounded-[40px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500">
+                        <div className="p-10">
+                            <h3 className="text-2xl font-black text-white italic mb-6">Create Salary Structure</h3>
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Structure Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Senior Management"
+                                        value={structureForm.name}
+                                        onChange={(e) => setStructureForm({ ...structureForm, name: e.target.value })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-[#8252e9] focus:outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
+                                    <textarea
+                                        placeholder="Enter details about this pay grade..."
+                                        value={structureForm.description}
+                                        onChange={(e) => setStructureForm({ ...structureForm, description: e.target.value })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-[#8252e9] focus:outline-none h-24"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <Button variant="secondary" onClick={() => setIsStructureModalOpen(false)} className="flex-1">Cancel</Button>
+                                <Button
+                                    variant="primary"
+                                    onClick={() => structureMutation.mutate(structureForm)}
+                                    isLoading={structureMutation.isPending}
+                                    disabled={!structureForm.name}
+                                    className="flex-1"
+                                >
+                                    Create Structure
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Configure Components Modal */}
+            {isConfigureModalOpen && selectedStructure && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                    <div className="absolute inset-0" onClick={() => setIsConfigureModalOpen(false)} />
+                    <div className="w-full max-w-2xl bg-[#0d0a1a] border border-white/10 rounded-[40px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500">
+                        <div className="p-10">
+                            <h3 className="text-2xl font-black text-white italic mb-2 uppercase tracking-tight">Configure {selectedStructure.name}</h3>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-8">Select pay components enabled for this grade</p>
+
+                            <div className="space-y-8 max-h-[50vh] overflow-y-auto no-scrollbar pr-4">
+                                {/* Earnings Section */}
+                                <div>
+                                    <h4 className="text-[10px] font-black text-[#10b981] uppercase tracking-[0.2em] mb-4 border-l-2 border-[#10b981] pl-3">Earnings Components</h4>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {payrollItems.filter(i => i.type === 'earning').map(item => {
+                                            const isSelected = structureForm.earnings_components?.includes(item.id);
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => toggleComponent('earnings', item.id)}
+                                                    className={`p-4 rounded-2xl border transition-all flex justify-between items-center cursor-pointer ${isSelected ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-80'}`}
+                                                >
+                                                    <div>
+                                                        <p className="text-xs font-black text-white uppercase">{item.name}</p>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">{item.code} • {item.method}</p>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-white/20'}`}>
+                                                        {isSelected && '✓'}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Deductions Section */}
+                                <div>
+                                    <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-4 border-l-2 border-rose-500 pl-3">Deductions Components</h4>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {payrollItems.filter(i => i.type === 'deduction').map(item => {
+                                            const isSelected = structureForm.deductions_components?.includes(item.id);
+                                            return (
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => toggleComponent('deductions', item.id)}
+                                                    className={`p-4 rounded-2xl border transition-all flex justify-between items-center cursor-pointer ${isSelected ? 'bg-rose-500/10 border-rose-500/20' : 'bg-white/5 border-white/5 opacity-50 hover:opacity-80'}`}
+                                                >
+                                                    <div>
+                                                        <p className="text-xs font-black text-white uppercase">{item.name}</p>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">{item.code} • {item.method}</p>
+                                                    </div>
+                                                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center ${isSelected ? 'bg-rose-500 border-rose-500 text-white' : 'border-white/20'}`}>
+                                                        {isSelected && '✓'}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-10">
+                                <Button variant="secondary" onClick={() => setIsConfigureModalOpen(false)} className="flex-1">Cancel</Button>
+                                <Button
+                                    variant="primary"
+                                    onClick={() => structureMutation.mutate(structureForm)}
+                                    isLoading={structureMutation.isPending}
+                                    className="flex-1 shadow-lg shadow-[#8252e9]/20"
+                                >
+                                    Save Configuration
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -283,13 +451,7 @@ const SalaryManagementTab: React.FC = () => {
                             </div>
 
                             <div className="flex gap-4 mt-10">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setIsMappingModalOpen(false)}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
+                                <Button variant="secondary" onClick={() => setIsMappingModalOpen(false)} className="flex-1">Cancel</Button>
                                 <Button
                                     variant="primary"
                                     onClick={() => assignMutation.mutate({
@@ -310,76 +472,7 @@ const SalaryManagementTab: React.FC = () => {
                 </div>
             )}
 
-            {/* Configure Modal */}
-            {isConfigureModalOpen && selectedStructure && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6 animate-in fade-in duration-300">
-                    <div className="absolute inset-0" onClick={() => setIsConfigureModalOpen(false)} />
-                    <div className="w-full max-w-2xl bg-[#0d0a1a] border border-white/10 rounded-[40px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500">
-                        <div className="p-10">
-                            <h3 className="text-2xl font-black text-white italic mb-2 uppercase tracking-tight">Configure {selectedStructure.name}</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-8">Manage earnings and deductions for this pay grade</p>
-
-                            <div className="space-y-8 max-h-[50vh] overflow-y-auto no-scrollbar pr-4">
-                                {/* Earnings Section */}
-                                <div>
-                                    <h4 className="text-[10px] font-black text-[#10b981] uppercase tracking-[0.2em] mb-4 border-l-2 border-[#10b981] pl-3">Earnings Components</h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {payrollItems.filter(i => i.type === 'earning').map(item => {
-                                            const isSelected = selectedStructure.earnings_components.includes(item.id);
-                                            return (
-                                                <div key={item.id} className={`p-4 rounded-2xl border transition-all flex justify-between items-center ${isSelected ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-white/5 border-white/5 opacity-50'}`}>
-                                                    <div>
-                                                        <p className="text-xs font-black text-white uppercase">{item.name}</p>
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">{item.code} • {item.method}</p>
-                                                    </div>
-                                                    <input type="checkbox" checked={isSelected} readOnly className="w-5 h-5 rounded-lg accent-emerald-500" />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Deductions Section */}
-                                <div>
-                                    <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-4 border-l-2 border-rose-500 pl-3">Deductions Components</h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {payrollItems.filter(i => i.type === 'deduction').map(item => {
-                                            const isSelected = selectedStructure.deductions_components.includes(item.id);
-                                            return (
-                                                <div key={item.id} className={`p-4 rounded-2xl border transition-all flex justify-between items-center ${isSelected ? 'bg-rose-500/10 border-rose-500/20' : 'bg-white/5 border-white/5 opacity-50'}`}>
-                                                    <div>
-                                                        <p className="text-xs font-black text-white uppercase">{item.name}</p>
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">{item.code} • {item.method}</p>
-                                                    </div>
-                                                    <input type="checkbox" checked={isSelected} readOnly className="w-5 h-5 rounded-lg accent-rose-500" />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-4 mt-10">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setIsConfigureModalOpen(false)}
-                                    className="flex-1"
-                                >
-                                    Close
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={() => alert('Component management for structures is read-only in this version. Use the seeder or backend to modify.')}
-                                    className="flex-1 text-[#8252e9] bg-white dark:bg-white/5 border border-[#8252e9]/20"
-                                >
-                                    Save Changes
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Detailed View/Edit Modal */}
+            {/* Detailed View/Edit Mapping Modal */}
             {viewMode && selectedMapping && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6 animate-in fade-in duration-300">
                     <div className="absolute inset-0" onClick={() => { setSelectedMappingId(null); setViewMode(null); }} />

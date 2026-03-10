@@ -69,7 +69,6 @@ const SIDEBAR_CONFIG = [
   { label: 'Memo', icon: <ICONS.Memo />, route: '/communication/memo' },
   { label: 'SYSTEM', isHeader: true, roles: [UserRole.SUPER_ADMIN] },
   { label: 'Brand Settings', icon: <ICONS.Administration />, route: '/settings' },
-  { label: 'Analytics', icon: <ICONS.Analytics />, route: '/analytics' },
   { label: 'Automation & AI', icon: <ICONS.Automation />, route: '/automation' },
   { label: 'Integrations', icon: <ICONS.Integrations />, route: '/integrations' },
 ];
@@ -168,7 +167,6 @@ const MainApp: React.FC<{
                 {currentUserRole === UserRole.SUPER_ADMIN && (
                   <>
                     <Route path="/settings" element={<Settings brand={brand} onUpdate={onUpdateBrand} userProfile={userProfile} onUpdateProfile={onUpdateProfile} />} />
-                    <Route path="/analytics" element={<Analytics />} />
                     <Route path="/automation" element={<AutomationAI />} />
                     <Route path="/integrations" element={<Integrations />} />
                   </>

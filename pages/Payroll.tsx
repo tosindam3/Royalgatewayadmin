@@ -13,6 +13,9 @@ import {
 import PayrollDashboard from '../components/payroll/PayrollDashboard';
 import SalaryManagementTab from '../components/payroll/SalaryManagementTab';
 
+import { organizationService } from '../services/organizationService';
+import { employeeService } from '../services/employeeService';
+
 const Payroll: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'Dashboard' | 'Periods' | 'Approvals' | 'Settings' | 'Management'>('Dashboard');
@@ -23,10 +26,18 @@ const Payroll: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [isCreateRunModalOpen, setIsCreateRunModalOpen] = useState(false);
   const [approvalToReject, setApprovalToReject] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const perPage = 50;
+  const [createRunForm, setCreateRunForm] = useState({
+    period_id: 0,
+    scope_type: 'all' as 'all' | 'department' | 'branch',
+    scope_ref_id: undefined as number | undefined,
+    approver_user_id: 0,
+    note: ''
+  });
 
+  const perPage = 50;
   // New state for settings
   const [settings, setSettings] = useState({
     taxRate: 10,
@@ -66,12 +77,31 @@ const Payroll: React.FC = () => {
     enabled: activeTab === 'Settings'
   });
 
-  const { data: periods = [] } = useQuery({
+  const { data: periods = [], isLoading: isLoadingPeriods } = useQuery({
     queryKey: ['payroll-periods'],
-    queryFn: () => payrollApi.getPeriods()
+    queryFn: () => payrollApi.getPeriods(),
+    staleTime: 30000
   });
 
-  const { data: runsData } = useQuery({
+  const { data: branches = [] } = useQuery({
+    queryKey: ['organization-branches'],
+    queryFn: () => organizationService.getBranches(),
+    enabled: isCreateRunModalOpen
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['organization-departments'],
+    queryFn: () => organizationService.getDepartments(),
+    enabled: isCreateRunModalOpen
+  });
+
+  const { data: employeesResponse } = useQuery({
+    queryKey: ['employees-list-approvers'],
+    queryFn: () => employeeService.getDirectory({ per_page: 100 }),
+    enabled: isCreateRunModalOpen
+  });
+
+  const { data: runsData, isLoading: isLoadingRuns } = useQuery({
     queryKey: ['payroll-runs', selectedPeriodId, currentPage],
     queryFn: () => payrollApi.getRuns({
       period_id: selectedPeriodId || undefined,
@@ -93,7 +123,7 @@ const Payroll: React.FC = () => {
     enabled: !!selectedRunId
   });
 
-  const { data: approvalInboxData } = useQuery({
+  const { data: approvalInboxData, isLoading: isLoadingApprovals } = useQuery({
     queryKey: ['approval-inbox', currentPage],
     queryFn: () => payrollApi.getApprovalInbox({
       entity_type: 'payroll_run',
@@ -108,6 +138,39 @@ const Payroll: React.FC = () => {
 
 
   // Mutations
+  // New Period State
+  const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
+  const [createPeriodForm, setCreatePeriodForm] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    start_date: '',
+    end_date: '',
+    working_days: 22
+  });
+
+  const createPeriodMutation = useMutation({
+    mutationFn: (data: any) => payrollApi.createPeriod(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll-periods'] });
+      setIsCreatePeriodModalOpen(false);
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to create payroll period');
+    }
+  });
+
+  const createRunMutation = useMutation({
+    mutationFn: (data: any) => payrollApi.createRun(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      setIsCreateRunModalOpen(false);
+      alert('Payroll run initiated successfully!');
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Failed to create payroll run');
+    }
+  });
+
   const updateSettingsMutation = useMutation({
     mutationFn: (newSettings: Record<string, any>) => payrollApi.updateSettings(newSettings),
     onSuccess: () => {
@@ -196,6 +259,14 @@ const Payroll: React.FC = () => {
   const canRecalculate = selectedRun && (selectedRun.status === 'draft' || selectedRun.status === 'rejected');
 
 
+  // Generic skeleton renderer for list items
+  const SkeletonCard = () => (
+    <div className="animate-pulse bg-slate-100 dark:bg-white/5 rounded-2xl p-4 space-y-3">
+      <div className="h-3 bg-slate-200 dark:bg-white/10 rounded w-32" />
+      <div className="h-2 bg-slate-200 dark:bg-white/10 rounded w-20" />
+    </div>
+  );
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
       {/* Header */}
@@ -231,8 +302,6 @@ const Payroll: React.FC = () => {
         {/* Dashboard Tab */}
         {activeTab === 'Dashboard' && (
           <PayrollDashboard
-            runs={runs}
-            meta={runsMeta}
             onSendToFinance={() => setActiveTab('Approvals')}
             onCreatePayroll={() => setActiveTab('Periods')}
           />
@@ -248,31 +317,49 @@ const Payroll: React.FC = () => {
           <div className="space-y-6">
             {/* Period Selector */}
             <GlassCard className="!p-6">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white mb-4 uppercase italic">
-                Select Period
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {periods.map((period) => (
-                  <button
-                    key={period.id}
-                    onClick={() => {
-                      setSelectedPeriodId(period.id);
-                      setCurrentPage(1);
-                    }}
-                    className={`p-4 rounded-2xl border-2 transition-all text-left ${selectedPeriodId === period.id
-                      ? 'border-[#8252e9] bg-[#8252e9]/10'
-                      : 'border-slate-200 dark:border-white/10 hover:border-[#8252e9]/50'
-                      }`}
-                  >
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">
-                      {period.name}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      {period.working_days} working days • {period.status}
-                    </p>
-                  </button>
-                ))}
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase italic">
+                  Payroll Periods
+                </h3>
+                <button
+                  onClick={() => setIsCreatePeriodModalOpen(true)}
+                  className="text-[9px] font-black text-[#8252e9] hover:underline uppercase tracking-widest"
+                >
+                  + Open New Period
+                </button>
               </div>
+              {isLoadingPeriods ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : periods.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-[10px] font-black uppercase tracking-widest italic opacity-50">
+                  No payroll periods found — click "+ Open New Period" to begin
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {periods.map((period) => (
+                    <button
+                      key={period.id}
+                      onClick={() => {
+                        setSelectedPeriodId(period.id);
+                        setCurrentPage(1);
+                      }}
+                      className={`p-4 rounded-2xl border-2 transition-all text-left ${selectedPeriodId === period.id
+                        ? 'border-[#8252e9] bg-[#8252e9]/10'
+                        : 'border-slate-200 dark:border-white/10 hover:border-[#8252e9]/50'
+                        }`}
+                    >
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">
+                        {period.name}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        {period.working_days} working days • {period.status}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </GlassCard>
 
 
@@ -283,7 +370,19 @@ const Payroll: React.FC = () => {
                   <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase italic">
                     Payroll Runs
                   </h3>
-                  <button className="px-4 py-2 bg-[#8252e9] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl">
+                  <button
+                    onClick={() => {
+                      setCreateRunForm({
+                        period_id: selectedPeriodId || 0,
+                        scope_type: 'all',
+                        scope_ref_id: undefined,
+                        approver_user_id: 0,
+                        note: ''
+                      });
+                      setIsCreateRunModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-[#8252e9] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl"
+                  >
                     + New Run
                   </button>
                 </div>
@@ -545,6 +644,182 @@ const Payroll: React.FC = () => {
         )}
       </div>
 
+
+      {/* Create Period Modal */}
+      {isCreatePeriodModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+          <div className="absolute inset-0" onClick={() => setIsCreatePeriodModalOpen(false)} />
+          <div className="w-full max-w-lg bg-white dark:bg-[#0d0a1a] border border-slate-200 dark:border-white/10 rounded-[40px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-500">
+            <div className="p-10">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white italic mb-6">Open New Payroll Period</h3>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Year</label>
+                    <input
+                      type="number"
+                      value={createPeriodForm.year}
+                      onChange={(e) => setCreatePeriodForm({ ...createPeriodForm, year: Number(e.target.value) })}
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:border-[#8252e9] focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Month (1-12)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={createPeriodForm.month}
+                      onChange={(e) => setCreatePeriodForm({ ...createPeriodForm, month: Number(e.target.value) })}
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:border-[#8252e9] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Start Date</label>
+                    <input
+                      type="date"
+                      value={createPeriodForm.start_date}
+                      onChange={(e) => setCreatePeriodForm({ ...createPeriodForm, start_date: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:border-[#8252e9] focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">End Date</label>
+                    <input
+                      type="date"
+                      value={createPeriodForm.end_date}
+                      onChange={(e) => setCreatePeriodForm({ ...createPeriodForm, end_date: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:border-[#8252e9] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Factored Working Days</label>
+                  <input
+                    type="number"
+                    value={createPeriodForm.working_days}
+                    onChange={(e) => setCreatePeriodForm({ ...createPeriodForm, working_days: Number(e.target.value) })}
+                    className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-sm text-slate-900 dark:text-white focus:border-[#8252e9] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-10">
+                <Button variant="secondary" onClick={() => setIsCreatePeriodModalOpen(false)} className="flex-1">Cancel</Button>
+                <Button
+                  variant="primary"
+                  onClick={() => createPeriodMutation.mutate(createPeriodForm)}
+                  isLoading={createPeriodMutation.isPending}
+                  className="flex-1"
+                >
+                  Create Period
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Run Modal */}
+      {isCreateRunModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300 p-6">
+          <div className="absolute inset-0" onClick={() => setIsCreateRunModalOpen(false)} />
+          <div className="w-full max-w-lg bg-white dark:bg-[#0d0a1a] shadow-2xl border border-slate-200 dark:border-white/10 animate-in zoom-in-95 duration-500 rounded-[32px] relative overflow-hidden">
+            <div className="p-8">
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-6 uppercase italic flex items-center gap-3">
+                <div className="w-2 h-8 bg-teal-500 rounded-full" />
+                Initiate Payroll Run
+              </h3>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Scope Type</label>
+                  <select
+                    value={createRunForm.scope_type}
+                    onChange={(e) => setCreateRunForm({ ...createRunForm, scope_type: e.target.value as any, scope_ref_id: undefined })}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold"
+                  >
+                    <option value="all">Entire Organization</option>
+                    <option value="branch">Specific Branch</option>
+                    <option value="department">Specific Department</option>
+                  </select>
+                </div>
+
+                {createRunForm.scope_type === 'branch' && (
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Select Branch</label>
+                    <select
+                      value={createRunForm.scope_ref_id}
+                      onChange={(e) => setCreateRunForm({ ...createRunForm, scope_ref_id: Number(e.target.value) })}
+                      className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold"
+                    >
+                      <option value="">Select Branch</option>
+                      {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {createRunForm.scope_type === 'department' && (
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Select Department</label>
+                    <select
+                      value={createRunForm.scope_ref_id}
+                      onChange={(e) => setCreateRunForm({ ...createRunForm, scope_ref_id: Number(e.target.value) })}
+                      className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold"
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Select Approver</label>
+                  <select
+                    value={createRunForm.approver_user_id}
+                    onChange={(e) => setCreateRunForm({ ...createRunForm, approver_user_id: Number(e.target.value) })}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold"
+                  >
+                    <option value="0">Select Approver</option>
+                    {employeesResponse?.data?.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Note (Optional)</label>
+                  <textarea
+                    value={createRunForm.note}
+                    onChange={(e) => setCreateRunForm({ ...createRunForm, note: e.target.value })}
+                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <Button variant="secondary" className="flex-1" onClick={() => setIsCreateRunModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1 !bg-teal-500 hover:!bg-teal-600 shadow-teal-500/20"
+                    isLoading={createRunMutation.isPending}
+                    onClick={() => createRunMutation.mutate(createRunForm)}
+                    disabled={!createRunForm.approver_user_id || (createRunForm.scope_type !== 'all' && !createRunForm.scope_ref_id)}
+                  >
+                    Start Run
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Employee Details Modal */}
       {selectedRunId && selectedEmployee && (

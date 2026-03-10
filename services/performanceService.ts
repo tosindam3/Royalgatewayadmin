@@ -38,16 +38,21 @@ class PerformanceService {
 
   // ─── Analytics ────────────────────────────────────────────────────────────
 
-  async getLeaderboard(limit?: number, period?: string) {
+  async getAvailablePeriods() {
+    const response = await apiClient.get(`${API_BASE}/available-periods`) as any;
+    return response?.data ?? { periods: [], years: [] };
+  }
+
+  async getLeaderboard(limit?: number, filters?: { period?: string, start_date?: string, end_date?: string, year?: string, quarter?: string }) {
     const response = await apiClient.get(`${API_BASE}/leaderboard`, {
-      params: { limit, period }
+      params: { limit, ...(filters || {}) }
     }) as any;
     return Array.isArray(response) ? response : (response?.data ?? []);
   }
 
-  async getDepartmentSummaries(period?: string) {
+  async getDepartmentSummaries(filters?: { period?: string, start_date?: string, end_date?: string, year?: string, quarter?: string }) {
     const response = await apiClient.get(`${API_BASE}/department-summaries`, {
-      params: { period }
+      params: filters || {}
     }) as any;
     return Array.isArray(response) ? response : (response?.data ?? []);
   }
@@ -98,6 +103,7 @@ class PerformanceService {
     description?: string;
     scope: 'department' | 'branch' | 'global';
     department_id?: number;
+    department_ids?: number[];
     branch_id?: number;
     sections: any[];
     scoring_config: any;

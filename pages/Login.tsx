@@ -138,18 +138,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
       onClick={() => handleNavClick('home')}
       className="flex items-center gap-3 cursor-pointer group"
     >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform overflow-hidden"
-        style={{ backgroundColor: brand.logoUrl ? 'transparent' : 'orange' }}
-      >
-        {brand.logoUrl ? (
-          <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Logo" />
-        ) : (
-          <span className="text-white text-xl font-black italic">{brand.companyName.charAt(0)}</span>
-        )}
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+        <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
       </div>
       <div className={`text-2xl font-black tracking-tighter uppercase italic text-slate-900 dark:text-white`}>
-        {brand.companyName}<span className="text-orange-500 font-normal">.</span>
+        HR360<span className="text-orange-500 font-normal">.</span>
       </div>
     </div>
   );
@@ -189,22 +182,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
       <AuthNav />
 
       <main className="flex-1 flex items-center justify-center relative z-10 p-6 pt-28">
-        <div className="w-full max-w-[480px] animate-fade-in">
+        <div className="w-full max-w-[480px] animate-in fade-in zoom-in duration-700 fill-mode-both" style={{ '--tw-scale-x': '0.95', '--tw-scale-y': '0.95' } as any}>
           <div className={`glass-morphism rounded-[40px] p-10 md:p-14 shadow-2xl bg-white/80 dark:bg-[#120e24]/80 backdrop-blur-3xl border border-slate-100 dark:border-white/5 relative overflow-hidden transition-all duration-500`}>
 
             <div className="flex flex-col items-center mb-10">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl overflow-hidden"
-                style={{ backgroundColor: brand.logoUrl ? 'transparent' : brand.primaryColor }}
-              >
-                {brand.logoUrl ? (
-                  <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Logo" />
-                ) : (
-                  <span className="text-white text-3xl font-black italic">{brand.companyName.charAt(0)}</span>
-                )}
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl overflow-hidden">
+                <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
               </div>
               <h2 className="text-2xl font-black text-center text-slate-900 dark:text-white italic">
-                Welcome to {brand.companyName} Admin
+                Welcome to HR360 Admin
               </h2>
               <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 italic">Authorized Access Only</p>
             </div>
@@ -255,13 +241,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
               </Button>
 
               <div className="flex flex-col items-center gap-4 pt-6">
-                <button
-                  type="button"
-                  onClick={handleQuickLogin}
-                  className="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
-                >
-                  ⚡ Quick Demo Login
-                </button>
                 <div className="text-center">
                   <button
                     type="button"
@@ -273,17 +252,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
                 </div>
               </div>
             </form>
-
-            <div className="absolute bottom-0 left-0 w-full p-4 bg-slate-50/50 dark:bg-white/[0.02] border-t border-slate-100 dark:border-white/5 flex justify-center gap-4 opacity-40 hover:opacity-100 transition-opacity">
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">User: <span className="text-slate-700 dark:text-slate-300">test@example.com</span></p>
-              <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Pass: <span className="text-slate-700 dark:text-slate-300">password</span></p>
-            </div>
           </div>
         </div>
       </main>
 
       <footer className="relative z-10 px-8 py-6 text-center opacity-30">
-        <p className="text-[9px] font-black text-slate-400 dark:text-white uppercase tracking-[0.4em]">© 2024 {brand.companyName} SYSTEMS INTELLIGENCE</p>
+        <p className="text-[9px] font-black text-slate-400 dark:text-white uppercase tracking-[0.4em]">© 2024 HR360 SYSTEMS INTELLIGENCE</p>
       </footer>
     </div>
   );

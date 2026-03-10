@@ -1,17 +1,18 @@
 @import "tailwindcss";
+@config "./tailwind.config.js";
 
 :root {
   /* Primary brand color - dynamically updated from settings */
   --brand-primary: #8252e9;
   --brand-primary-rgb: 130, 82, 233;
-  
+
   /* Brand color variations - auto-calculated */
   --brand-primary-10: rgba(var(--brand-primary-rgb), 0.1);
   --brand-primary-20: rgba(var(--brand-primary-rgb), 0.2);
   --brand-primary-30: rgba(var(--brand-primary-rgb), 0.3);
   --brand-primary-50: rgba(var(--brand-primary-rgb), 0.5);
   --brand-primary-80: rgba(var(--brand-primary-rgb), 0.8);
-  
+
   /* Glass morphism */
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.08);
@@ -29,7 +30,7 @@
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
 .glass {
@@ -237,4 +238,60 @@ body {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+}
+
+/* Recharts Tooltip Theme Support */
+.recharts-tooltip-wrapper {
+  z-index: 1000;
+}
+
+.recharts-default-tooltip {
+  background-color: white !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  padding: 12px !important;
+}
+
+.dark .recharts-default-tooltip {
+  background-color: #1e293b !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+.recharts-tooltip-label {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  margin-bottom: 8px !important;
+}
+
+.dark .recharts-tooltip-label {
+  color: #f1f5f9 !important;
+}
+
+.recharts-tooltip-item {
+  color: #475569 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  padding: 2px 0 !important;
+}
+
+.dark .recharts-tooltip-item {
+  color: #cbd5e1 !important;
+}
+
+.recharts-tooltip-item-name {
+  margin-right: 8px !important;
+}
+
+.recharts-tooltip-item-value {
+  font-weight: 900 !important;
+  color: #0f172a !important;
+}
+
+.dark .recharts-tooltip-item-value {
+  color: #ffffff !important;
 }

@@ -3,4 +3,6 @@ export default {
     '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
+  // Suppress the 'from' option warning
+  parser: undefined,
 }

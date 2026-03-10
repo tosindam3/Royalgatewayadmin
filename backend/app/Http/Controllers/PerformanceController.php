@@ -9,6 +9,7 @@ use App\Services\PerformanceScoringEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class PerformanceController extends Controller
 {
@@ -17,6 +18,52 @@ class PerformanceController extends Controller
     public function __construct(PerformanceScoringEngine $scoringEngine)
     {
         $this->scoringEngine = $scoringEngine;
+    }
+
+    private function applyDateFilters($query, Request $request)
+    {
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('submitted_at', [$request->start_date, $request->end_date . ' 23:59:59']);
+        } elseif ($request->filled('year') && $request->year !== 'all_time') {
+            $year = $request->year;
+            if ($request->filled('quarter')) {
+                $quarter = $request->quarter; 
+                $startMonth = ($quarter - 1) * 3 + 1;
+                $endMonth = $startMonth + 2;
+                $query->whereYear('submitted_at', $year)
+                      ->whereMonth('submitted_at', '>=', $startMonth)
+                      ->whereMonth('submitted_at', '<=', $endMonth);
+            } else {
+                $query->whereYear('submitted_at', $year);
+            }
+        } elseif ($request->filled('period') && $request->period !== 'all_time') {
+            $query->where('period', $request->period);
+        }
+        return $query;
+    }
+
+    public function getAvailablePeriods()
+    {
+        $periods = PerformanceSubmission::select('period')
+            ->whereNotNull('period')
+            ->distinct()
+            ->orderBy('period', 'desc')
+            ->pluck('period');
+            
+        // Also get distinct years
+        $years = PerformanceSubmission::select(DB::raw('YEAR(submitted_at) as year'))
+            ->whereNotNull('submitted_at')
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year');
+            
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'periods' => $periods,
+                'years' => $years
+            ]
+        ]);
     }
 
     // Get submissions for current user (or all if admin)
@@ -38,9 +85,7 @@ class PerformanceController extends Controller
             $query->where('status', $request->status);
         }
 
-        if ($request->period) {
-            $query->where('period', $request->period);
-        }
+        $this->applyDateFilters($query, $request);
 
         $submissions = $query->orderBy('created_at', 'desc')
             ->paginate($request->per_page ?? 20);
@@ -153,24 +198,20 @@ class PerformanceController extends Controller
     public function leaderboard(Request $request)
     {
         $limit = $request->limit ?? 10;
-        $period = $request->period;
+        
+        $cacheKey = 'perf_leaderboard_' . md5(json_encode($request->all()));
 
-        $cacheKey = 'performance_leaderboard_' . ($period ?? 'all') . '_' . $limit;
-
-        $leaderboard = Cache::remember($cacheKey, 300, function () use ($limit, $period) {
+        $leaderboard = Cache::remember($cacheKey, 300, function () use ($request, $limit) {
             $query = PerformanceSubmission::select(
                 'employee_id',
                 DB::raw('AVG(score) as average_score'),
                 DB::raw('COUNT(*) as submission_count')
             )
-            ->with('employee:id,first_name,last_name,employee_code,department_id')
-            ->with('employee.department:id,name')
+            ->with('employee:id,first_name,last_name,employee_code,department_id', 'employee.department:id,name')
             ->where('status', 'submitted')
             ->whereNotNull('score');
 
-            if ($period) {
-                $query->where('period', $period);
-            }
+            $this->applyDateFilters($query, $request);
 
             return $query->groupBy('employee_id')
                 ->orderBy('average_score', 'desc')
@@ -199,10 +240,9 @@ class PerformanceController extends Controller
     // Get department summaries
     public function departmentSummaries(Request $request)
     {
-        $period = $request->period;
-        $cacheKey = 'performance_dept_summaries_' . ($period ?? 'all');
+        $cacheKey = 'performance_dept_summaries_' . md5(json_encode($request->all()));
 
-        $summaries = Cache::remember($cacheKey, 300, function () use ($period) {
+        $summaries = Cache::remember($cacheKey, 300, function () use ($request) {
             $query = PerformanceSubmission::select(
                 'department_id',
                 DB::raw('AVG(score) as average_score'),
@@ -213,22 +253,18 @@ class PerformanceController extends Controller
             ->where('status', 'submitted')
             ->whereNotNull('score');
 
-            if ($period) {
-                $query->where('period', $period);
-            }
+            $this->applyDateFilters($query, $request);
 
             return $query->groupBy('department_id')
                 ->orderBy('average_score', 'desc')
                 ->get()
-                ->map(function ($item) use ($period) {
+                ->map(function ($item) use ($request) {
                     // Get top performer
                     $topQuery = PerformanceSubmission::where('department_id', $item->department_id)
                         ->where('score', $item->top_score)
                         ->with('employee:id,first_name,last_name');
                     
-                    if ($period) {
-                        $topQuery->where('period', $period);
-                    }
+                    $this->applyDateFilters($topQuery, $request);
                     
                     $topPerformer = $topQuery->first();
 
@@ -324,11 +360,13 @@ class PerformanceController extends Controller
         $branchId = $employee->branch_id;
 
         // Get submissions for all employees in this branch
-        $branchSubmissions = PerformanceSubmission::where('branch_id', $branchId)
+        $query = PerformanceSubmission::where('branch_id', $branchId)
             ->where('status', 'submitted')
             ->whereNotNull('score')
-            ->with(['department:id,name', 'employee:id,first_name,last_name'])
-            ->get();
+            ->with(['department:id,name', 'employee:id,first_name,last_name']);
+            
+        $this->applyDateFilters($query, $request);
+        $branchSubmissions = $query->get();
 
         if ($branchSubmissions->isEmpty()) {
             return response()->json(['success' => true, 'data' => null]);
@@ -338,9 +376,10 @@ class PerformanceController extends Controller
         $branchAvg = $branchSubmissions->avg('score');
 
         // Org average
-        $orgAvg = PerformanceSubmission::where('status', 'submitted')
-            ->whereNotNull('score')
-            ->avg('score');
+        $orgQuery = PerformanceSubmission::where('status', 'submitted')
+            ->whereNotNull('score');
+        $this->applyDateFilters($orgQuery, $request);
+        $orgAvg = $orgQuery->avg('score');
 
         // Group by department to get department averages within the branch
         $deptGroups = $branchSubmissions->groupBy('department_id');
@@ -377,10 +416,13 @@ class PerformanceController extends Controller
     // Get all configs (admin — all statuses)
     public function getConfigs(Request $request)
     {
-        $query = PerformanceConfig::with(['department:id,name', 'branch:id,name', 'creator:id,name']);
+        $query = PerformanceConfig::with(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']);
 
         if ($request->filled('department_id')) {
-            $query->where('department_id', $request->department_id);
+            $query->where(function($q) use ($request) {
+                $q->where('department_id', $request->department_id)
+                  ->orWhereHas('departments', fn($subQ) => $subQ->where('departments.id', $request->department_id));
+            });
         }
         if ($request->filled('branch_id')) {
             $query->where('branch_id', $request->branch_id);
@@ -400,7 +442,7 @@ class PerformanceController extends Controller
     // Get single config
     public function getConfig($id)
     {
-        $config = PerformanceConfig::with(['department:id,name', 'creator:id,name'])
+        $config = PerformanceConfig::with(['department:id,name', 'departments:id,name', 'creator:id,name'])
             ->findOrFail($id);
 
         return response()->json([
@@ -412,9 +454,12 @@ class PerformanceController extends Controller
     // Get config by department
     public function getConfigByDepartment($departmentId)
     {
-        $config = PerformanceConfig::where('department_id', $departmentId)
-            ->where('is_active', true)
-            ->with(['department:id,name'])
+        $config = PerformanceConfig::where('is_active', true)
+            ->where(function($q) use ($departmentId) {
+                $q->where('department_id', $departmentId)
+                  ->orWhereHas('departments', fn($subQ) => $subQ->where('departments.id', $departmentId));
+            })
+            ->with(['department:id,name', 'departments:id,name'])
             ->first();
 
         if (!$config) {
@@ -437,14 +482,16 @@ class PerformanceController extends Controller
             'name'           => 'required|string|max:255',
             'description'    => 'nullable|string',
             'scope'          => 'required|in:department,branch,global',
-            'department_id'  => 'nullable|exists:departments,id',
+            'department_ids' => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
+            'department_id'  => 'nullable|exists:departments,id', // Legacy support
             'branch_id'      => 'nullable|exists:branches,id',
             'sections'       => 'required|array',
             'scoring_config' => 'required|array',
         ]);
 
-        if ($validated['scope'] === 'department' && empty($validated['department_id'])) {
-            return response()->json(['success' => false, 'message' => 'department_id is required when scope is department'], 422);
+        if ($validated['scope'] === 'department' && empty($validated['department_ids']) && empty($validated['department_id'])) {
+            return response()->json(['success' => false, 'message' => 'department_ids array is required when scope is department'], 422);
         }
         if ($validated['scope'] === 'branch' && empty($validated['branch_id'])) {
             return response()->json(['success' => false, 'message' => 'branch_id is required when scope is branch'], 422);
@@ -452,12 +499,25 @@ class PerformanceController extends Controller
 
         $validated['created_by'] = $request->user()->id;
         $validated['status']     = 'draft';
+        
+        // Handle legacy single department_id gracefully for backwards-compatible initial save
+        if (!empty($validated['department_id']) && empty($validated['department_ids'])) {
+            $validated['department_ids'] = [$validated['department_id']];
+        }
 
-        $config = PerformanceConfig::create($validated);
+        $config = PerformanceConfig::create(array_diff_key($validated, array_flip(['department_ids'])));
+        
+        if (!empty($validated['department_ids'])) {
+            $config->departments()->sync($validated['department_ids']);
+            // Also set legacy column if only 1 is selected to keep basic things working out of the box if needed.
+            if (count($validated['department_ids']) === 1) {
+                $config->update(['department_id' => $validated['department_ids'][0]]);
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'data'    => $config->load(['department:id,name', 'branch:id,name', 'creator:id,name']),
+            'data'    => $config->load(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']),
             'message' => 'Configuration created successfully',
         ], 201);
     }
@@ -471,6 +531,8 @@ class PerformanceController extends Controller
             'name'           => 'sometimes|string|max:255',
             'description'    => 'nullable|string',
             'scope'          => 'sometimes|in:department,branch,global',
+            'department_ids' => 'nullable|array',
+            'department_ids.*' => 'exists:departments,id',
             'department_id'  => 'nullable|exists:departments,id',
             'branch_id'      => 'nullable|exists:branches,id',
             'sections'       => 'sometimes|array',
@@ -483,11 +545,25 @@ class PerformanceController extends Controller
             $validated['published_at'] = null;
         }
 
-        $config->update($validated);
+        // Handle legacy department_id mapping
+        if (isset($validated['department_id']) && !isset($validated['department_ids'])) {
+            $validated['department_ids'] = [$validated['department_id']];
+        }
+
+        $config->update(array_diff_key($validated, array_flip(['department_ids'])));
+        
+        if (isset($validated['department_ids'])) {
+            $config->departments()->sync($validated['department_ids']);
+            if (count($validated['department_ids']) === 1) {
+                $config->update(['department_id' => $validated['department_ids'][0]]);
+            } else {
+                $config->update(['department_id' => null]);
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'data'    => $config->fresh(['department:id,name', 'branch:id,name', 'creator:id,name']),
+            'data'    => $config->fresh(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']),
             'message' => 'Configuration updated. Status reverted to draft — re-publish to update the employee portal.',
         ]);
     }
@@ -512,36 +588,128 @@ class PerformanceController extends Controller
     // Analytics summary endpoint
     public function analytics(Request $request)
     {
-        $period = $request->period;
+        $cacheKey = 'perf_analytics_' . md5(json_encode($request->all()));
+        
+        return Cache::remember($cacheKey, 600, function () use ($request) {
+            $query = PerformanceSubmission::where('status', 'submitted')->whereNotNull('score');
+            
+            // Applying advanced date/period filters
+            $this->applyDateFilters($query, $request);
 
-        $query = PerformanceSubmission::where('status', 'submitted')->whereNotNull('score');
-        if ($period) {
-            $query->where('period', $period);
-        }
+            $total      = $query->count();
+            $avgScore   = $query->avg('score');
+            $topScore   = $query->max('score');
 
-        $total      = $query->count();
-        $avgScore   = $query->avg('score');
-        $topScore   = $query->max('score');
-        $byDept     = $query->clone()
-            ->select('department_id', DB::raw('AVG(score) as avg_score'), DB::raw('COUNT(*) as count'))
-            ->groupBy('department_id')
-            ->with('department:id,name')
-            ->get()
-            ->map(fn($d) => [
-                'name'  => $d->department->name ?? 'N/A',
-                'score' => round($d->avg_score, 2),
-                'count' => $d->count,
+            // 1. Department Breakdown
+            $byDept = $query->clone()
+                ->select('department_id', DB::raw('AVG(score) as avg_score'), DB::raw('COUNT(*) as count'))
+                ->groupBy('department_id')
+                ->with('department:id,name')
+                ->get()
+                ->map(fn($d) => [
+                    'name'  => $d->department->name ?? 'N/A',
+                    'score' => round($d->avg_score, 2),
+                    'count' => $d->count,
+                ]);
+
+            // 2. Growth Trajectory (Monthly Trend)
+            // Strategy: Respect organizational filters (Dept/Branch) but use a wider time range for the trend
+            $trajectoryQuery = PerformanceSubmission::where('status', 'submitted')
+                ->whereNotNull('score');
+
+            if ($request->department_id) {
+                $trajectoryQuery->where('department_id', $request->department_id);
+            }
+            if ($request->branch_id) {
+                $trajectoryQuery->whereHas('employee', function($q) use ($request) {
+                    $q->where('branch_id', $request->branch_id);
+                });
+            }
+
+            // If a year is selected, we might want to show that year's trajectory
+            $lookback = 6;
+            $start = Carbon::now()->subMonths($lookback);
+            
+            if ($request->year) {
+                $start = Carbon::create($request->year, 1, 1);
+            }
+
+            $trajectory = $trajectoryQuery
+                ->where('submitted_at', '>=', $start)
+                ->select(
+                    DB::raw('DATE_FORMAT(submitted_at, "%Y-%m") as month_key'),
+                    DB::raw('AVG(score) as avg_score')
+                )
+                ->groupBy('month_key')
+                ->orderBy('month_key', 'asc')
+                ->get()
+                ->map(fn($t) => [
+                    'month' => Carbon::parse($t->month_key . '-01')->format('M Y'),
+                    'score' => round($t->avg_score, 2),
+                ]);
+
+            // Ensure we at least have 2 points for a line chart if the range allows it
+            // (If there's only one month of data in the system, we can't do much)
+
+            // 3. Score Distribution (Histogram buckets)
+            $distribution = [
+                ['category' => '90-100', 'count' => 0],
+                ['category' => '80-89', 'count' => 0],
+                ['category' => '70-79', 'count' => 0],
+                ['category' => '60-69', 'count' => 0],
+                ['category' => '<60', 'count' => 0],
+            ];
+
+            $scores = $query->clone()->pluck('score');
+            foreach ($scores as $s) {
+                if ($s >= 90) $distribution[0]['count']++;
+                elseif ($s >= 80) $distribution[1]['count']++;
+                elseif ($s >= 70) $distribution[2]['count']++;
+                elseif ($s >= 60) $distribution[3]['count']++;
+                else $distribution[4]['count']++;
+            }
+
+            // 4. Competency Breakdown (Radar Chart)
+            // Aggregating all field scores across submissions
+            $allBreakdowns = $query->clone()->pluck('breakdown');
+            $competencyMatrix = [];
+            $tempBreakdown = [];
+
+            foreach ($allBreakdowns as $json) {
+                $breakdown = is_string($json) ? json_decode($json, true) : $json;
+                if (!is_array($breakdown)) continue;
+                
+                foreach ($breakdown as $item) {
+                    $key = $item['field_label'] ?? $item['field_id'] ?? 'Unknown';
+                    if (!isset($tempBreakdown[$key])) {
+                        $tempBreakdown[$key] = ['total' => 0, 'count' => 0];
+                    }
+                    $tempBreakdown[$key]['total'] += $item['score'] ?? 0;
+                    $tempBreakdown[$key]['count']++;
+                }
+            }
+
+            foreach ($tempBreakdown as $label => $stats) {
+                $competencyMatrix[] = [
+                    'subject' => $label,
+                    'score'   => round($stats['total'] / $stats['count'], 1),
+                    'fullMark' => 100
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'total_submissions' => $total,
+                    'average_score'     => round($avgScore, 2),
+                    'top_score'         => $topScore,
+                    'by_department'     => $byDept,
+                    'trajectory'        => $trajectory,
+                    'distribution'      => $distribution,
+                    'competency_matrix' => $competencyMatrix,
+                ],
             ]);
-
-        return response()->json([
-            'success' => true,
-            'data'    => [
-                'total_submissions' => $total,
-                'average_score'     => round($avgScore, 2),
-                'top_score'         => $topScore,
-                'by_department'     => $byDept,
-            ],
-        ]);
+        });
     }
 
     // ─── Lifecycle Actions ───────────────────────────────────────────────────

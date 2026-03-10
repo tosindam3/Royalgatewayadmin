@@ -37,6 +37,11 @@ class PerformanceConfig extends Model
     {
         return $this->belongsTo(Department::class);
     }
+    
+    public function departments()
+    {
+        return $this->belongsToMany(Department::class, 'department_performance_config');
+    }
 
     public function branch()
     {
@@ -70,7 +75,12 @@ class PerformanceConfig extends Model
         if ($employee->department_id) {
             $config = self::published()
                 ->where('scope', 'department')
-                ->where('department_id', $employee->department_id)
+                ->where(function($q) use ($employee) {
+                    $q->where('department_id', $employee->department_id)
+                      ->orWhereHas('departments', function($subQ) use ($employee) {
+                          $subQ->where('departments.id', $employee->department_id);
+                      });
+                })
                 ->latest('published_at')
                 ->first();
             if ($config) return $config;

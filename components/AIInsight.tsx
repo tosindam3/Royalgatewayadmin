@@ -14,10 +14,10 @@ const AIInsight: React.FC<AIInsightProps> = ({ content, isLoading, onRefresh, cl
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-[#8252e9]/20 flex items-center justify-center text-lg animate-pulse">✨</div>
-          <span className="text-[10px] font-black text-white uppercase tracking-widest">AI Strategic Analyst</span>
+          <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">AI Strategic Analyst</span>
         </div>
         {onRefresh && (
-          <button 
+          <button
             onClick={onRefresh}
             className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white transition-all disabled:opacity-30"
             disabled={isLoading}
@@ -36,7 +36,7 @@ const AIInsight: React.FC<AIInsightProps> = ({ content, isLoading, onRefresh, cl
           <div className="h-3 bg-white/5 rounded-full w-[60%] animate-pulse" />
         </div>
       ) : (
-        <p className="text-xs text-slate-300 leading-relaxed font-medium italic animate-in fade-in slide-in-from-bottom-1 duration-500">
+        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium italic animate-in fade-in slide-in-from-bottom-1 duration-500">
           "{content || 'Awaiting fresh data parameters for strategic evaluation...'}"
         </p>
       )}

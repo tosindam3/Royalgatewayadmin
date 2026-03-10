@@ -30,7 +30,26 @@ class EmployeeSalaryController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'salary_structure_id' => 'required|exists:salary_structures,id',
+            'base_salary' => 'required|numeric|min:0',
+            'effective_date' => 'required|date',
+            'is_active' => 'boolean'
+        ]);
+
+        // If active, deactivate other mappings for the same employee
+        if ($request->boolean('is_active', true)) {
+            EmployeeSalary::where('employee_id', $validated['employee_id'])->update(['is_active' => false]);
+            $validated['is_active'] = true;
+        }
+
+        $mapping = EmployeeSalary::create($validated);
+
+        return response()->json([
+            'data' => $mapping->load(['employee', 'salaryStructure']),
+            'message' => 'Salary structure assigned successfully'
+        ], 201);
     }
 
     /**

@@ -19,6 +19,13 @@ import {
  * Requires authentication (Bearer token)
  */
 export const payrollApi = {
+  // ==================== DASHBOARD ====================
+
+  getMetrics: async (): Promise<any> => {
+    const response = await apiClient.get('/payroll/metrics');
+    return response.data || response;
+  },
+
   // ==================== PERIODS ====================
 
   getPeriods: async (params?: {
@@ -26,12 +33,23 @@ export const payrollApi = {
     year?: number;
   }): Promise<PayrollPeriod[]> => {
     const response = await apiClient.get('/payroll/periods', { params });
-    return response.data || response;
+    return response.data?.data || response.data || response;
   },
 
   getPeriod: async (id: number): Promise<PayrollPeriod> => {
     const response = await apiClient.get(`/payroll/periods/${id}`);
-    return response.data || response;
+    return response.data?.data || response.data || response;
+  },
+
+  createPeriod: async (data: {
+    year: number;
+    month: number;
+    start_date: string;
+    end_date: string;
+    working_days: number;
+  }): Promise<PayrollPeriod> => {
+    const response = await apiClient.post('/payroll/periods', data);
+    return response.data?.data || response.data || response;
   },
 
   // ==================== RUNS ====================
@@ -49,7 +67,7 @@ export const payrollApi = {
 
   getStructures: async (): Promise<SalaryStructure[]> => {
     const response = await apiClient.get('/payroll/structures');
-    return response.data || response;
+    return response.data?.data || response.data || response;
   },
 
   createStructure: async (data: Partial<SalaryStructure>): Promise<SalaryStructure> => {
@@ -62,11 +80,15 @@ export const payrollApi = {
     return response.data || response;
   },
 
+  deleteStructure: async (id: number): Promise<void> => {
+    await apiClient.delete(`/payroll/structures/${id}`);
+  },
+
   // ==================== EMPLOYEE SALARIES ====================
 
   getEmployeeSalaries: async (params?: { employee_id?: number }): Promise<EmployeeSalary[]> => {
     const response = await apiClient.get('/payroll/salaries', { params });
-    return response.data || response;
+    return response.data?.data || response.data || response;
   },
 
   // ==================== EMPLOYEE SALARIES (CONTINUED) ====================
@@ -174,7 +196,7 @@ export const payrollApi = {
     active?: boolean;
   }): Promise<PayrollItem[]> => {
     const response = await apiClient.get('/payroll/items', { params });
-    return response.data || response;
+    return response.data?.data || response.data || response;
   },
 
   createPayItem: async (data: Partial<PayrollItem>): Promise<PayrollItem> => {
