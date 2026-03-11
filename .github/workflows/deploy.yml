@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 env:
+  # Opt into Node.js 24 for all actions to avoid deprecation warnings
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -52,18 +53,17 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -v -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
-          echo "Verifying SSH Key format (should be OpenSSH Private Key or RSA)..."
-          head -n 1 ~/.ssh/id_rsa
+          # We use -o StrictHostKeyChecking=no in the commands below to avoid keyscan failures
+          echo "SSH setup complete"
 
       - name: Create Release Directory
         run: |
-          ssh -v -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+          ssh -v -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
           "mkdir -p ~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}"
 
       - name: Upload Files via Rsync
         run: |
-          rsync -avz -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
+          rsync -avz -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no" \
             --exclude='.git*' \
             --exclude='node_modules' \
             --exclude='backend/node_modules' \
@@ -76,5 +76,5 @@ jobs:
 
       - name: Execute Remote Deployment Script
         run: |
-          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
           "export GITHUB_TOKEN=${{ secrets.DEPLOY_TOKEN_PAT }} && bash ~/apps/royalgatewayadmin/scripts/deploy.sh ${{ steps.release_id.outputs.id }}"
