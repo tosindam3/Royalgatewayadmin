@@ -24,7 +24,8 @@ jobs:
 
     - name: Copy React Build
       run: |
-        rm -rf backend/public/*
+        # Clear old assets but keep Laravel entry points
+        rm -rf backend/public/assets
         cp -r dist/* backend/public/
 
     - name: Setup SSH
