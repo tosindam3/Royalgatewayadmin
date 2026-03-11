@@ -42,7 +42,7 @@ jobs:
     - name: Deploy Public Assets
       run: |
         rsync -avz --delete -e "ssh -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=no" \
-        backend/public/ ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:~/public_html/
+        backend/public/ ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:~/domains/royalgatewayadmin.com/public_html/
 
     - name: Run Laravel Commands
       run: |
