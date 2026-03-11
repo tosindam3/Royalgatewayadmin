@@ -112,7 +112,7 @@ jobs:
           cd ~/royalgatewayadmin-api
           
           # Update remote URL with token
-          git remote set-url origin https://${{ secrets.GITHUB_TOKEN_DEPLOY }}@github.com/${{ github.repository }}.git
+          git remote set-url origin https://${{ secrets.DEPLOY_TOKEN_PAT }}:x-oauth-basic@github.com/${{ github.repository }}.git
           
           # Pull latest changes using token
           git fetch origin main
