@@ -28,37 +28,33 @@ jobs:
         rm -rf backend/public/assets
         cp -r dist/* backend/public/
 
-    - name: Setup SSH
+    - name: Deploy Backend Core
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.RG_SSH }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_HOST }} >> ~/.ssh/known_hosts
+        rsync -avz --delete --exclude 'public' -e "ssh -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=no" \
+        backend/ ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
-    - name: Deploy to Server
+    - name: Prepare Public Entry Point
       run: |
-        rsync -avz --delete \
-        -e "ssh -p ${{ secrets.HOSTINGER_PORT }}" \
-        backend/ \
-        ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:${{ secrets.DEPLOY_PATH }}
+        # Adjust index.php paths for sibling directory structure before sync
+        sed -i "s|__DIR__.'/../vendor|__DIR__.'/../apps/royalgatewayadmin/vendor|g" backend/public/index.php
+        sed -i "s|__DIR__.'/../bootstrap|__DIR__.'/../apps/royalgatewayadmin/bootstrap|g" backend/public/index.php
+
+    - name: Deploy Public Assets
+      run: |
+        rsync -avz --delete -e "ssh -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=no" \
+        backend/public/ ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:~/public_html/
 
     - name: Run Laravel Commands
       run: |
-        ssh -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }} << 'EOF'
-        cd ${{ secrets.DEPLOY_PATH }}
-        composer install --no-dev --optimize-autoloader
-        php artisan migrate --force
-        php artisan db:seed --force
-        php artisan config:clear
-        php artisan route:clear
-        php artisan cache:clear
-        php artisan config:cache
-        php artisan route:cache
-        # Ensure directories exist and have right permissions
-        chmod -R 775 storage bootstrap/cache
-        # Sync build to public_html
-        rsync -av --delete public/ ~/public_html/
-        # Storage link and optimize
-        php artisan storage:link || true
-        php artisan optimize
+        ssh -p ${{ secrets.HOSTINGER_PORT }} -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }} << 'EOF'
+          cd ${{ secrets.DEPLOY_PATH }}
+          # Restore .env if missing (Deployment might have wiped it)
+          if [ ! -f .env ]; then
+             cp .env.example .env
+             php artisan key:generate
+          fi
+          composer install --no-dev --optimize-autoloader
+          php artisan migrate --force
+          php artisan db:seed --force
+          php artisan optimize
         EOF
