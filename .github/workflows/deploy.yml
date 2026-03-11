@@ -1,84 +1,63 @@
-name: Deploy to Hostinger
+name: Deploy RoyalGatewayAdmin
 
 on:
   push:
-    branches:
-      - main
-      - staging
-  workflow_dispatch:
-
-env:
-  # Opt into Node.js 24 for all actions to avoid deprecation warnings
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    branches: [ main, staging ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
 
-      - name: Install Frontend Dependencies
-        run: npm ci
+    - name: Build React Frontend
+      run: |
+        npm install
+        npm run build
 
-      - name: Build Frontend
-        run: npm run build
+    - name: Copy React Build
+      run: |
+        rm -rf backend/public/*
+        cp -r dist/* backend/public/
 
-      - name: Verify Build Output
-        run: |
-          echo "Checking dist directory..."
-          ls -la dist
-          if [ ! -d "dist" ]; then
-            echo "❌ Frontend build failed - dist directory not found"
-            exit 1
-          fi
-          if [ ! -f "dist/index.html" ]; then
-            echo "❌ Frontend build failed - dist/index.html not found"
-            exit 1
-          fi
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.RG_SSH }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Generate Release ID
-        id: release_id
-        run: echo "id=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+    - name: Deploy to Server
+      run: |
+        rsync -avz --delete \
+        -e "ssh -p ${{ secrets.HOSTINGER_PORT }}" \
+        backend/ \
+        ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }}:${{ secrets.DEPLOY_PATH }}
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          # We use -o StrictHostKeyChecking=no in the commands below to avoid keyscan failures
-          echo "SSH setup complete"
-
-      - name: Create Release Directory
-        run: |
-          ssh -v -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
-          "mkdir -p ~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}"
-
-      - name: Upload Files via Rsync
-        run: |
-          # Sync scripts first to ensure the latest deploy.sh is used
-          rsync -avz -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no" \
-            scripts/ ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/apps/royalgatewayadmin/scripts/
-
-          rsync -avz -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no" \
-            --exclude='.git*' \
-            --exclude='node_modules' \
-            --exclude='backend/node_modules' \
-            --exclude='backend/vendor' \
-            --exclude='backend/storage/framework/cache/*' \
-            --exclude='backend/storage/framework/sessions/*' \
-            --exclude='backend/storage/framework/views/*' \
-            --exclude='backend/storage/logs/*' \
-            ./ ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}/
-
-      - name: Execute Remote Deployment Script
-        run: |
-          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} -o StrictHostKeyChecking=no ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
-          "export GITHUB_TOKEN=${{ secrets.DEPLOY_TOKEN_PAT }} && bash ~/apps/royalgatewayadmin/scripts/deploy.sh ${{ steps.release_id.outputs.id }}"
+    - name: Run Laravel Commands
+      run: |
+        ssh -p ${{ secrets.HOSTINGER_PORT }} ${{ secrets.HOSTINGER_USER }}@${{ secrets.HOSTINGER_HOST }} << 'EOF'
+        cd ${{ secrets.DEPLOY_PATH }}
+        composer install --no-dev --optimize-autoloader
+        php artisan migrate --force
+        php artisan db:seed --force
+        php artisan config:clear
+        php artisan route:clear
+        php artisan cache:clear
+        php artisan config:cache
+        php artisan route:cache
+        # Ensure directories exist and have right permissions
+        chmod -R 775 storage bootstrap/cache
+        # Sync build to public_html
+        rsync -av --delete public/ ~/public_html/
+        # Storage link and optimize
+        php artisan storage:link || true
+        php artisan optimize
+        EOF
