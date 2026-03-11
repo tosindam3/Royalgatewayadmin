@@ -18,10 +18,13 @@ jobs:
       with:
         node-version: '18'
         
-    - name: Clean install dependencies
+    - name: Install dependencies with force
       run: |
-        rm -rf node_modules package-lock.json
-        npm install
+        npm install --force
+        
+    - name: Rebuild native modules
+      run: |
+        npm rebuild @tailwindcss/postcss
         
     - name: Build frontend
       run: npm run build
