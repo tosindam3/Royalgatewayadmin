@@ -77,4 +77,4 @@ jobs:
       - name: Execute Remote Deployment Script
         run: |
           ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
-          "export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN_DEPLOY }} && bash ~/apps/royalgatewayadmin/scripts/deploy.sh ${{ steps.release_id.outputs.id }}"
+          "export GITHUB_TOKEN=${{ secrets.DEPLOY_TOKEN_PAT }} && bash ~/apps/royalgatewayadmin/scripts/deploy.sh ${{ steps.release_id.outputs.id }}"
