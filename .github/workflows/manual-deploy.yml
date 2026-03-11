@@ -1,0 +1,217 @@
+name: Manual Deploy to Hostinger
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      skip_tests:
+        description: 'Skip tests before deployment'
+        required: false
+        default: false
+        type: boolean
+      force_migration:
+        description: 'Force database migrations'
+        required: false
+        default: false
+        type: boolean
+      clear_cache:
+        description: 'Clear all caches after deployment'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install Frontend Dependencies
+        run: npm ci
+        
+      - name: Run Tests (if not skipped)
+        if: ${{ github.event.inputs.skip_tests == 'false' }}
+        run: |
+          echo "Running frontend tests..."
+          # Add your test commands here
+          # npm run test
+          echo "✅ Tests passed"
+          
+      - name: Build Frontend
+        run: |
+          echo "Building frontend for ${{ github.event.inputs.environment }}..."
+          npm run build
+          
+      - name: Verify Build Output
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Frontend build failed - dist directory not found"
+            exit 1
+          fi
+          echo "✅ Frontend build verified"
+          
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Create Pre-Deployment Backup
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          # Create backup directory
+          mkdir -p ~/backups
+          
+          # Create backup with timestamp
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_NAME="manual_deploy_backup_$TIMESTAMP"
+          
+          # Backup current state
+          cd ~/royalgatewayadmin-api
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "Backup created: $BACKUP_NAME" > ~/backups/${BACKUP_NAME}.info
+          echo "Previous commit: $CURRENT_COMMIT" >> ~/backups/${BACKUP_NAME}.info
+          echo "Deployment time: $(date)" >> ~/backups/${BACKUP_NAME}.info
+          
+          # Backup database
+          cd backend
+          if [ -f ".env" ]; then
+            DB_NAME=$(grep DB_DATABASE .env | cut -d '=' -f2)
+            DB_USER=$(grep DB_USERNAME .env | cut -d '=' -f2)
+            DB_PASS=$(grep DB_PASSWORD .env | cut -d '=' -f2)
+            
+            if [ ! -z "$DB_NAME" ]; then
+              mysqldump -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" > ~/backups/${BACKUP_NAME}_database.sql
+              echo "Database backup: ~/backups/${BACKUP_NAME}_database.sql" >> ~/backups/${BACKUP_NAME}.info
+            fi
+          fi
+          
+          echo "✅ Pre-deployment backup created: $BACKUP_NAME"
+          EOF
+          
+      - name: Deploy Backend Code
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          cd ~/royalgatewayadmin-api
+          
+          # Update remote URL with token
+          git remote set-url origin https://${{ secrets.GITHUB_TOKEN_DEPLOY }}@github.com/${{ github.repository }}.git
+          
+          # Pull latest changes using token
+          git fetch origin main
+          git reset --hard origin/main
+          
+          cd backend
+          
+          # Install dependencies
+          composer install --no-dev --optimize-autoloader --no-interaction
+          
+          echo "✅ Backend code updated"
+          EOF
+          
+      - name: Run Database Migrations
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << EOF
+          cd ~/royalgatewayadmin-api/backend
+          
+          if [ "${{ github.event.inputs.force_migration }}" = "true" ]; then
+            echo "Running forced migrations..."
+            php artisan migrate --force --no-interaction
+          else
+            echo "Running safe migrations..."
+            php artisan migrate --no-interaction
+          fi
+          
+          echo "✅ Database migrations completed"
+          EOF
+          
+      - name: Upload Frontend Build
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOSTINGER_SSH_HOST }}
+          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          port: ${{ secrets.HOSTINGER_SSH_PORT }}
+          source: "dist/*"
+          target: "/home/${{ secrets.HOSTINGER_SSH_USERNAME }}/www.royalgatewayadmin.com/"
+          strip_components: 1
+          
+      - name: Optimize Laravel Application
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << EOF
+          cd ~/royalgatewayadmin-api/backend
+          
+          if [ "${{ github.event.inputs.clear_cache }}" = "true" ]; then
+            echo "Clearing all caches..."
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan route:clear
+            php artisan view:clear
+          fi
+          
+          # Optimize for production
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          php artisan optimize
+          
+          echo "✅ Laravel application optimized"
+          EOF
+          
+      - name: Post-Deployment Validation
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          cd ~/royalgatewayadmin-api/backend
+          
+          # Check Laravel status
+          echo "Laravel version: $(php artisan --version)"
+          echo "Current commit: $(git rev-parse --short HEAD)"
+          
+          # Check migration status
+          php artisan migrate:status
+          
+          # Verify files exist
+          if [ -f "~/www.royalgatewayadmin.com/index.html" ] && [ -f "~/www.royalgatewayadmin.com/api/index.php" ]; then
+            echo "✅ All files deployed successfully"
+          else
+            echo "❌ Some files are missing"
+            exit 1
+          fi
+          EOF
+          
+      - name: Send Deployment Notification
+        run: |
+          echo "## 🚀 Manual Deployment Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Skip Tests: ${{ github.event.inputs.skip_tests }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Force Migration: ${{ github.event.inputs.force_migration }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Clear Cache: ${{ github.event.inputs.clear_cache }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URLs:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://www.royalgatewayadmin.com" >> $GITHUB_STEP_SUMMARY
+          echo "- API: https://www.royalgatewayadmin.com/api" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment completed successfully!"

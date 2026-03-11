@@ -1,0 +1,204 @@
+name: Update Production Site
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of update'
+        required: true
+        default: 'code-only'
+        type: choice
+        options:
+          - code-only
+          - with-migrations
+          - full-update
+      create_backup:
+        description: 'Create backup before update'
+        required: false
+        default: true
+        type: boolean
+      skip_cache_clear:
+        description: 'Skip cache clearing (faster updates)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  update-production:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install and Build Frontend
+        run: |
+          npm ci
+          npm run build
+          
+      - name: Verify Build
+        run: |
+          if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+            echo "❌ Frontend build failed"
+            exit 1
+          fi
+          echo "✅ Frontend build verified"
+          
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Create Backup (if requested)
+        if: ${{ github.event.inputs.create_backup == 'true' }}
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BACKUP_DIR="~/backups/production_update_$TIMESTAMP"
+          
+          mkdir -p "$BACKUP_DIR"
+          
+          # Backup current code
+          cd ~/royalgatewayadmin-api
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "Backup created: $TIMESTAMP" > "$BACKUP_DIR/backup.info"
+          echo "Previous commit: $CURRENT_COMMIT" >> "$BACKUP_DIR/backup.info"
+          echo "Update type: ${{ github.event.inputs.update_type }}" >> "$BACKUP_DIR/backup.info"
+          
+          # Backup database
+          cd backend
+          if [ -f ".env" ]; then
+            DB_NAME=$(grep DB_DATABASE .env | cut -d '=' -f2)
+            DB_USER=$(grep DB_USERNAME .env | cut -d '=' -f2)
+            DB_PASS=$(grep DB_PASSWORD .env | cut -d '=' -f2)
+            
+            if [ ! -z "$DB_NAME" ]; then
+              mysqldump -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" > "$BACKUP_DIR/database.sql" 2>/dev/null || echo "Database backup skipped"
+            fi
+          fi
+          
+          echo "✅ Backup created: $BACKUP_DIR"
+          EOF
+          
+      - name: Update Backend Code
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          cd ~/royalgatewayadmin-api
+          
+          # Update remote URL with token
+          git remote set-url origin https://${{ secrets.GITHUB_TOKEN_DEPLOY }}@github.com/${{ github.repository }}.git
+          
+          # Pull latest changes
+          echo "Fetching latest changes..."
+          git fetch origin main
+          git reset --hard origin/main
+          
+          cd backend
+          
+          # Install/update dependencies
+          echo "Installing dependencies..."
+          composer install --no-dev --optimize-autoloader --no-interaction
+          
+          echo "✅ Backend code updated"
+          EOF
+          
+      - name: Run Database Migrations (if requested)
+        if: ${{ github.event.inputs.update_type == 'with-migrations' || github.event.inputs.update_type == 'full-update' }}
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          cd ~/royalgatewayadmin-api/backend
+          
+          echo "Running database migrations..."
+          php artisan migrate --force --no-interaction
+          
+          echo "✅ Database migrations completed"
+          EOF
+          
+      - name: Upload Frontend Files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOSTINGER_SSH_HOST }}
+          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          port: ${{ secrets.HOSTINGER_SSH_PORT }}
+          source: "dist/*"
+          target: "/home/${{ secrets.HOSTINGER_SSH_USERNAME }}/www.royalgatewayadmin.com/"
+          strip_components: 1
+          
+      - name: Optimize Application
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << EOF
+          cd ~/royalgatewayadmin-api/backend
+          
+          if [ "${{ github.event.inputs.skip_cache_clear }}" = "false" ]; then
+            echo "Clearing caches..."
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan route:clear
+            php artisan view:clear
+          fi
+          
+          # Optimize for production
+          echo "Optimizing application..."
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          php artisan optimize
+          
+          echo "✅ Application optimized"
+          EOF
+          
+      - name: Validate Update
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+          cd ~/royalgatewayadmin-api/backend
+          
+          # Check Laravel status
+          echo "Laravel version: $(php artisan --version)"
+          echo "Current commit: $(git rev-parse --short HEAD)"
+          
+          # Check migration status
+          if [ "${{ github.event.inputs.update_type }}" != "code-only" ]; then
+            php artisan migrate:status
+          fi
+          
+          # Verify files exist
+          if [ -f "~/www.royalgatewayadmin.com/index.html" ] && [ -f "~/www.royalgatewayadmin.com/api/index.php" ]; then
+            echo "✅ All files updated successfully"
+          else
+            echo "❌ Some files are missing"
+            exit 1
+          fi
+          
+          echo "✅ Update validation completed"
+          EOF
+          
+      - name: Update Summary
+        run: |
+          echo "## 🚀 Production Update Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Update Type:** ${{ github.event.inputs.update_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Updated by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Backup Created: ${{ github.event.inputs.create_backup }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Cache Cleared: ${{ github.event.inputs.skip_cache_clear == 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Migrations Run: ${{ github.event.inputs.update_type != 'code-only' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Site URLs:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://www.royalgatewayadmin.com" >> $GITHUB_STEP_SUMMARY
+          echo "- API: https://www.royalgatewayadmin.com/api" >> $GITHUB_STEP_SUMMARY
+          echo "- Health: https://www.royalgatewayadmin.com/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Update completed successfully!**"

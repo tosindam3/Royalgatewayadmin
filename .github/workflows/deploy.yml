@@ -1,0 +1,69 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Verify Build Output
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ Frontend build failed - dist directory not found"
+            exit 1
+          fi
+
+      - name: Generate Release ID
+        id: release_id
+        run: echo "id=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create Release Directory
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+          "mkdir -p ~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}"
+
+      - name: Upload Files via Rsync
+        run: |
+          rsync -avz -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
+            --exclude='.git*' \
+            --exclude='node_modules' \
+            --exclude='backend/node_modules' \
+            --exclude='backend/vendor' \
+            --exclude='backend/storage/framework/cache/*' \
+            --exclude='backend/storage/framework/sessions/*' \
+            --exclude='backend/storage/framework/views/*' \
+            --exclude='backend/storage/logs/*' \
+            ./ ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}/
+
+      - name: Execute Remote Deployment Script
+        run: |
+          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+          "export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN_DEPLOY }} && bash ~/apps/royalgatewayadmin/scripts/deploy.sh ${{ steps.release_id.outputs.id }}"

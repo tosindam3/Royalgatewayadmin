@@ -28,7 +28,7 @@ const Leave = lazy(() => import('./pages/Leave'));
 const TalentManagement = lazy(() => import('./pages/TalentManagement'));
 const Settings = lazy(() => import('./pages/Settings'));
 const MemoSystem = lazy(() => import('./pages/Memo'));
-const Analytics = lazy(() => import('./pages/Analytics'));
+// const Analytics = lazy(() => import('./pages/Analytics'));
 const AutomationAI = lazy(() => import('./pages/AutomationAI'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const EmployeeProfile = lazy(() => import('./pages/Employees/EmployeeProfile'));

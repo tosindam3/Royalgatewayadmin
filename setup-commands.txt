@@ -1,0 +1,22 @@
+chmod +x ~/deploy.sh
+cat > ~/.deploy-config << 'EOF'
+DB_HOST="localhost"
+DB_NAME="u237094395_rgadmin"
+DB_USER="u237094395_admin"
+DB_PASS="Babatotech@123"
+BUILD_FRONTEND_ON_SERVER=false
+DEPLOY_METHOD="rsync"
+EOF
+chmod 600 ~/.deploy-config
+if [ ! -f ~/.ssh/id_rsa ]; then
+ssh-keygen -t rsa -b 4096 -C "deployment@royalgatewayadmin.com" -f ~/.ssh/id_rsa -N ""
+echo "Add this public key to GitHub Deploy Keys:"
+echo "=========================================="
+cat ~/.ssh/id_rsa.pub
+echo "=========================================="
+echo "Go to: https://github.com/babatotech/Drealtiesfx_Academy/settings/keys"
+echo "Press Enter after adding the key..."
+read
+fi
+ssh -o StrictHostKeyChecking=no -T git@github.com || echo "GitHub connection test completed"
+./deploy.sh --first-timefor 

@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => {
       // Gzipped sizes are acceptable for production
       chunkSizeWarningLimit: 1500,
       minify: 'esbuild',
+      manifest: true,
     },
   };
 });

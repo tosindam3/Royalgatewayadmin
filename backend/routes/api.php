@@ -3,6 +3,9 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Health Check Routes (no authentication required)
+require __DIR__.'/health.php';
+
 // API v1 Routes
 Route::prefix('v1')->group(function () {
     // Authentication Routes
