@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Frontend Dependencies
@@ -32,8 +32,14 @@ jobs:
 
       - name: Verify Build Output
         run: |
+          echo "Checking dist directory..."
+          ls -la dist
           if [ ! -d "dist" ]; then
             echo "❌ Frontend build failed - dist directory not found"
+            exit 1
+          fi
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ Frontend build failed - dist/index.html not found"
             exit 1
           fi
 
@@ -46,11 +52,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -v -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+          echo "Verifying SSH Key format (should be OpenSSH Private Key or RSA)..."
+          head -n 1 ~/.ssh/id_rsa
 
       - name: Create Release Directory
         run: |
-          ssh -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+          ssh -v -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
           "mkdir -p ~/apps/royalgatewayadmin/releases/${{ steps.release_id.outputs.id }}"
 
       - name: Upload Files via Rsync
