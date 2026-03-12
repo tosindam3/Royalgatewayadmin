@@ -155,6 +155,44 @@ jobs:
           chmod 644 /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess
           find /home/u237094395/domains/royalgatewayadmin.com/public_html -type f -exec chmod 644 {} \;
           find /home/u237094395/domains/royalgatewayadmin.com/public_html -type d -exec chmod 755 {} \;
+          
+          # Create comprehensive .htaccess for both React and Laravel API
+          cat > /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess << 'EOF'
+          <IfModule mod_rewrite.c>
+          RewriteEngine On
+          
+          # Force HTTPS
+          RewriteCond %{HTTPS} off
+          RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+          
+          # Serve static assets directly
+          RewriteCond %{REQUEST_FILENAME} -f
+          RewriteRule ^ - [L]
+          
+          # API requests go to Laravel
+          RewriteRule ^api/(.*)$ /index.php [QSA,L]
+          
+          # All other requests go to React app
+          RewriteRule ^(.*)$ /index.html [QSA,L]
+          </IfModule>
+          
+          <IfModule mod_mime.c>
+          AddType application/javascript .js
+          AddType application/javascript .mjs
+          AddType text/javascript .js
+          AddType application/json .json
+          AddType text/css .css
+          </IfModule>
+          
+          <IfModule mod_deflate.c>
+          AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+          </IfModule>
+          EOF
+          
+          # Set proper permissions
+          chmod 644 /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type f -exec chmod 644 {} \;
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type d -exec chmod 755 {} \;
 
 # ---------------------------------------
 # Health Check
