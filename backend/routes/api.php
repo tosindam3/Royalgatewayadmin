@@ -378,8 +378,11 @@ Route::prefix('v1')->group(function () {
     });
 
     // Brand Settings Routes
+    // Public endpoint for getting brand settings (needed for login page branding)
+    Route::get('brand-settings', [App\Http\Controllers\BrandSettingsController::class, 'index']);
+    
+    // Protected brand settings routes
     Route::prefix('brand-settings')->middleware('auth:sanctum')->group(function () {
-        Route::get('/', [App\Http\Controllers\BrandSettingsController::class, 'index']);
         Route::put('/', [App\Http\Controllers\BrandSettingsController::class, 'update']);
         Route::post('/reset', [App\Http\Controllers\BrandSettingsController::class, 'reset']);
         Route::get('/history', [App\Http\Controllers\BrandSettingsController::class, 'history']);

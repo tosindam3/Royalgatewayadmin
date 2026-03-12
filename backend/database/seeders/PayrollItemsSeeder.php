@@ -106,9 +106,12 @@ class PayrollItemsSeeder extends Seeder
         ];
         
         foreach ($items as $item) {
-            PayrollItem::create($item);
+            PayrollItem::updateOrCreate(
+                ['code' => $item['code']], // Find by code
+                $item // Update or create with these values
+            );
         }
         
-        $this->command->info('Created ' . count($items) . ' payroll items');
+        $this->command->info('Seeded ' . count($items) . ' payroll items (created or updated)');
     }
 }

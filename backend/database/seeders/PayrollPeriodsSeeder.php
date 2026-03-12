@@ -46,8 +46,16 @@ class PayrollPeriodsSeeder extends Seeder
             ];
         }
         
-        PayrollPeriod::insert($periods);
+        foreach ($periods as $period) {
+            PayrollPeriod::updateOrCreate(
+                [
+                    'year' => $period['year'],
+                    'month' => $period['month']
+                ],
+                $period
+            );
+        }
         
-        $this->command->info('Created ' . count($periods) . ' payroll periods');
+        $this->command->info('Seeded ' . count($periods) . ' payroll periods (created or updated)');
     }
 }
