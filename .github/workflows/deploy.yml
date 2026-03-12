@@ -43,9 +43,9 @@ jobs:
           TARGET: "domains/royalgatewayadmin.com/public_html"
           ARGS: "-avz --checksum --delete"
           SOURCE: "dist/"
-          EXCLUDE: ".env*,.htaccess,index.php"
-
-      - name: 🚀 Disable index.html Caching
+          EXCLUDE: ".env*,index.php"
+          
+      - name: 📄 Deploy .htaccess
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOSTINGER_SSH_HOST }}
@@ -53,13 +53,71 @@ jobs:
           key: ${{ secrets.HOSTINGER_SSH_KEY }}
           port: ${{ secrets.HOSTINGER_SSH_PORT }}
           script: |
-            HTACCESS="domains/royalgatewayadmin.com/public_html/.htaccess"
-            if ! grep -q "index.html" "$HTACCESS"; then
-              echo -e "\n<FilesMatch \"index\.html$\">\n    FileETag None\n    <IfModule mod_headers.c>\n        Header unset ETag\n        Header set Cache-Control \"max-age=0, no-cache, no-store, must-revalidate\"\n        Header set Pragma \"no-cache\"\n        Header set Expires \"Wed, 11 Jan 1984 05:00:00 GMT\"\n    </IfModule>\n</FilesMatch>" >> "$HTACCESS"
-              echo "✅ Cache-control added to .htaccess"
-            else
-              echo "ℹ️ Cache-control already exists in .htaccess"
-            fi
+            cat > domains/royalgatewayadmin.com/public_html/.htaccess << 'EOF'
+            <IfModule mod_negotiation.c>
+                Options -MultiViews -Indexes
+            </IfModule>
+
+            <IfModule mod_rewrite.c>
+                RewriteEngine On
+
+                # Handle Authorization Header
+                RewriteCond %{HTTP:Authorization} .
+                RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+                # Redirect Trailing Slashes If Not A Folder...
+                RewriteCond %{REQUEST_FILENAME} !-d
+                RewriteCond %{REQUEST_URI} (.+)/$
+                RewriteRule ^ %1 [L,R=301]
+
+                # Send Requests To Front Controller...
+                RewriteCond %{REQUEST_FILENAME} !-d
+                RewriteCond %{REQUEST_FILENAME} !-f
+                RewriteRule ^ index.html [L]
+            </IfModule>
+
+            # Serve static assets with correct MIME types
+            <IfModule mod_mime.c>
+                AddType application/javascript .js
+                AddType application/javascript .mjs
+                AddType text/css .css
+                AddType image/svg+xml .svg
+                AddType image/x-icon .ico
+                AddType font/woff2 .woff2
+                AddType font/woff .woff
+                AddType font/ttf .ttf
+            </IfModule>
+
+            # Enable compression
+            <IfModule mod_deflate.c>
+                AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json image/svg+xml
+            </IfModule>
+
+            # Cache static assets
+            <IfModule mod_expires.c>
+                ExpiresActive On
+                ExpiresByType image/jpg "access plus 1 year"
+                ExpiresByType image/jpeg "access plus 1 year"
+                ExpiresByType image/gif "access plus 1 year"
+                ExpiresByType image/png "access plus 1 year"
+                ExpiresByType image/svg+xml "access plus 1 year"
+                ExpiresByType text/css "access plus 1 month"
+                ExpiresByType application/javascript "access plus 1 month"
+                ExpiresByType font/woff2 "access plus 1 year"
+            </IfModule>
+
+            # Disable caching for index.html
+            <FilesMatch "index\.html$">
+                FileETag None
+                <IfModule mod_headers.c>
+                    Header unset ETag
+                    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+                    Header set Pragma "no-cache"
+                    Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+                </IfModule>
+            </FilesMatch>
+            EOF
+            echo "✅ .htaccess deployed successfully"
 
       - name: 🔄 Post-Deployment Backend Update
         uses: appleboy/ssh-action@master
