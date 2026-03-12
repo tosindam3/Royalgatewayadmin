@@ -61,16 +61,8 @@ debug_*.txt
 *.backup
 *.cache
 
-# Scripts (NOT needed for production)
-scripts/
-/scripts/
-
 # Debug components
 components/debug/
-
-# Documentation
-/docs/
-docs/
 
 # Release archives (built locally, not for git)
 *.tar.gz

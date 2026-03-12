@@ -9,10 +9,7 @@ import {
   MemoFilters,
   PaginatedMemos 
 } from '../types/memo';
-
-const API_BASE = '/api/v1/memos';
-const API_FOLDERS = '/api/v1/memo-folders';
-const API_SIGNATURES = '/api/v1/memo-signatures';
+import apiClient from './apiClient';
 
 class MemoService {
   // Get memos with filters
@@ -25,271 +22,81 @@ class MemoService {
       }
     });
     
-    const response = await fetch(`${API_BASE}?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch memos');
-    }
-    
-    return response.json();
+    return apiClient.get(`/memos?${params}`);
   }
 
   // Get single memo
   async getMemo(id: number): Promise<Memo> {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch memo');
-    }
-    
-    return response.json();
+    return apiClient.get(`/memos/${id}`);
   }
 
   // Create memo
   async createMemo(data: CreateMemoRequest): Promise<Memo> {
-    const response = await fetch(API_BASE, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to create memo');
-    }
-    
-    return response.json();
+    return apiClient.post('/memos', data);
   }
 
   // Update memo (drafts only)
   async updateMemo(id: number, data: Partial<CreateMemoRequest>): Promise<Memo> {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to update memo');
-    }
-    
-    return response.json();
+    return apiClient.put(`/memos/${id}`, data);
   }
 
   // Delete memo
   async deleteMemo(id: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to delete memo');
-    }
+    return apiClient.delete(`/memos/${id}`);
   }
 
   // Reply to memo
   async replyToMemo(id: number, data: ReplyMemoRequest): Promise<Memo> {
-    const response = await fetch(`${API_BASE}/${id}/reply`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to reply to memo');
-    }
-    
-    return response.json();
+    return apiClient.post(`/memos/${id}/reply`, data);
   }
 
   // Forward memo
   async forwardMemo(id: number, data: ForwardMemoRequest): Promise<Memo> {
-    const response = await fetch(`${API_BASE}/${id}/forward`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to forward memo');
-    }
-    
-    return response.json();
+    return apiClient.post(`/memos/${id}/forward`, data);
   }
 
   // Toggle star
   async toggleStar(id: number): Promise<{ is_starred: boolean }> {
-    const response = await fetch(`${API_BASE}/${id}/star`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to toggle star');
-    }
-    
-    return response.json();
+    return apiClient.post(`/memos/${id}/star`);
   }
 
   // Mark as read
   async markAsRead(id: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/${id}/read`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to mark as read');
-    }
+    return apiClient.post(`/memos/${id}/read`);
   }
 
   // Move to folder
   async moveToFolder(id: number, folderId: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/${id}/move`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ folder_id: folderId }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to move memo');
-    }
+    return apiClient.post(`/memos/${id}/move`, { folder_id: folderId });
   }
 
   // Bulk operations
   async bulkDelete(memoIds: number[]): Promise<void> {
-    const response = await fetch(`${API_BASE}/bulk-delete`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ memo_ids: memoIds }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to bulk delete memos');
-    }
+    return apiClient.post('/memos/bulk-delete', { memo_ids: memoIds });
   }
 
   async bulkMarkAsRead(memoIds: number[]): Promise<void> {
-    const response = await fetch(`${API_BASE}/bulk-read`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ memo_ids: memoIds }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to bulk mark as read');
-    }
+    return apiClient.post('/memos/bulk-read', { memo_ids: memoIds });
   }
 
   // Get user stats
   async getStats(): Promise<MemoStats> {
-    const response = await fetch(`${API_BASE}/stats`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch stats');
-    }
-    
-    return response.json();
+    return apiClient.get('/memos/stats');
   }
 
   // Search memos
   async searchMemos(query: string): Promise<Memo[]> {
-    const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to search memos');
-    }
-    
-    return response.json();
+    return apiClient.get(`/memos/search?q=${encodeURIComponent(query)}`);
   }
 
   // Folders
   async getFolders(): Promise<MemoFolder[]> {
-    const response = await fetch(API_FOLDERS, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch folders');
-    }
-    
-    return response.json();
+    return apiClient.get('/memo-folders');
   }
 
   // Signatures
   async getSignatures(): Promise<MemoSignature[]> {
-    const response = await fetch(API_SIGNATURES, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch signatures');
-    }
-    
-    return response.json();
+    return apiClient.get('/memo-signatures');
   }
 
   // Upload attachment
@@ -297,20 +104,11 @@ class MemoService {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch(`${API_BASE}/${memoId}/attachments`, {
-      method: 'POST',
+    return apiClient.post(`/memos/${memoId}/attachments`, formData, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('royalgateway_auth_token')}`,
-        'Accept': 'application/json',
+        'Content-Type': 'multipart/form-data',
       },
-      body: formData,
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to upload attachment');
-    }
-    
-    return response.json();
   }
 
   // Download attachment

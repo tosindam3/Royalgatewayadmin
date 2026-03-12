@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Memo;
 use App\Models\MemoRecipient;
 use App\Services\MemoService;
+use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class MemoController extends Controller
 {
+    use ApiResponse;
+
     protected $memoService;
 
     public function __construct(MemoService $memoService)
@@ -45,7 +48,7 @@ class MemoController extends Controller
             ->latest('created_at')
             ->paginate($perPage);
         
-        return response()->json($memos);
+        return $this->success($memos);
     }
 
     public function store(Request $request)
@@ -68,7 +71,7 @@ class MemoController extends Controller
         
         $memo = $this->memoService->createMemo(Auth::id(), $validated);
         
-        return response()->json($memo->load(['sender', 'recipients.recipient', 'attachments']), 201);
+        return $this->success($memo->load(['sender', 'recipients.recipient', 'attachments']), 'Memo created successfully', 201);
     }
 
     public function show($id)
@@ -79,7 +82,7 @@ class MemoController extends Controller
         // Check access
         $userId = Auth::id();
         if (!$this->memoService->canAccessMemo($userId, $memo)) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return $this->error('Unauthorized', 403);
         }
         
         // Mark as read if user is recipient
@@ -88,7 +91,7 @@ class MemoController extends Controller
             $recipient->markAsRead();
         }
         
-        return response()->json($memo);
+        return $this->success($memo);
     }
 
     public function update(Request $request, $id)
@@ -97,12 +100,12 @@ class MemoController extends Controller
         
         // Only sender can update
         if ($memo->sender_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            return $this->error('Unauthorized', 403);
         }
         
         // Only drafts can be updated
         if (!$memo->isDraft()) {
-            return response()->json(['message' => 'Only drafts can be updated'], 400);
+            return $this->error('Only drafts can be updated', 400);
         }
         
         $validated = $request->validate([
@@ -114,7 +117,7 @@ class MemoController extends Controller
         
         $memo->update($validated);
         
-        return response()->json($memo->load(['sender', 'recipients.recipient', 'attachments']));
+        return $this->success($memo->load(['sender', 'recipients.recipient', 'attachments']), 'Memo updated successfully');
     }
 
     public function destroy($id)
@@ -125,17 +128,17 @@ class MemoController extends Controller
         // Sender can delete
         if ($memo->sender_id === $userId) {
             $memo->delete();
-            return response()->json(['message' => 'Memo deleted']);
+            return $this->success(null, 'Memo deleted');
         }
         
         // Recipient can mark as deleted
         $recipient = $memo->recipients()->where('recipient_id', $userId)->first();
         if ($recipient) {
             $recipient->update(['deleted_at' => now()]);
-            return response()->json(['message' => 'Memo moved to trash']);
+            return $this->success(null, 'Memo moved to trash');
         }
         
-        return response()->json(['message' => 'Unauthorized'], 403);
+        return $this->error('Unauthorized', 403);
     }
 
     public function reply(Request $request, $id)
@@ -149,7 +152,7 @@ class MemoController extends Controller
         
         $memo = $this->memoService->replyToMemo(Auth::id(), $parentMemo, $validated);
         
-        return response()->json($memo->load(['sender', 'recipients.recipient']), 201);
+        return $this->success($memo->load(['sender', 'recipients.recipient']), 'Reply sent successfully', 201);
     }
 
     public function forward(Request $request, $id)
@@ -176,7 +179,7 @@ class MemoController extends Controller
         $recipient = $memo->recipients()->where('recipient_id', $userId)->firstOrFail();
         $recipient->toggleStar();
         
-        return response()->json(['is_starred' => $recipient->is_starred]);
+        return $this->success(['is_starred' => $recipient->is_starred]);
     }
 
     public function markAsRead($id)
@@ -188,12 +191,12 @@ class MemoController extends Controller
         $recipient = $memo->recipients()->where('recipient_id', $userId)->first();
         
         if (!$recipient) {
-            return response()->json(['message' => 'You are not a recipient of this memo'], 400);
+            return $this->error('You are not a recipient of this memo', 400);
         }
         
         $recipient->markAsRead();
         
-        return response()->json(['message' => 'Marked as read']);
+        return $this->success(null, 'Marked as read');
     }
 
     public function moveToFolder(Request $request, $id)
@@ -208,7 +211,7 @@ class MemoController extends Controller
         $recipient = $memo->recipients()->where('recipient_id', $userId)->firstOrFail();
         $recipient->moveToFolder($validated['folder_id']);
         
-        return response()->json(['message' => 'Moved to folder']);
+        return $this->success(null, 'Moved to folder');
     }
 
     public function bulkSend(Request $request)
@@ -223,10 +226,10 @@ class MemoController extends Controller
         
         $memos = $this->memoService->bulkSend(Auth::id(), $validated);
         
-        return response()->json([
+        return $this->success([
             'message' => 'Memos sent successfully',
             'count' => count($memos),
-        ], 201);
+        ], 'Memos sent successfully', 201);
     }
 
     public function bulkDelete(Request $request)
@@ -238,7 +241,7 @@ class MemoController extends Controller
         
         $count = $this->memoService->bulkDelete(Auth::id(), $validated['memo_ids']);
         
-        return response()->json(['message' => "{$count} memos deleted"]);
+        return $this->success(null, "{$count} memos deleted");
     }
 
     public function bulkMarkAsRead(Request $request)
@@ -250,7 +253,7 @@ class MemoController extends Controller
         
         $count = $this->memoService->bulkMarkAsRead(Auth::id(), $validated['memo_ids']);
         
-        return response()->json(['message' => "{$count} memos marked as read"]);
+        return $this->success(null, "{$count} memos marked as read");
     }
 
     public function stats()
@@ -258,7 +261,7 @@ class MemoController extends Controller
         $userId = Auth::id();
         $stats = $this->memoService->getUserStats($userId);
         
-        return response()->json($stats);
+        return $this->success($stats);
     }
 
     public function search(Request $request)
@@ -270,6 +273,6 @@ class MemoController extends Controller
         $userId = Auth::id();
         $results = $this->memoService->searchMemos($userId, $validated['q']);
         
-        return response()->json($results);
+        return $this->success($results);
     }
 }

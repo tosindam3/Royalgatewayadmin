@@ -1,160 +1,165 @@
-name: Fresh Deploy to Hostinger via Rsync
+name: RoyalGatewayAdmin Production Deploy
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
-    name: Build & Deploy
+    name: Deploy React + Laravel
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+# ---------------------------------------
+# Checkout Repository
+# ---------------------------------------
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+# ---------------------------------------
+# Setup Node
+# ---------------------------------------
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
 
-      - name: 📦 Install NPM Dependencies
-        run: npm ci
+# ---------------------------------------
+# Install Dependencies
+# ---------------------------------------
+    - name: Install Dependencies
+      run: npm ci
 
-      - name: 🏗️ Build React App
-        env:
-          VITE_API_BASE_URL: https://www.royalgatewayadmin.com
-          NODE_ENV: production
-        run: npm run build
-        
-      - name: 📤 Deploy to Hostinger via SSH/Rsync
-        uses: easingthemes/ssh-deploy@main
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
-          REMOTE_USER: ${{ secrets.HOSTINGER_SSH_USERNAME }}
-          REMOTE_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
-          TARGET: "domains/royalgatewayadmin.com/public_html"
-          ARGS: "-avz --checksum --delete"
-          SOURCE: "dist/"
-          EXCLUDE: ".env*,index.php"
+# ---------------------------------------
+# Build React
+# ---------------------------------------
+    - name: Build React
+      env:
+        VITE_API_BASE_URL: https://www.royalgatewayadmin.com/api
+        NODE_ENV: production
+      run: npm run build
+
+# ---------------------------------------
+# Setup SSH
+# ---------------------------------------
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
+
+# ---------------------------------------
+# Deploy React Frontend
+# ---------------------------------------
+    - name: Deploy React
+      run: |
+        rsync -avz --delete \
+        -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
+        dist/ \
+        ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:/home/u237094395/domains/royalgatewayadmin.com/public_html/
+
+# ---------------------------------------
+# Deploy Laravel Backend
+# ---------------------------------------
+    - name: Deploy Laravel
+      run: |
+        rsync -avz --delete \
+        --exclude=".env" \
+        --exclude="node_modules" \
+        --exclude="vendor" \
+        -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
+        backend/ \
+        ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:/home/u237094395/apps/royalgatewayadmin/backend/
+
+# ---------------------------------------
+# Run Laravel Setup
+# ---------------------------------------
+    - name: Configure Backend
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          set -e
+          cd /home/u237094395/apps/royalgatewayadmin/backend
+          echo "Creating deployment backup..."
+          mkdir -p ../backups
+          tar -czf ../backups/backend_$(date +%F_%H-%M-%S).tar.gz .
+          echo "Installing Composer dependencies..."
+          composer install --no-dev --optimize-autoloader --no-interaction
+          echo "Running database migrations..."
+          php artisan migrate --force
+          echo "Optimizing Laravel..."
+          php artisan optimize:clear
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          chmod -R 775 storage bootstrap/cache
+          echo "Laravel deployment completed."
+
+# ---------------------------------------
+# Deploy Full Stack Routing (CORRECTED)
+# ---------------------------------------
+    - name: Configure Full Stack Routing
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          # Copy Laravel public files to frontend directory for API access
+          cp -r /home/u237094395/apps/royalgatewayadmin/backend/public/* /home/u237094395/domains/royalgatewayadmin.com/public_html/
           
-      - name: 📄 Deploy .htaccess
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          script: |
-            cat > domains/royalgatewayadmin.com/public_html/.htaccess << 'EOF'
-            <IfModule mod_negotiation.c>
-                Options -MultiViews -Indexes
-            </IfModule>
+          # Create comprehensive .htaccess for both React and Laravel API
+          cat > /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess << 'EOF'
+          <IfModule mod_rewrite.c>
+          RewriteEngine On
+          
+          # Force HTTPS
+          RewriteCond %{HTTPS} off
+          RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+          
+          # Serve static assets directly
+          RewriteCond %{REQUEST_FILENAME} -f
+          RewriteRule ^ - [L]
+          
+          # API requests go to Laravel
+          RewriteRule ^api/(.*)$ /index.php [QSA,L]
+          
+          # All other requests go to React app
+          RewriteRule ^(.*)$ /index.html [QSA,L]
+          </IfModule>
+          
+          <IfModule mod_mime.c>
+          AddType application/javascript .js
+          AddType application/javascript .mjs
+          AddType text/javascript .js
+          AddType application/json .json
+          AddType text/css .css
+          </IfModule>
+          
+          <IfModule mod_deflate.c>
+          AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+          </IfModule>
+          EOF
+          
+          # Set proper permissions
+          chmod 644 /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type f -exec chmod 644 {} \;
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type d -exec chmod 755 {} \;
 
-            <IfModule mod_rewrite.c>
-                RewriteEngine On
-
-                # Handle Authorization Header
-                RewriteCond %{HTTP:Authorization} .
-                RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-
-                # Redirect Trailing Slashes If Not A Folder...
-                RewriteCond %{REQUEST_FILENAME} !-d
-                RewriteCond %{REQUEST_URI} (.+)/$
-                RewriteRule ^ %1 [L,R=301]
-
-                # Send Requests To Front Controller...
-                RewriteCond %{REQUEST_FILENAME} !-d
-                RewriteCond %{REQUEST_FILENAME} !-f
-                RewriteRule ^ index.html [L]
-            </IfModule>
-
-            # Serve static assets with correct MIME types
-            <IfModule mod_mime.c>
-                AddType application/javascript .js
-                AddType application/javascript .mjs
-                AddType text/css .css
-                AddType image/svg+xml .svg
-                AddType image/x-icon .ico
-                AddType font/woff2 .woff2
-                AddType font/woff .woff
-                AddType font/ttf .ttf
-            </IfModule>
-
-            # Enable compression
-            <IfModule mod_deflate.c>
-                AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json image/svg+xml
-            </IfModule>
-
-            # Cache static assets
-            <IfModule mod_expires.c>
-                ExpiresActive On
-                ExpiresByType image/jpg "access plus 1 year"
-                ExpiresByType image/jpeg "access plus 1 year"
-                ExpiresByType image/gif "access plus 1 year"
-                ExpiresByType image/png "access plus 1 year"
-                ExpiresByType image/svg+xml "access plus 1 year"
-                ExpiresByType text/css "access plus 1 month"
-                ExpiresByType application/javascript "access plus 1 month"
-                ExpiresByType font/woff2 "access plus 1 year"
-            </IfModule>
-
-            # Disable caching for index.html
-            <FilesMatch "index\.html$">
-                FileETag None
-                <IfModule mod_headers.c>
-                    Header unset ETag
-                    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
-                    Header set Pragma "no-cache"
-                    Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
-                </IfModule>
-            </FilesMatch>
-            EOF
-            echo "✅ .htaccess deployed successfully"
-
-      - name: 🔄 Post-Deployment Backend Update
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          script: |
-            set -e
-            echo "🔄 Starting backend update process..."
-            cd /home/u237094395/apps/royalgatewayadmin/backend
-            
-            # CRITICAL: Verify .env exists
-            if [ ! -f .env ]; then
-              echo "❌ ERROR: .env file is missing in backend! Stopping deployment to prevent data loss."
-              exit 1
-            fi
-            
-            # Optimization: Pull latest repo changes for backend
-            cd ..
-            # Update remote URL to use token for authentication
-            git remote set-url origin https://x-access-token:${{ secrets.DEPLOY_TOKEN_PAT }}@github.com/tosindam3/Royalgatewayadmin.git
-            git pull origin main
-            
-            cd backend
-            composer install --no-dev --optimize-autoloader --no-interaction
-            php artisan migrate --force
-            php artisan optimize:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-            
-            chmod -R 775 storage bootstrap/cache
-            echo "✅ Backend updated successfully!"
-
-      - name: 🩺 Final Health Check
-        run: |
-          sleep 5
-          curl -f https://www.royalgatewayadmin.com/api/health || echo "Health check failed, please check manually."
+# ---------------------------------------
+# Health Check
+# ---------------------------------------
+    - name: Health Check
+      run: |
+        sleep 10
+        curl -f https://www.royalgatewayadmin.com/api/health || echo "Health check failed"

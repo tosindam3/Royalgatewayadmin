@@ -16,6 +16,10 @@
 /public/build
 /public/hot
 /public/storage
+/public/assets
+/public/.vite
+/public/index.html
+/public/favicon.svg
 /storage/*.key
 /storage/pail
 /vendor

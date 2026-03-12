@@ -30,7 +30,7 @@ apiClient.interceptors.response.use(
             // Return the data field, or empty object if undefined
             return response.data.data !== undefined ? response.data.data : {};
         }
-        // Return response.data or empty object
+        // For direct responses (like paginated data), return as-is
         return response.data || {};
     },
     (error) => {
