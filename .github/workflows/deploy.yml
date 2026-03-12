@@ -17,14 +17,13 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
+        cache: 'npm'
         
-    - name: Install dependencies with force
+    - name: Clean install dependencies
       run: |
-        npm install --force
-        
-    - name: Rebuild native modules
-      run: |
-        npm rebuild @tailwindcss/postcss
+        rm -rf node_modules package-lock.json
+        npm install
+        npm rebuild
         
     - name: Build frontend
       run: npm run build
