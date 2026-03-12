@@ -39,7 +39,7 @@ jobs:
 # ---------------------------------------
     - name: Build React
       env:
-        VITE_API_BASE_URL: https://www.royalgatewayadmin.com/api
+        VITE_API_BASE_URL: https://www.royalgatewayadmin.com/api/v1
         NODE_ENV: production
       run: npm run build
 
