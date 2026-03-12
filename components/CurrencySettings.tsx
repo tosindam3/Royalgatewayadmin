@@ -28,11 +28,33 @@ const CurrencySettings: React.FC = () => {
         currencyApi.getSettings(),
         currencyApi.getCurrencyList(),
       ]);
-      setSettings(settingsData);
-      setCurrencies(currenciesData);
-      setCurrencySettings(settingsData);
+      
+      // Ensure we have valid settings data with defaults
+      const validSettings: CurrencySettingsType = settingsData && typeof settingsData === 'object' ? {
+        currency_code: settingsData.currency_code || 'USD',
+        currency_symbol: settingsData.currency_symbol || '$',
+        currency_position: (settingsData.currency_position === 'before' || settingsData.currency_position === 'after') 
+          ? settingsData.currency_position 
+          : 'before',
+        decimal_separator: settingsData.decimal_separator || '.',
+        thousand_separator: settingsData.thousand_separator || ',',
+        decimal_places: settingsData.decimal_places || 2,
+      } : {
+        currency_code: 'USD',
+        currency_symbol: '$',
+        currency_position: 'before',
+        decimal_separator: '.',
+        thousand_separator: ',',
+        decimal_places: 2,
+      };
+      
+      setSettings(validSettings);
+      setCurrencies(currenciesData || []);
+      setCurrencySettings(validSettings);
     } catch (error: any) {
-      toast.error('Failed to load currency settings');
+      console.error('Currency settings error:', error);
+      toast.error('Failed to load currency settings - using defaults');
+      // Keep default settings on error
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +97,7 @@ const CurrencySettings: React.FC = () => {
   const previewAmount = 1234567.89;
 
   return (
-    <GlassCard title="Currency Settings" icon={DollarSign}>
+    <GlassCard title="Currency Settings">
       <div className="space-y-6">
         {/* Currency Selection */}
         <div>
