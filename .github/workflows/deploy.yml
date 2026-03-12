@@ -43,7 +43,7 @@ jobs:
           TARGET: "domains/royalgatewayadmin.com/public_html"
           ARGS: "-avz --checksum --delete"
           SOURCE: "dist/"
-          EXCLUDE: "/.htaccess, /index.php, /.env"
+          EXCLUDE: ".env*,.htaccess,index.php"
 
       - name: 🚀 Disable index.html Caching
         uses: appleboy/ssh-action@master
@@ -72,6 +72,12 @@ jobs:
             set -e
             echo "🔄 Starting backend update process..."
             cd /home/u237094395/apps/royalgatewayadmin/backend
+            
+            # CRITICAL: Verify .env exists
+            if [ ! -f .env ]; then
+              echo "❌ ERROR: .env file is missing in backend! Stopping deployment to prevent data loss."
+              exit 1
+            fi
             
             # Optimization: Pull latest repo changes for backend
             cd ..
