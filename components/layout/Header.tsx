@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({
     const totalCount   = overview?.totalEmployees ?? '—';
 
     return (
-        <header className="h-20 border-b border-slate-200 dark:border-white/5 flex items-center px-4 md:px-10 bg-white/80 dark:bg-[#0d0a1a]/60 backdrop-blur-2xl justify-between z-40">
+        <header className="hidden md:flex h-20 border-b border-slate-200 dark:border-white/5 items-center px-4 md:px-10 bg-white/80 dark:bg-[#0d0a1a]/60 backdrop-blur-2xl justify-between z-40">
             <div className="flex items-center gap-4 flex-1">
                 <div className="relative flex-1 max-w-lg hidden sm:block">
                     <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2.5" /></svg>

@@ -73,7 +73,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
         bg-white dark:bg-white/5 
         border border-slate-200 dark:border-white/10 
         ${colors.border}
-        rounded-2xl p-6 
+        rounded-xl md:rounded-2xl p-4 md:p-6 
         shadow-sm hover:shadow-md
         ${colors.bg}
         transition-all duration-300 
@@ -83,7 +83,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
       onClick={onClick}
     >
       {/* Top section with title and trend */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-3 md:mb-4">
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           {title}
         </span>
@@ -103,8 +103,8 @@ const MetricCard: React.FC<MetricCardProps> = ({
       </div>
 
       {/* Main value */}
-      <div className="mb-4">
-        <h3 className={`text-3xl font-bold ${colors.accent} tracking-tight`}>
+      <div className="mb-3 md:mb-4">
+        <h3 className={`text-2xl md:text-3xl font-bold ${colors.accent} tracking-tight`}>
           {value}
         </h3>
       </div>

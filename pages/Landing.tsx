@@ -123,16 +123,16 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 h-24 flex items-center px-8 md:px-16 glass border-b border-slate-200 dark:border-white/5 bg-white/70 backdrop-blur-3xl shadow-sm animate-in slide-in-from-top duration-700 fill-mode-both">
+      <nav className="fixed top-0 left-0 right-0 z-50 h-16 md:h-24 flex items-center px-4 sm:px-8 md:px-16 glass border-b border-slate-200 dark:border-white/5 bg-white/70 backdrop-blur-3xl shadow-sm animate-in slide-in-from-top duration-700 fill-mode-both">
         <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
           <div
             onClick={() => scrollToSection('home')}
             className="flex items-center gap-3 cursor-pointer group animate-in fade-in zoom-in duration-500 delay-300 fill-mode-both"
           >
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+            <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
               <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
             </div>
-            <div className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
+            <div className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
               HR360<span className="text-orange-500 font-normal group-hover:text-orange-400 transition-colors">.</span>
             </div>
           </div>
@@ -169,7 +169,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
       </nav>
 
       {/* Hero Section */}
-      <section id="home" className="relative z-10 pt-48 pb-32 px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
+      <section id="home" className="relative z-10 pt-24 md:pt-48 pb-16 md:pb-32 px-4 md:px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
         {/* Hero Background Image */}
         <div className="absolute inset-0 z-0">
           <img
@@ -186,12 +186,12 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 dark:text-white/60 italic">Human Resources Operating System</span>
           </div>
 
-          <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-400 fill-mode-both">
+          <h1 className="text-4xl sm:text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-6 md:mb-8 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-400 fill-mode-both">
             <span className="block text-slate-900 dark:text-white mb-2">HUMAN CAPITAL</span>
             <span className="gradient-text-live italic">REIMAGINED.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto text-slate-500 dark:text-slate-400 text-lg md:text-xl font-medium leading-relaxed mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-600 fill-mode-both">
+          <p className="max-w-2xl mx-auto text-slate-500 dark:text-slate-400 text-base md:text-lg lg:text-xl font-medium leading-relaxed mb-8 md:mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-600 fill-mode-both">
             Empower your workforce with HR360's most advanced HR operating system. Provision identities, automate compliance, and unlock predictive intelligence.
           </p>
 

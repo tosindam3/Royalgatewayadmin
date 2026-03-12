@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @config "./tailwind.config.js";
+@import "./styles/brand-colors.css";
+@import "./styles/mobile-responsive.css";
 
 :root {
   /* Primary brand color - dynamically updated from settings */

@@ -13,6 +13,8 @@ import { useBrandSettings } from './hooks/useBrandSettings';
 // Layout & UI Components
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
+import MobileSidebar from './components/layout/MobileSidebar';
+import MobileHeader from './components/layout/MobileHeader';
 import PageSkeleton from './components/ui/PageSkeleton';
 import AppLoadingSkeleton from './components/ui/AppLoadingSkeleton';
 import AttendanceClockModal from './components/attendance/AttendanceClockModal';
@@ -85,6 +87,7 @@ const MainApp: React.FC<{
   onToggleTheme: () => void;
 }> = ({ onLogout, brand, onUpdateBrand, userProfile, currentUserRole, onUpdateProfile, theme, onToggleTheme }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [selectedBranchScope, setSelectedBranchScope] = useState('All Branches');
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
@@ -112,6 +115,7 @@ const MainApp: React.FC<{
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#0d0a1a] selection:bg-purple-500/30">
       <Toaster position="top-right" richColors closeButton />
 
+      {/* Desktop Sidebar */}
       <Sidebar
         brand={brand}
         isCollapsed={isCollapsed}
@@ -119,7 +123,16 @@ const MainApp: React.FC<{
         menuItems={filteredMenu}
       />
 
+      {/* Mobile Sidebar */}
+      <MobileSidebar
+        brand={brand}
+        menuItems={filteredMenu}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+      />
+
       <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Desktop Header */}
         <Header
           userProfile={userProfile}
           theme={theme}
@@ -132,7 +145,20 @@ const MainApp: React.FC<{
           onOpenClockModal={() => setIsClockModalOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto relative p-4 md:p-10 scroll-smooth no-scrollbar text-slate-900 dark:text-white">
+        {/* Mobile Header */}
+        <MobileHeader
+          brand={brand}
+          userProfile={userProfile}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          onLogout={onLogout}
+          notifications={notifications}
+          onMarkAsRead={markAsRead}
+          onOpenSidebar={() => setIsMobileSidebarOpen(true)}
+          onOpenClockModal={() => setIsClockModalOpen(true)}
+        />
+
+        <main className="flex-1 overflow-y-auto relative p-3 sm:p-4 md:p-10 scroll-smooth no-scrollbar text-slate-900 dark:text-white">
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[var(--brand-primary)]/5 blur-[160px] rounded-full pointer-events-none -z-10 animate-pulse" />
           <div className="max-w-[1400px] mx-auto animate-fade-in">
             <Suspense fallback={<PageSkeleton />}>

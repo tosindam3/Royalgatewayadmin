@@ -109,9 +109,9 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200 dark:border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-200 dark:border-white/10 pb-4 md:pb-6">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
             Control <span className="text-brand-primary">{dashboardLabel}</span>
           </h2>
           <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1">
@@ -119,13 +119,13 @@ const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-2xl text-[10px] font-black text-brand-primary uppercase tracking-widest">
+        <div className="px-3 md:px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black text-brand-primary uppercase tracking-widest">
           Role: {currentUserRole} {user?.department?.name ? `• ${user.department.name}` : ''}
         </div>
       </div>
 
       {/* Main Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {isLoading ? (
           [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)
         ) : (
@@ -160,10 +160,10 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+        <div className="lg:col-span-8 space-y-6 md:space-y-8">
           {/* Main Chart Section - Talent & Turnover */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <GlassCard
               title="Talent Trends"
               className="cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Hiring Funnel & Analytics Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             {currentUserRole !== UserRole.EMPLOYEE && (
               <GlassCard title="Hiring Funnel (Discovery)">
                 <div className="space-y-4 py-2">
@@ -280,7 +280,7 @@ const Dashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <GlassCard
               title="AI Strategic Summary"
               className="border-t-2 border-t-brand-primary/30 hover:bg-brand-primary-10 cursor-pointer transition-all"
@@ -322,7 +322,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-8">
+        <div className="lg:col-span-4 space-y-6 md:space-y-8">
           {/* Demographics Card */}
           {currentUserRole !== UserRole.EMPLOYEE && (
             <GlassCard title="Demographics Insight">

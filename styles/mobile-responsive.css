@@ -1,0 +1,211 @@
+/* Mobile Responsive Utilities */
+
+/* Hide scrollbars but keep functionality */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile-first responsive text sizes */
+.text-responsive-xs {
+  @apply text-xs sm:text-sm;
+}
+
+.text-responsive-sm {
+  @apply text-sm sm:text-base;
+}
+
+.text-responsive-base {
+  @apply text-base sm:text-lg;
+}
+
+.text-responsive-lg {
+  @apply text-lg sm:text-xl;
+}
+
+.text-responsive-xl {
+  @apply text-xl sm:text-2xl;
+}
+
+.text-responsive-2xl {
+  @apply text-2xl sm:text-3xl;
+}
+
+.text-responsive-3xl {
+  @apply text-3xl sm:text-4xl;
+}
+
+/* Mobile-friendly spacing */
+.space-responsive {
+  @apply space-y-4 md:space-y-6;
+}
+
+.gap-responsive {
+  @apply gap-4 md:gap-6;
+}
+
+.p-responsive {
+  @apply p-3 sm:p-4 md:p-6;
+}
+
+.px-responsive {
+  @apply px-3 sm:px-4 md:px-6;
+}
+
+.py-responsive {
+  @apply py-3 sm:py-4 md:py-6;
+}
+
+/* Mobile-friendly grid layouts */
+.grid-responsive-2 {
+  @apply grid-cols-1 sm:grid-cols-2;
+}
+
+.grid-responsive-3 {
+  @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+}
+
+.grid-responsive-4 {
+  @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-4;
+}
+
+/* Mobile-friendly card layouts */
+.card-mobile {
+  @apply rounded-xl md:rounded-2xl p-4 md:p-6;
+}
+
+/* Touch-friendly interactive elements */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Mobile-friendly modal */
+.modal-mobile {
+  @apply w-full max-w-[95vw] sm:max-w-md mx-4 sm:mx-auto;
+}
+
+/* Safe area handling for mobile devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Mobile-specific animations */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-slide-left {
+    animation: slideLeft 0.3s ease-out;
+  }
+  
+  .animate-slide-right {
+    animation: slideRight 0.3s ease-out;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideRight {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile-friendly focus states */
+@media (hover: none) and (pointer: coarse) {
+  .hover\:bg-slate-50:hover {
+    background-color: transparent;
+  }
+  
+  .hover\:scale-105:hover {
+    transform: none;
+  }
+  
+  /* Use active states instead of hover on touch devices */
+  .touch-active:active {
+    @apply bg-slate-100 dark:bg-white/10 scale-95;
+    transition: all 0.1s ease;
+  }
+}
+
+/* Responsive table handling */
+.table-responsive {
+  @apply block overflow-x-auto whitespace-nowrap sm:table sm:overflow-visible sm:whitespace-normal;
+}
+
+/* Mobile-friendly form elements */
+.input-mobile {
+  @apply text-base; /* Prevents zoom on iOS */
+}
+
+/* Responsive image handling */
+.img-responsive {
+  @apply w-full h-auto max-w-full;
+}
+
+/* Mobile-friendly navigation */
+.nav-mobile {
+  @apply fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-50;
+}
+
+/* Responsive container */
+.container-responsive {
+  @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
