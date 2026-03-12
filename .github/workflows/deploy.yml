@@ -33,16 +33,6 @@ jobs:
           NODE_ENV: production
         run: npm run build
         
-      - name: 🔑 Install SSH Key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          known_hosts: unnecessary # We scan below
-          if_key_exists: replace
-
-      - name: 🔍 Add Known Hosts
-        run: ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} -H ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
-
       - name: 📤 Deploy to Hostinger via SSH/Rsync
         uses: easingthemes/ssh-deploy@main
         with:
@@ -56,31 +46,33 @@ jobs:
           EXCLUDE: "/.htaccess, /index.php, /.env"
 
       - name: 🔄 Post-Deployment Backend Update
-        run: |
-          # Note: We use the existing SSH logic to update the backend
-          # This keeps the backend code in sync with the repository
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} bash << 'ENDSSH'
-          set -e
-          cd /home/u237094395/apps/royalgatewayadmin/backend
-          echo "🔄 Running backend updates..."
-          
-          # Optimization: Pull latest repo changes for backend
-          cd ..
-          # Update remote URL to use token for authentication
-          git remote set-url origin https://x-access-token:${{ secrets.DEPLOY_TOKEN_PAT }}@github.com/tosindam3/Royalgatewayadmin.git
-          git pull origin main
-          
-          cd backend
-          composer install --no-dev --optimize-autoloader --no-interaction
-          php artisan migrate --force
-          php artisan optimize:clear
-          php artisan config:cache
-          php artisan route:cache
-          php artisan view:cache
-          
-          chmod -R 775 storage bootstrap/cache
-          echo "✅ Backend updated!"
-          ENDSSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOSTINGER_SSH_HOST }}
+          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+          key: ${{ secrets.HOSTINGER_SSH_KEY }}
+          port: ${{ secrets.HOSTINGER_SSH_PORT }}
+          script: |
+            set -e
+            echo "🔄 Starting backend update process..."
+            cd /home/u237094395/apps/royalgatewayadmin/backend
+            
+            # Optimization: Pull latest repo changes for backend
+            cd ..
+            # Update remote URL to use token for authentication
+            git remote set-url origin https://x-access-token:${{ secrets.DEPLOY_TOKEN_PAT }}@github.com/tosindam3/Royalgatewayadmin.git
+            git pull origin main
+            
+            cd backend
+            composer install --no-dev --optimize-autoloader --no-interaction
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            
+            chmod -R 775 storage bootstrap/cache
+            echo "✅ Backend updated successfully!"
 
       - name: 🩺 Final Health Check
         run: |
