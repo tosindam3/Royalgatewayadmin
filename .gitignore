@@ -71,3 +71,32 @@ components/debug/
 # Documentation
 /docs/
 docs/
+
+# Release archives (built locally, not for git)
+*.tar.gz
+*.zip
+
+# Deployment run logs and status files (CI artifacts)
+run_log.txt
+run_status.txt
+setup-commands.txt
+metadata.json
+
+# Old deployment docs (cleaned up)
+DEPLOYMENT_QUICK_FIX.md
+DEPLOYMENT_READY.md
+PRODUCTION_DEPLOYMENT_COMPLETE.md
+NEXT_STEPS.md
+SECRETS_UPDATED.md
+SECURITY_WARNING.md
+DYNAMIC_BRAND_COLORS.md
+
+# Temp PHP debug files
+*.php.bak
+enable_debug.php
+fix_key.php
+tmp_*.php
+tmp_*.js
+
+# Backend vendor (installed by composer on server)
+backend/vendor/

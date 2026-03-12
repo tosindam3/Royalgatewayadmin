@@ -1,3 +1,42 @@
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
+
+class HostingerDeployAndSetupCicd extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'hostinger:deploy-and-setup-cicd';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Setup GitHub Actions CI/CD and Server Scripts for Hostinger Deployment';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $this->info('🚀 Starting RoyalGateway Hostinger CI/CD Setup...');
+
+        // 1. Create .github/workflows directory
+        $workflowDir = base_path('../.github/workflows');
+        if (!File::exists($workflowDir)) {
+            File::makeDirectory($workflowDir, 0755, true);
+            $this->comment('✅ Created .github/workflows directory.');
+        }
+
+        // 2. Define Workflow Content (Rsync based)
+        $workflowContent = <<<'YML'
 name: 🚀 Deploy to Production (Hostinger)
 
 on:
@@ -123,3 +162,56 @@ jobs:
         run: |
           sleep 5
           curl -f https://www.royalgatewayadmin.com/api/health || echo "Health check failed, manual verification needed."
+YML;
+
+        File::put($workflowDir . '/deploy.yml', $workflowContent);
+        $this->info('✅ GitHub Deployment Workflow created.');
+
+        // 3. Create Server Setup Script
+        $deployDir = base_path('../deploy');
+        if (!File::exists($deployDir)) {
+            File::makeDirectory($deployDir, 0755, true);
+        }
+
+        $serverScriptContent = <<<'SH'
+#!/bin/bash
+set -e
+BACKEND_DIR="/home/u237094395/apps/royalgatewayadmin"
+BACKEND_APP_DIR="$BACKEND_DIR/backend"
+
+echo "🔧 Starting Server Setup..."
+if [ ! -d "$BACKEND_DIR/.git" ]; then
+    git clone https://github.com/tosindam3/Royalgatewayadmin.git "$BACKEND_DIR"
+fi
+
+cd "$BACKEND_APP_DIR"
+if [ ! -f .env ]; then
+    cp .env.production .env
+    echo "⚠️  Created .env from template. Update your DB credentials!"
+fi
+
+composer install --no-dev --optimize-autoloader --no-interaction
+php artisan key:generate --force
+php artisan migrate --force
+php artisan optimize:clear
+chmod -R 775 storage bootstrap/cache
+echo "✅ Server setup complete!"
+SH;
+
+        File::put($deployDir . '/server-setup.sh', $serverScriptContent);
+        $this->info('✅ Server setup script created at deploy/server-setup.sh');
+
+        // 4. Instructions
+        $this->newLine();
+        $this->warn('🚀 FINAL STEPS REQUIRED:');
+        $this->line('1. Go to GitHub Repository Settings > Secrets > Actions');
+        $this->line('2. Add these repository secrets:');
+        $this->line('   - HOSTINGER_SSH_HOST: 147.93.54.101');
+        $this->line('   - HOSTINGER_SSH_USERNAME: u237094395');
+        $this->line('   - HOSTINGER_SSH_PORT: 65002');
+        $this->line('   - HOSTINGER_SSH_KEY: [Content of your private key]');
+        $this->line('   - DEPLOY_TOKEN_PAT: [Your GitHub PAT Token]');
+        $this->newLine();
+        $this->info('Deployment is ready. Push to "main" branch to trigger.');
+    }
+}
