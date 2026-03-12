@@ -9,12 +9,12 @@
   --brand-primary-light: color-mix(in srgb, var(--brand-primary) 80%, white);
   --brand-primary-dark: color-mix(in srgb, var(--brand-primary) 80%, black);
   
-  /* Opacity variations */
-  --brand-primary-10: color-mix(in srgb, var(--brand-primary) 10%, transparent);
-  --brand-primary-20: color-mix(in srgb, var(--brand-primary) 20%, transparent);
-  --brand-primary-30: color-mix(in srgb, var(--brand-primary) 30%, transparent);
-  --brand-primary-50: color-mix(in srgb, var(--brand-primary) 50%, transparent);
-  --brand-primary-80: color-mix(in srgb, var(--brand-primary) 80%, transparent);
+  /* Opacity variations - using rgba for better browser support */
+  --brand-primary-10: rgba(var(--brand-primary-rgb), 0.1);
+  --brand-primary-20: rgba(var(--brand-primary-rgb), 0.2);
+  --brand-primary-30: rgba(var(--brand-primary-rgb), 0.3);
+  --brand-primary-50: rgba(var(--brand-primary-rgb), 0.5);
+  --brand-primary-80: rgba(var(--brand-primary-rgb), 0.8);
 }
 
 /* Utility classes for brand colors */
@@ -132,6 +132,95 @@
 
 .glow-brand-strong {
   box-shadow: 0 0 30px var(--brand-primary-50);
+}
+
+/* Card styling utilities */
+.card-brand-accent {
+  border-left: 4px solid var(--brand-primary);
+}
+
+.card-brand-accent:hover {
+  background-color: var(--brand-primary-10);
+  box-shadow: 0 4px 20px var(--brand-primary-20);
+}
+
+.card-brand-indicator {
+  background-color: var(--brand-primary);
+  transition: width 0.5s ease-out;
+}
+
+.card-brand-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-brand-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--brand-primary-10);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border-radius: inherit;
+}
+
+.card-brand-glow:hover::before {
+  opacity: 1;
+}
+
+/* Metric card specific styles */
+.metric-card {
+  position: relative;
+  background: white;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.dark .metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.metric-card:hover {
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.15);
+  transform: translateY(-1px);
+}
+
+.metric-card-primary {
+  border-left: 4px solid var(--brand-primary);
+}
+
+.metric-card-primary:hover {
+  background-color: var(--brand-primary-10);
+}
+
+.metric-card-success {
+  border-left: 4px solid #10b981;
+}
+
+.metric-card-success:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.metric-card-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.metric-card-warning:hover {
+  background-color: rgba(245, 158, 11, 0.1);
+}
+
+.metric-card-info {
+  border-left: 4px solid #3b82f6;
+}
+
+.metric-card-info:hover {
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 /* Shimmer effect for skeleton loaders */

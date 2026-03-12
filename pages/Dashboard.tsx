@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import GlassCard from '../components/GlassCard';
+import MetricCard from '../components/ui/MetricCard';
 import AIInsight from '../components/AIInsight';
 import Skeleton from '../components/Skeleton';
 import {
@@ -11,6 +12,7 @@ import { generateHRAssistantResponse } from '../services/geminiService';
 import { dashboardService } from '../services/dashboardService';
 import AnalysisDetailModal from '../components/dashboard/AnalysisDetailModal';
 import { getTooltipStyles } from '../utils/chartTheme';
+import { useBrandSettings } from '../hooks/useBrandSettings';
 
 const Dashboard: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -19,6 +21,9 @@ const Dashboard: React.FC = () => {
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
+
+  // Brand settings hook
+  const { brandSettings } = useBrandSettings();
 
   // Interactive Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,14 +112,14 @@ const Dashboard: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200 dark:border-white/10 pb-6">
         <div>
           <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
-            Control <span className="text-[#8252e9]">{dashboardLabel}</span>
+            Control <span className="text-brand-primary">{dashboardLabel}</span>
           </h2>
           <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mt-1">
             {subLabel}
           </p>
         </div>
 
-        <div className="px-4 py-2 bg-[#8252e9]/10 border border-[#8252e9]/20 rounded-2xl text-[10px] font-black text-[#8252e9] uppercase tracking-widest">
+        <div className="px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-2xl text-[10px] font-black text-brand-primary uppercase tracking-widest">
           Role: {currentUserRole} {user?.department?.name ? `• ${user.department.name}` : ''}
         </div>
       </div>
@@ -122,24 +127,36 @@ const Dashboard: React.FC = () => {
       {/* Main Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoading ? (
-          [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-[24px]" />)
+          [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)
         ) : (
-          dashboardData?.stats.map((s: any, i: number) => (
-            <GlassCard
-              key={i}
-              className="!p-6 border-l-4 border-l-[#8252e9] hover:bg-[#8252e9]/5 transition-all cursor-pointer group"
-              onClick={() => handleStatClick(s.label, s.val)}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{s.label}</span>
-                <span className={`text-[9px] font-bold px-2 py-1 rounded-md bg-white/5 dark:bg-white/5 ${s.delta.includes('+') ? 'text-emerald-500' : 'text-slate-400'}`}>
-                  {s.delta}
-                </span>
-              </div>
-              <h3 className={`text-3xl font-black ${s.color}`}>{s.val}</h3>
-              <div className="h-0.5 w-0 group-hover:w-full bg-[#8252e9] transition-all duration-300 mt-2" />
-            </GlassCard>
-          ))
+          dashboardData?.stats.map((s: any, i: number) => {
+            // Determine color based on metric type
+            const getMetricColor = (label: string) => {
+              if (label.toLowerCase().includes('retention')) return 'success';
+              if (label.toLowerCase().includes('burnout') || label.toLowerCase().includes('turnover')) return 'warning';
+              if (label.toLowerCase().includes('headcount') || label.toLowerCase().includes('employees')) return 'info';
+              return 'primary';
+            };
+
+            // Determine trend based on delta
+            const getTrend = (delta: string) => {
+              if (delta.includes('+')) return 'up';
+              if (delta.includes('-')) return 'down';
+              return 'neutral';
+            };
+
+            return (
+              <MetricCard
+                key={i}
+                title={s.label}
+                value={s.val}
+                delta={s.delta}
+                trend={getTrend(s.delta)}
+                color={getMetricColor(s.label)}
+                onClick={() => handleStatClick(s.label, s.val)}
+              />
+            );
+          })
         )}
       </div>
 
@@ -151,7 +168,7 @@ const Dashboard: React.FC = () => {
               title="Talent Trends"
               className="cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
               onClick={() => handleStatClick('Talent Trends', 'Live Data Sync')}
-              action={<button className="text-[10px] font-black text-[#8252e9] uppercase tracking-widest hover:underline">View Historical ›</button>}
+              action={<button className="text-[10px] font-black text-brand-primary uppercase tracking-widest hover:underline">View Historical ›</button>}
             >
               <div className="h-[250px] w-full mt-4">
                 {isLoading ? (
@@ -161,15 +178,15 @@ const Dashboard: React.FC = () => {
                     <AreaChart data={dashboardData?.talent_trends}>
                       <defs>
                         <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8252e9" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#8252e9" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--brand-primary)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="var(--brand-primary)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#00000008" vertical={false} />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                       <YAxis hide />
                       <Tooltip {...tooltipStyles} />
-                      <Area type="monotone" dataKey="val" stroke="#8252e9" strokeWidth={3} fill="url(#chartGrad)" />
+                      <Area type="monotone" dataKey="val" stroke="var(--brand-primary)" strokeWidth={3} fill="url(#chartGrad)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -266,7 +283,7 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <GlassCard
               title="AI Strategic Summary"
-              className="border-t-2 border-t-[#8252e9]/30 hover:bg-[#8252e9]/5 cursor-pointer transition-all"
+              className="border-t-2 border-t-brand-primary/30 hover:bg-brand-primary-10 cursor-pointer transition-all"
               onClick={() => handleStatClick('AI Strategic Intelligence', aiInsight)}
             >
               <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
@@ -329,7 +346,7 @@ const Dashboard: React.FC = () => {
                       <div key={i} className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{age.name} Yrs</span>
                         <div className="flex-1 mx-4 h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#8252e9]" style={{ width: `${age.value}%` }} />
+                          <div className="h-full bg-brand-primary" style={{ width: `${age.value}%` }} />
                         </div>
                         <span className="text-[10px] font-black text-slate-900 dark:text-white">{age.value}%</span>
                       </div>
@@ -346,7 +363,7 @@ const Dashboard: React.FC = () => {
                 [1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)
               ) : (
                 dashboardData?.milestones?.map((item: any, i: number) => (
-                  <div key={i} className={`p-4 rounded-2xl bg-black/5 dark:bg-white/5 border-l-4 ${item.c} group hover:bg-[#8252e9]/5 transition-all cursor-pointer`}>
+                  <div key={i} className={`p-4 rounded-2xl bg-black/5 dark:bg-white/5 border-l-4 ${item.c} group hover:bg-brand-primary-10 transition-all cursor-pointer`}>
                     <div className="flex justify-between items-center">
                       <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{item.t}</h4>
                       <span className="text-xl">{item.i}</span>

@@ -8,6 +8,7 @@ import { UserRole, Notification, BrandSettings, UserProfile, mapBackendRoleToUse
 import { authService } from './services/authService';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { updateBrandColor, initBrandColors } from './utils/brandColors';
+import { useBrandSettings } from './hooks/useBrandSettings';
 
 // Layout & UI Components
 import Sidebar from './components/layout/Sidebar';
@@ -197,16 +198,21 @@ const App: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>(UserRole.EMPLOYEE);
-  const [brand, setBrand] = useState<BrandSettings>({
-    companyName: 'HR360',
-    logoUrl: '',
-    primaryColor: '#4c49d8'
-  });
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: '',
     username: '',
     avatar: ''
   });
+
+  // Use brand settings hook
+  const { brandSettings, updateBrandSettings } = useBrandSettings();
+
+  // Convert brand settings to legacy format for compatibility
+  const brand: BrandSettings = {
+    companyName: brandSettings?.company_name || 'HR360',
+    logoUrl: brandSettings?.logo_url || '',
+    primaryColor: brandSettings?.primary_color || '#8252e9'
+  };
 
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
@@ -215,12 +221,12 @@ const App: React.FC = () => {
 
   // Initialize and update brand color globally
   useEffect(() => {
-    initBrandColors(brand.primaryColor);
-  }, []);
-
-  useEffect(() => {
-    updateBrandColor(brand.primaryColor);
-  }, [brand.primaryColor]);
+    if (brandSettings?.primary_color) {
+      updateBrandColor(brandSettings.primary_color);
+    } else {
+      initBrandColors('#8252e9');
+    }
+  }, [brandSettings?.primary_color]);
 
   useEffect(() => {
     const initSession = async () => {
@@ -290,7 +296,13 @@ const App: React.FC = () => {
         theme={theme}
         onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
         brand={brand}
-        onUpdateBrand={setBrand}
+        onUpdateBrand={async (newBrand: BrandSettings) => {
+          await updateBrandSettings({
+            primary_color: newBrand.primaryColor,
+            company_name: newBrand.companyName,
+            logo_url: newBrand.logoUrl
+          });
+        }}
         userProfile={userProfile}
         currentUserRole={currentUserRole}
         onUpdateProfile={setUserProfile}

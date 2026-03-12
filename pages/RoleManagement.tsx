@@ -226,7 +226,7 @@ const RoleManagement: React.FC = () => {
                             <>
                                 <CardSkeleton /> <CardSkeleton /> <CardSkeleton />
                             </>
-                        ) : rolesData && rolesData.length > 0 ? (
+                        ) : rolesData && Array.isArray(rolesData) && rolesData.length > 0 ? (
                             rolesData.map((role) => (
                                 <GlassCard key={role.id} className="!p-6 hover:bg-white/[0.05] transition-all">
                                     <div className="flex justify-between items-start mb-4">
@@ -262,7 +262,7 @@ const RoleManagement: React.FC = () => {
                                         <div>
                                             <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Permissions</p>
                                             <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase border border-emerald-500/20">
-                                                {role.permissions?.length || 0}
+                                                {Array.isArray(role.permissions) ? role.permissions.length : 0}
                                             </span>
                                         </div>
                                         <div>
@@ -356,7 +356,7 @@ const RoleManagement: React.FC = () => {
                                         {module}
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {permissions.map((permission: Permission) => (
+                                        {Array.isArray(permissions) ? permissions.map((permission: Permission) => (
                                             <div
                                                 key={permission.id}
                                                 className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5"
@@ -368,17 +368,17 @@ const RoleManagement: React.FC = () => {
                                                     {permission.name}
                                                 </p>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {permission.available_scopes.map((scope) => (
+                                                    {Array.isArray(permission.available_scopes) ? permission.available_scopes.map((scope) => (
                                                         <span
                                                             key={scope}
                                                             className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 text-[8px] font-black uppercase border border-purple-500/20"
                                                         >
                                                             {scope}
                                                         </span>
-                                                    ))}
+                                                    )) : null}
                                                 </div>
                                             </div>
-                                        ))}
+                                        )) : null}
                                     </div>
                                 </GlassCard>
                             ))
