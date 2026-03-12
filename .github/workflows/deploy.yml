@@ -56,6 +56,8 @@ jobs:
           
           # Optimization: Pull latest repo changes for backend
           cd ..
+          # Update remote URL to use token for authentication
+          git remote set-url origin https://x-access-token:${{ secrets.DEPLOY_TOKEN_PAT }}@github.com/tosindam3/Royalgatewayadmin.git
           git pull origin main
           
           cd backend
