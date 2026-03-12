@@ -44,21 +44,42 @@ jobs:
       run: npm run build
 
 # ---------------------------------------
-# Setup SSH
+# Deploy React Frontend
 # ---------------------------------------
-    - name: Setup SSH
+    - name: Deploy React
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          set -e
+          echo "Deploying React frontend..."
+          # Create backup
+          if [ -d "/home/u237094395/domains/royalgatewayadmin.com/public_html_backup" ]; then
+            rm -rf /home/u237094395/domains/royalgatewayadmin.com/public_html_backup
+          fi
+          if [ -d "/home/u237094395/domains/royalgatewayadmin.com/public_html" ]; then
+            cp -r /home/u237094395/domains/royalgatewayadmin.com/public_html /home/u237094395/domains/royalgatewayadmin.com/public_html_backup
+          fi
+          # Clear existing frontend files (keep .htaccess and index.php)
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type f ! -name '.htaccess' ! -name 'index.php' -delete
+          find /home/u237094395/domains/royalgatewayadmin.com/public_html -type d -empty -delete
+          echo "Frontend deployment preparation completed."
+
+    - name: Upload React Build
       run: |
+        # Create a temporary SSH key file
         mkdir -p ~/.ssh
         echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -p ${{ secrets.HOSTINGER_SSH_PORT }} ${{ secrets.HOSTINGER_SSH_HOST }} >> ~/.ssh/known_hosts
-
-# ---------------------------------------
-# Deploy React Frontend
-# ---------------------------------------
-    - name: Deploy React
-      run: |
+        
+        # Upload the built files
         rsync -avz --delete \
+        --exclude='.htaccess' \
+        --exclude='index.php' \
         -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
         dist/ \
         ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:/home/u237094395/domains/royalgatewayadmin.com/public_html/
@@ -67,7 +88,27 @@ jobs:
 # Deploy Laravel Backend
 # ---------------------------------------
     - name: Deploy Laravel
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          set -e
+          echo "Preparing Laravel backend deployment..."
+          # Create backup
+          if [ -d "/home/u237094395/apps/royalgatewayadmin/backend_backup" ]; then
+            rm -rf /home/u237094395/apps/royalgatewayadmin/backend_backup
+          fi
+          if [ -d "/home/u237094395/apps/royalgatewayadmin/backend" ]; then
+            cp -r /home/u237094395/apps/royalgatewayadmin/backend /home/u237094395/apps/royalgatewayadmin/backend_backup
+          fi
+          echo "Backend deployment preparation completed."
+
+    - name: Upload Laravel Backend
       run: |
+        # Use the existing SSH setup
         rsync -avz --delete \
         --exclude=".env" \
         --exclude="node_modules" \
@@ -108,7 +149,7 @@ jobs:
           echo "Laravel deployment completed."
 
 # ---------------------------------------
-# Deploy Full Stack Routing (CORRECTED)
+# Deploy Full Stack Routing
 # ---------------------------------------
     - name: Configure Full Stack Routing
       uses: appleboy/ssh-action@v1
