@@ -8,6 +8,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 // Fixed: Corrected initialization to use import.meta.env for Vite compatibility
 const getAI = () => {
+  // Disable Gemini API for now as requested
+  return null;
+  
   const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.GEMINI_API_KEY || (process as any).env.API_KEY;
 
   if (!apiKey) {
