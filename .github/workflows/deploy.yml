@@ -73,16 +73,19 @@ jobs:
             -o ConnectTimeout=30 \
             -o ServerAliveInterval=10 \
             -o StrictHostKeyChecking=no \
-            ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} << 'EOF'
+            ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }} \
+            "DEPLOY_TOKEN='${{ secrets.DEPLOY_TOKEN_PAT }}' bash -s" << 'EOF'
         set -e
         cd ~/apps/royalgatewayadmin
         
         echo "Enabling maintenance mode..."
         php artisan down --retry=60 || true
         
-        echo "Pulling latest code..."
+        echo "Pulling latest code via GitHub token..."
+        git remote set-url origin "https://tosindam3:${DEPLOY_TOKEN}@github.com/tosindam3/Royalgatewayadmin.git"
         git fetch origin main
         git reset --hard origin/main
+        git remote set-url origin "https://github.com/tosindam3/Royalgatewayadmin.git"
         
         echo "Installing dependencies..."
         composer install --no-dev --optimize-autoloader --no-interaction
