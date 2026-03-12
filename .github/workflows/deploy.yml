@@ -72,6 +72,7 @@ jobs:
         --exclude=".env" \
         --exclude="node_modules" \
         --exclude="vendor" \
+        --exclude="public/index.php" \
         -e "ssh -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
         backend/ \
         ${{ secrets.HOSTINGER_SSH_USERNAME }}@${{ secrets.HOSTINGER_SSH_HOST }}:/home/u237094395/apps/royalgatewayadmin/backend/
@@ -117,6 +118,9 @@ jobs:
         script: |
           # Copy Laravel public files to frontend directory for API access
           cp -r /home/u237094395/apps/royalgatewayadmin/backend/public/* /home/u237094395/domains/royalgatewayadmin.com/public_html/
+          
+          # Copy production index.php
+          cp /home/u237094395/apps/royalgatewayadmin/backend/public/index.production.php /home/u237094395/domains/royalgatewayadmin.com/public_html/index.php
           
           # Create comprehensive .htaccess for both React and Laravel API
           cat > /home/u237094395/domains/royalgatewayadmin.com/public_html/.htaccess << 'EOF'
