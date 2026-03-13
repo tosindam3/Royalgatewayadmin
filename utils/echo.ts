@@ -13,12 +13,7 @@ window.Pusher = Pusher;
 export const initEcho = (token: string | null) => {
     if (!token) return null;
 
-    // Disable WebSocket in production until properly configured
-    if (window.location.hostname === 'www.royalgatewayadmin.com' || 
-        window.location.hostname === 'royalgatewayadmin.com') {
-        console.log('WebSocket disabled in production environment');
-        return null;
-    }
+    // WebSockets are now enabled for production via Pusher
 
     return new Echo({
         broadcaster: 'pusher',
