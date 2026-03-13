@@ -116,10 +116,19 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const filteredMessages = messages.filter(msg =>
+  const safeChannels = Array.isArray(channels) ? channels : [];
+  const safeMessages = Array.isArray(messages) ? messages : [];
+
+  const filteredMessages = safeMessages.filter(msg =>
     !channelSearchTerm ||
-    msg.content.toLowerCase().includes(channelSearchTerm.toLowerCase())
+    msg?.content?.toLowerCase().includes(channelSearchTerm.toLowerCase())
   );
+
+  console.log('[Diagnostic] channels:', channels);
+  console.log('[Diagnostic] messagesData:', messagesData);
+  console.log('[Diagnostic] messages:', messages);
+  console.log('[Diagnostic] onlineUsers:', onlineUsers);
+  console.log('[Diagnostic] typingUsers:', typingUsers);
 
   return (
     <div className="flex h-full gap-6 animate-in fade-in duration-500">
@@ -152,11 +161,11 @@ const ChatInterface: React.FC = () => {
             <div className="text-center text-slate-500 py-8">Loading channels...</div>
           ) : (
             <>
-              {(channels.filter(c => c.is_pinned && c.name.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).length > 0) && (
+              {(safeChannels.filter(c => c.is_pinned && c.name?.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).length > 0) && (
                 <div>
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-2">Pinned</p>
                   <div className="space-y-1">
-                    {channels.filter(c => c.is_pinned && c.name.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).map((channel) => (
+                    {safeChannels.filter(c => c.is_pinned && c.name?.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).map((channel) => (
                       <button
                         key={channel.id}
                         onClick={() => setSelectedChannelId(channel.id)}
@@ -198,11 +207,11 @@ const ChatInterface: React.FC = () => {
                 </div>
               )}
 
-              {(channels.filter(c => !c.is_pinned && c.name.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).length > 0) && (
+              {(safeChannels.filter(c => !c.is_pinned && c.name?.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).length > 0) && (
                 <div>
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-2">Recent</p>
                   <div className="space-y-1">
-                    {channels.filter(c => !c.is_pinned && c.name.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).map((channel) => (
+                    {safeChannels.filter(c => !c.is_pinned && c.name?.toLowerCase().includes(sidebarSearchTerm.toLowerCase())).map((channel) => (
                       <button
                         key={channel.id}
                         onClick={() => setSelectedChannelId(channel.id)}
