@@ -13,6 +13,24 @@ class AttendanceScopeService
      */
     public function getAccessScope(User $user): array
     {
+        // Check roles first - using standardized slugs
+        $roles = $user->roles->pluck('name')->toArray();
+        
+        // Super Admin / CEO / HR Manager - Full access
+        // We check this BEFORE the employee profile check because admins may not have an employee record
+        if (in_array('super_admin', $roles) || in_array('admin', $roles) || in_array('ceo', $roles) || in_array('hr_manager', $roles)) {
+            return [
+                'scope' => 'all',
+                'employee_ids' => Employee::where('status', 'active')->pluck('id')->toArray(),
+                'department_ids' => [],
+                'branch_ids' => [],
+                'can_view_all' => true,
+                'can_manage_settings' => true,
+                'can_approve_corrections' => true,
+                'can_export' => true,
+            ];
+        }
+
         $employee = $user->employeeProfile;
         
         if (!$employee) {
@@ -25,23 +43,6 @@ class AttendanceScopeService
                 'can_manage_settings' => false,
                 'can_approve_corrections' => false,
                 'can_export' => false,
-            ];
-        }
-
-        // Check roles - using standardized slugs
-        $roles = $user->roles->pluck('name')->toArray();
-        
-        // Super Admin / CEO / HR Manager - Full access
-        if (in_array('super_admin', $roles) || in_array('ceo', $roles) || in_array('hr_manager', $roles)) {
-            return [
-                'scope' => 'all',
-                'employee_ids' => Employee::where('status', 'active')->pluck('id')->toArray(),
-                'department_ids' => [],
-                'branch_ids' => [],
-                'can_view_all' => true,
-                'can_manage_settings' => true,
-                'can_approve_corrections' => true,
-                'can_export' => true,
             ];
         }
         

@@ -12,7 +12,7 @@ interface GlassCardProps {
 const GlassCard: React.FC<GlassCardProps> = ({ children, className = '', title, action, onClick }) => {
   return (
     <div
-      className={`glass rounded-[24px] border border-slate-200 dark:border-white/10 p-6 shadow-xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] bg-white/70 dark:bg-white/5 ${className}`}
+      className={`glass rounded-[24px] border border-slate-200 dark:border-white/10 p-6 shadow-xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] bg-white/70 dark:bg-white/5 ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
       {(title || action) && (

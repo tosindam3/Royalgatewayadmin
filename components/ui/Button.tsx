@@ -21,7 +21,7 @@ const Button: React.FC<ButtonProps> = ({
     disabled,
     ...props
 }) => {
-    const baseStyles = "relative flex items-center justify-center gap-2 font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
+    const baseStyles = "relative flex items-center justify-center gap-2 font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
 
     const variants = {
         primary: "bg-[var(--brand-primary)] text-white shadow-xl shadow-purple-500/20 hover:scale-[1.02]",

@@ -148,8 +148,8 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission, string $scope = null): bool
     {
-        // 1. Super Admin & CEO Bypass
-        if ($this->hasAnyRole(['super_admin', 'ceo'])) {
+        // 1. Super Admin, CEO & HR Manager Bypass
+        if ($this->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
             return true;
         }
 

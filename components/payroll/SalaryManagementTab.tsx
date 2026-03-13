@@ -159,65 +159,67 @@ const SalaryManagementTab: React.FC = () => {
                     </div>
 
                     <GlassCard className="!p-0 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-white/5">
-                                <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                    <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Structure</th>
-                                    <th className="px-6 py-4">Base Salary</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {mappings.map((mapping: EmployeeSalary) => (
-                                    <tr key={mapping.id} className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-black text-blue-400">
-                                                    {mapping.employee?.first_name?.charAt(0) || 'E'}
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-black text-white uppercase">{mapping.employee?.first_name} {mapping.employee?.last_name}</p>
-                                                    <p className="text-[9px] text-slate-500 font-bold uppercase">{mapping.employee?.employee_code}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-xs font-bold text-[#8252e9]">{mapping.salary_structure?.name}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="text-xs font-black text-white">{formatCurrency(mapping.base_salary)}</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${mapping.is_active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>
-                                                {mapping.is_active ? 'Active' : 'Superseded'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right space-x-4">
-                                            <button
-                                                onClick={() => { setSelectedMappingId(mapping.id); setViewMode('view'); }}
-                                                className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest transition-all"
-                                            >
-                                                View
-                                            </button>
-                                            <button
-                                                onClick={() => { setSelectedMappingId(mapping.id); setViewMode('edit'); }}
-                                                className="text-[9px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-all"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => { if (confirm('Delete this mapping?')) deleteMutation.mutate(mapping.id); }}
-                                                className="text-[9px] font-black text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-all"
-                                            >
-                                                Delete
-                                            </button>
-                                        </td>
+                        <div className="overflow-x-auto no-scrollbar">
+                            <table className="w-full text-left whitespace-nowrap">
+                                <thead className="bg-white/5">
+                                    <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                        <th className="px-6 py-4">Employee</th>
+                                        <th className="px-6 py-4">Structure</th>
+                                        <th className="px-6 py-4">Base Salary</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {mappings.map((mapping: EmployeeSalary) => (
+                                        <tr key={mapping.id} className="hover:bg-white/[0.02] transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-black text-blue-400 shrink-0">
+                                                        {mapping.employee?.first_name?.charAt(0) || 'E'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-black text-white uppercase">{mapping.employee?.first_name} {mapping.employee?.last_name}</p>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">{mapping.employee?.employee_code}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-xs font-bold text-[#8252e9]">{mapping.salary_structure?.name}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-xs font-black text-white">{formatCurrency(mapping.base_salary)}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${mapping.is_active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                                                    {mapping.is_active ? 'Active' : 'Superseded'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right space-x-4">
+                                                <button
+                                                    onClick={() => { setSelectedMappingId(mapping.id); setViewMode('view'); }}
+                                                    className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest transition-all"
+                                                >
+                                                    View
+                                                </button>
+                                                <button
+                                                    onClick={() => { setSelectedMappingId(mapping.id); setViewMode('edit'); }}
+                                                    className="text-[9px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-all"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => { if (confirm('Delete this mapping?')) deleteMutation.mutate(mapping.id); }}
+                                                    className="text-[9px] font-black text-rose-500 hover:text-rose-400 uppercase tracking-widest transition-all"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </GlassCard>
                 </div>
             ) : (

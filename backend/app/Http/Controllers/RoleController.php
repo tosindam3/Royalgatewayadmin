@@ -77,8 +77,8 @@ class RoleController extends Controller
     {
         $role = Role::findOrFail($id);
 
-        if ($role->is_system) {
-            return $this->error('System roles cannot be modified', 403);
+        if ($role->is_system || $role->name === 'super_admin') {
+            return $this->error('The Super Administrator role is a protected system role and cannot be modified.', 403);
         }
 
         $validated = $request->validate([

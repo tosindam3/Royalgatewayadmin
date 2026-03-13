@@ -36,7 +36,7 @@ export function DataTable<T>({
     return (
         <div className="w-full bg-white/5 border border-white/5 rounded-[32px] overflow-hidden backdrop-blur-3xl animate-in fade-in duration-500">
             <div className="overflow-x-auto no-scrollbar">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
                     <thead>
                         <tr className="border-b border-white/5 bg-white/[0.02]">
                             {columns.map((col, idx) => (

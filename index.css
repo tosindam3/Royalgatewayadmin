@@ -1,7 +1,7 @@
 @import "tailwindcss";
-@config "./tailwind.config.js";
 @import "./styles/brand-colors.css";
 @import "./styles/mobile-responsive.css";
+@config "./tailwind.config.js";
 
 :root {
   /* Primary brand color - dynamically updated from settings */
@@ -29,6 +29,14 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+button, a, [role="button"], input[type="submit"], input[type="button"] {
+  cursor: pointer;
+}
+
+button:disabled, a:disabled, [role="button"]:disabled {
+  cursor: not-allowed;
 }
 
 body {

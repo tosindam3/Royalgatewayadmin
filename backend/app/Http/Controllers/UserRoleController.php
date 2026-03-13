@@ -48,6 +48,24 @@ class UserRoleController extends Controller
 
         try {
             DB::transaction(function () use ($user, $validated, $currentUser) {
+                // Singleton Superadmin Enforcement
+                $superRole = Role::where('name', 'super_admin')->first();
+                if ($superRole && in_array($superRole->id, $validated['role_ids'])) {
+                    // 1. Only existing super_admin can assign super_admin role
+                    if (!$currentUser->hasRole('super_admin')) {
+                        throw new \Exception('Only the Super Administrator can assign the super_admin role.');
+                    }
+
+                    // 2. Check if another user already has the role
+                    $existingSuper = User::whereHas('roles', function ($q) use ($superRole) {
+                        $q->where('roles.id', $superRole->id);
+                    })->where('users.id', '!=', $user->id)->exists();
+
+                    if ($existingSuper) {
+                        throw new \Exception('A Super Administrator already exists. There can only be one global superadmin.');
+                    }
+                }
+
                 $user->syncRoles($validated['role_ids'], $currentUser);
 
                 if (isset($validated['primary_role_id'])) {
@@ -149,6 +167,29 @@ class UserRoleController extends Controller
 
         try {
             DB::transaction(function () use ($validated, $role, $currentUser) {
+                // Singleton Superadmin Enforcement
+                if ($role->name === 'super_admin') {
+                    // 1. Only existing super_admin can assign super_admin role
+                    if (!$currentUser || !$currentUser->hasRole('super_admin')) {
+                        throw new \Exception('Only the Super Administrator can assign the super_admin role.');
+                    }
+
+                    // 2. Prevent bulk assignment if it would result in > 1 superadmin
+                    // In bulk, if we are assigning to > 1 user, it's inherently invalid for a singleton
+                    if (count($validated['user_ids']) > 1) {
+                        throw new \Exception('There can only be one global superadmin. Bulk assignment of this role is not permitted.');
+                    }
+
+                    // 3. Check if another user already has the role
+                    $existingSuper = User::whereHas('roles', function ($q) use ($role) {
+                        $q->where('roles.id', $role->id);
+                    })->where('users.id', '!=', $validated['user_ids'][0])->exists();
+
+                    if ($existingSuper) {
+                        throw new \Exception('A Super Administrator already exists. There can only be one global superadmin.');
+                    }
+                }
+
                 foreach ($validated['user_ids'] as $userId) {
                     $user = User::find($userId);
                     $user->assignRole($role, $currentUser);
