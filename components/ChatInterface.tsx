@@ -51,7 +51,7 @@ const ChatInterface: React.FC = () => {
   });
 
   const selectedChannel = channels.find(c => c.id === selectedChannelId);
-  const messages = messagesData?.data || [];
+  const messages = Array.isArray(messagesData) ? messagesData : (messagesData?.data || []);
 
   // Auto-select first channel
   useEffect(() => {
@@ -127,8 +127,6 @@ const ChatInterface: React.FC = () => {
   console.log('[Diagnostic] channels:', channels);
   console.log('[Diagnostic] messagesData:', messagesData);
   console.log('[Diagnostic] messages:', messages);
-  console.log('[Diagnostic] onlineUsers:', onlineUsers);
-  console.log('[Diagnostic] typingUsers:', typingUsers);
 
   return (
     <div className="flex h-full gap-6 animate-in fade-in duration-500">
