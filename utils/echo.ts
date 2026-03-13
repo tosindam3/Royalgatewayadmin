@@ -21,11 +21,10 @@ export const initEcho = (token: string | null) => {
     }
 
     return new Echo({
-        broadcaster: 'reverb',
-        key: 'rgadmin_key',
-        wsHost: window.location.hostname,
-        wsPort: 8080,
-        forceTLS: false,
+        broadcaster: 'pusher',
+        key: import.meta.env.VITE_PUSHER_APP_KEY || '52b91711bf1f63cd7102',
+        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'eu',
+        forceTLS: true,
         enabledTransports: ['ws'],
         authEndpoint: `${window.location.protocol}//${window.location.hostname}:8000/api/v1/broadcasting/auth`,
         auth: {
