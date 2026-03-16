@@ -27,14 +27,19 @@ const Dashboard: React.FC = () => {
 
   // Fetch employee summary data when the manifest says it's needed
   const widgets: any[] = Array.isArray(manifest?.widgets) ? manifest.widgets : [];
+  // isEmployee: backend sets is_management=false for non-management roles,
+  // also cross-check that the employee_metrics widget is authorized
   const isEmployee = manifest && !manifest?.meta?.is_management;
-  const employeeEndpoint = widgets.find((w: any) => w.type === 'employee_metrics')?.endpoint;
+  const employeeWidget = widgets.find((w: any) => w.type === 'employee_metrics');
+  const employeeEndpoint = employeeWidget?.endpoint;
+  const employeeWidgetAuthorized = employeeWidget?.authorized === true;
 
-  const { data: employeeSummary, isLoading: isLoadingEmployeeSummary } = useQuery({
+  const { data: employeeSummary, isLoading: isLoadingEmployeeSummary, error: employeeSummaryError } = useQuery({
     queryKey: ['employee-summary', selectedPeriod],
     queryFn: () => apiClient.get(`${employeeEndpoint}?period=${selectedPeriod}`) as unknown as any,
-    enabled: !!isEmployee && !!employeeEndpoint,
+    enabled: !!isEmployee && !!employeeEndpoint && employeeWidgetAuthorized,
     staleTime: 60000,
+    retry: 1,
   });
 
   const fetchInsight = async () => {
@@ -135,6 +140,10 @@ const Dashboard: React.FC = () => {
           {isLoadingEmployeeSummary ? (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+            </div>
+          ) : employeeSummaryError ? (
+            <div className="p-4 rounded-2xl border border-dashed border-amber-400/40 bg-amber-500/5 text-[11px] text-amber-500 font-bold uppercase tracking-widest">
+              Employee profile not linked to this account. Contact HR to resolve.
             </div>
           ) : employeeSummary ? (
             widgets

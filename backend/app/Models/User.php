@@ -172,7 +172,13 @@ class User extends Authenticatable
     public function hasPermission(string $permission, string $scope = null): bool
     {
         // 1. Privileged Roles Bypass (Super Admin, Admin, CEO, HR Manager)
-        if ($this->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
+        // Also check the legacy 'role' column as a fallback for production compatibility
+        $legacyRole = $this->attributes['role'] ?? null;
+        $privilegedRoles = ['super_admin', 'admin', 'ceo', 'hr_manager'];
+        if ($legacyRole && in_array($legacyRole, $privilegedRoles)) {
+            return true;
+        }
+        if ($this->hasAnyRole($privilegedRoles)) {
             return true;
         }
 

@@ -183,14 +183,29 @@ class DashboardService
         }, $calculationEnd);
 
         // 3. Pending Tasks
-        $taskCount = \App\Models\OnboardingTask::where('owner_user_id', $employee->user_id)
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->count();
+        $taskCount = 0;
+        try {
+            $taskCount = \App\Models\OnboardingTask::where('owner_user_id', $employee->user_id)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->count();
+        } catch (\Exception $e) {
+            // onboarding_tasks table may not exist in all environments
+        }
 
         // 4. AI Advisory
         $advisory = "Keep up the consistent clock-in times. Improving your communication score by 5% could put you in the top tier for the next promotion cycle.";
         if ($latestScore && $latestScore->score < 70) {
             $advisory = "Focus on technical proficiency training modules this month to boost your performance score.";
+        }
+
+        $nextDue = null;
+        try {
+            $nextDue = \App\Models\OnboardingTask::where('owner_user_id', $employee->user_id)
+                ->whereIn('status', ['pending', 'in_progress'])
+                ->orderBy('due_date', 'asc')
+                ->first()?->due_date?->format('Y-m-d');
+        } catch (\Exception $e) {
+            // onboarding_tasks table may not exist in all environments
         }
 
         return [
@@ -207,10 +222,7 @@ class DashboardService
             ],
             'tasks' => [
                 'pending_count' => $taskCount,
-                'next_due' => \App\Models\OnboardingTask::where('owner_user_id', $employee->user_id)
-                    ->whereIn('status', ['pending', 'in_progress'])
-                    ->orderBy('due_date', 'asc')
-                    ->first()?->due_date?->format('Y-m-d')
+                'next_due' => $nextDue,
             ],
             'ai_advisory' => [
                 'message' => $advisory,

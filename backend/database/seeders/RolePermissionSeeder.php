@@ -183,9 +183,13 @@ class RolePermissionSeeder extends Seeder
         $branchPerms = [];
         foreach ($permissions as $key => $permission) {
             $module = explode('.', $key)[0];
-            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports', 'payroll'])) {
+            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports', 'payroll', 'dashboard'])) {
                 $branchPerms[$permission->id] = ['scope_level' => 'branch'];
             }
+        }
+        // Branch managers see the management dashboard
+        if (isset($permissions['dashboard.management'])) {
+            $branchPerms[$permissions['dashboard.management']->id] = ['scope_level' => 'branch'];
         }
         $roles['branch_manager']->permissions()->sync($branchPerms);
 
@@ -193,9 +197,13 @@ class RolePermissionSeeder extends Seeder
         $deptPerms = [];
         foreach ($permissions as $key => $permission) {
             $module = explode('.', $key)[0];
-            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports'])) {
+            if (in_array($module, ['employees', 'attendance', 'leave', 'performance', 'reports', 'dashboard'])) {
                 $deptPerms[$permission->id] = ['scope_level' => 'department'];
             }
+        }
+        // Department heads see the management dashboard
+        if (isset($permissions['dashboard.management'])) {
+            $deptPerms[$permissions['dashboard.management']->id] = ['scope_level' => 'department'];
         }
         $roles['department_head']->permissions()->sync($deptPerms);
 

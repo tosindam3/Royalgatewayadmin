@@ -22,7 +22,9 @@ class ScopeEngine
      */
     public function getUserScope(User $user, string $permission): string
     {
-        if ($user->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
+        $privilegedRoles = ['super_admin', 'admin', 'ceo', 'hr_manager'];
+        $legacyRole = $user->attributes['role'] ?? null;
+        if (($legacyRole && in_array($legacyRole, $privilegedRoles)) || $user->hasAnyRole($privilegedRoles)) {
             return 'all';
         }
 

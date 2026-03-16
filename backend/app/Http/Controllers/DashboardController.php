@@ -22,7 +22,8 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isManagement = $user->hasPermission('dashboard.management');
+        $isManagement = $user->hasPermission('dashboard.management') ||
+            $user->hasAnyRole(['branch_manager', 'department_head']);
 
         \Log::info('Dashboard Manifest Access', [
             'user_id' => $user->id,

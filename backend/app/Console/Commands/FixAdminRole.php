@@ -42,14 +42,12 @@ class FixAdminRole extends Command
         if ($email) {
             $query->where('email', $email);
         } else {
-            // Fix users who have no primary role or have wrong role
+            // Fix users who have no primary role — including those relying on legacy 'role' column
             $query->where(function ($q) {
                 $q->whereNull('primary_role_id')
                   ->orWhereHas('primaryRole', function ($r) {
                       $r->whereNotIn('name', ['super_admin', 'admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head', 'employee']);
                   });
-            })->whereHas('roles', function ($q) {
-                $q->whereIn('name', ['super_admin', 'admin', 'super-admin']);
             });
         }
 
@@ -73,17 +71,20 @@ class FixAdminRole extends Command
         foreach ($users as $user) {
             $this->line("Processing: {$user->email}");
 
-            // Determine the right role
+            // Determine the right role — check pivot first, then legacy column
             $targetRole = $superAdminRole;
 
-            // Check if user already has a role in pivot
             $existingRole = $user->roles->first();
             if ($existingRole && in_array($existingRole->name, ['super_admin', 'admin', 'ceo', 'hr_manager'])) {
                 $targetRole = $existingRole;
+            } elseif ($user->role && in_array($user->role, ['super_admin', 'admin', 'ceo', 'hr_manager'])) {
+                $legacyRole = Role::where('name', $user->role)->first();
+                if ($legacyRole) $targetRole = $legacyRole;
             }
 
-            // Set primary_role_id
+            // Set primary_role_id and legacy role column
             $user->primary_role_id = $targetRole->id;
+            $user->role = $targetRole->name;
             $user->save();
 
             // Ensure pivot entry exists

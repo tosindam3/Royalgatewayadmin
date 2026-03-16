@@ -63,8 +63,9 @@ class CreateAdminUser extends Command
         }
 
         if ($adminRole) {
-            // Set as primary role
+            // Set as primary role and legacy role column
             $user->primary_role_id = $adminRole->id;
+            $user->role = 'super_admin';
             $user->save();
 
             // Also attach to roles pivot if not already there
