@@ -35,54 +35,74 @@ class FixAdminRole extends Command
         $superAdminRole->permissions()->sync($syncData);
         $this->info("✅ super_admin role has " . count($syncData) . " permissions.");
 
-        // Find users to fix
         $email = $this->option('email');
-        $query = User::with(['roles', 'primaryRole']);
 
+        // Build the user list to fix
         if ($email) {
-            $query->where('email', $email);
+            $users = User::with(['roles', 'primaryRole'])->where('email', $email)->get();
+            if ($users->isEmpty()) {
+                $this->error("User not found: {$email}");
+                return 1;
+            }
         } else {
-            // Fix users who have no primary role — including those relying on legacy 'role' column
-            $query->where(function ($q) {
-                $q->whereNull('primary_role_id')
-                  ->orWhereHas('primaryRole', function ($r) {
-                      $r->whereNotIn('name', ['super_admin', 'admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head', 'employee']);
-                  });
-            });
+            // Catch ALL cases:
+            // 1. No primary_role_id set
+            // 2. primary_role_id points to a non-existent role (orphaned FK)
+            // 3. Has a privileged role column value but no pivot entry
+            $users = User::with(['roles', 'primaryRole'])
+                ->where(function ($q) {
+                    $q->whereNull('primary_role_id')
+                      ->orWhereDoesntHave('primaryRole')
+                      ->orWhereNull('role')
+                      ->orWhere('role', '')
+                      ->orWhereHas('primaryRole', function ($r) {
+                          $r->whereNotIn('name', [
+                              'super_admin', 'admin', 'ceo', 'hr_manager',
+                              'branch_manager', 'department_head', 'employee'
+                          ]);
+                      });
+                })
+                ->get();
+
+            // Also always include known admin emails regardless of above conditions
+            $adminEmails = ['admin@hr360.com', 'superadmin@hr360.com'];
+            $adminUsers = User::with(['roles', 'primaryRole'])
+                ->whereIn('email', $adminEmails)
+                ->get();
+
+            $users = $users->merge($adminUsers)->unique('id');
         }
 
-        $users = $query->get();
-
         if ($users->isEmpty()) {
-            // If email specified, just fix that user directly
-            if ($email) {
-                $user = User::where('email', $email)->first();
-                if (!$user) {
-                    $this->error("User not found: {$email}");
-                    return 1;
-                }
-                $users = collect([$user]);
-            } else {
-                $this->warn("No users found needing role fix.");
-                return 0;
-            }
+            $this->warn("No users found needing role fix.");
+            return 0;
         }
 
         foreach ($users as $user) {
             $this->line("Processing: {$user->email}");
 
-            // Determine the right role — check pivot first, then legacy column
-            $targetRole = $superAdminRole;
+            // Determine the right role:
+            // 1. Check existing pivot roles
+            // 2. Fall back to role column
+            // 3. Default to super_admin for admin emails, employee otherwise
+            $targetRole = null;
 
-            $existingRole = $user->roles->first();
-            if ($existingRole && in_array($existingRole->name, ['super_admin', 'admin', 'ceo', 'hr_manager'])) {
-                $targetRole = $existingRole;
-            } elseif ($user->role && in_array($user->role, ['super_admin', 'admin', 'ceo', 'hr_manager'])) {
-                $legacyRole = Role::where('name', $user->role)->first();
-                if ($legacyRole) $targetRole = $legacyRole;
+            $existingPivotRole = $user->roles->first();
+            if ($existingPivotRole && in_array($existingPivotRole->name, ['super_admin', 'admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head'])) {
+                $targetRole = $existingPivotRole;
+            } elseif ($user->role) {
+                $targetRole = Role::where('name', $user->role)->first();
             }
 
-            // Set primary_role_id and convenience role column
+            // Final fallback
+            if (!$targetRole) {
+                $adminEmails = ['admin@hr360.com', 'superadmin@hr360.com'];
+                $targetRole = in_array($user->email, $adminEmails)
+                    ? $superAdminRole
+                    : Role::where('name', 'employee')->first() ?? $superAdminRole;
+            }
+
+            // Set primary_role_id and role column
             $user->primary_role_id = $targetRole->id;
             $user->role = $targetRole->name;
             $user->save();
@@ -95,10 +115,11 @@ class FixAdminRole extends Command
                 ]);
             }
 
-            $this->info("  ✅ Set primary role to '{$targetRole->name}' for {$user->email}");
+            $this->info("  ✅ {$user->email} → role: '{$targetRole->name}' (primary_role_id: {$targetRole->id})");
         }
 
-        $this->info("\nDone. Run 'php artisan optimize:clear' to clear any cached user data.");
+        $this->info("\nDone.");
         return 0;
     }
+
 }

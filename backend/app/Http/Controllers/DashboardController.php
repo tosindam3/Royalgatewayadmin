@@ -22,18 +22,36 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isManagement = $user->hasPermission('dashboard.management') ||
-            $user->hasAnyRole(['branch_manager', 'department_head']);
+
+        // Resolve effective role with multiple fallback layers:
+        // 1. primaryRole relationship (eager loaded)
+        // 2. roles pivot (eager loaded)
+        // 3. role convenience column
+        // 4. Direct DB query on user_roles pivot (bypasses broken FK / stale cache)
+        // 5. Default to 'employee'
+        $effectiveRole = ($user->primaryRole?->name ?: null)
+            ?: ($user->roles->first()?->name ?: null)
+            ?: ($user->role ?: null)
+            ?: (\DB::table('user_roles')
+                ->join('roles', 'user_roles.role_id', '=', 'roles.id')
+                ->where('user_roles.user_id', $user->id)
+                ->whereNotNull('roles.name')
+                ->where('roles.name', '!=', '')
+                ->orderByRaw("FIELD(roles.name, 'super_admin', 'admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head', 'employee')")
+                ->value('roles.name'))
+            ?: 'employee';
+
+        $managementRoles = ['super_admin', 'admin', 'ceo', 'hr_manager', 'branch_manager', 'department_head'];
+        $isManagement = in_array($effectiveRole, $managementRoles);
 
         \Log::info('Dashboard Manifest Access', [
             'user_id' => $user->id,
             'email' => $user->email,
+            'effective_role' => $effectiveRole,
             'is_management' => $isManagement,
-            'roles' => $user->all_roles?->pluck('name')->toArray(),
-            'permissions_sample' => [
-                'dashboard.view' => $user->hasPermission('dashboard.view'),
-                'dashboard.management' => $user->hasPermission('dashboard.management')
-            ]
+            'primary_role_name' => $user->primaryRole?->name,
+            'role_column' => $user->role,
+            'pivot_roles' => $user->roles->pluck('name')->toArray(),
         ]);
 
         $manifest = [
@@ -78,7 +96,7 @@ class DashboardController extends Controller
                 ]
             ],
             'meta' => [
-                'user_role' => $user->all_roles?->first()?->name ?? 'employee',
+                'user_role' => $effectiveRole,
                 'is_management' => $isManagement,
                 'last_updated' => now()->toIso8601String()
             ]

@@ -19,7 +19,9 @@ return new class extends Migration
         // Backfill existing users from their primary role
         DB::table('users')
             ->join('roles', 'users.primary_role_id', '=', 'roles.id')
-            ->whereNull('users.role')
+            ->where(function ($q) {
+                $q->whereNull('users.role')->orWhere('users.role', '');
+            })
             ->update(['users.role' => DB::raw('roles.name')]);
     }
 
