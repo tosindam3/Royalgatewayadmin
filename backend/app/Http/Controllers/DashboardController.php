@@ -24,6 +24,17 @@ class DashboardController extends Controller
         $user = $request->user();
         $isManagement = $user->hasPermission('dashboard.management');
 
+        \Log::info('Dashboard Manifest Access', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'is_management' => $isManagement,
+            'roles' => $user->all_roles?->pluck('name')->toArray(),
+            'permissions_sample' => [
+                'dashboard.view' => $user->hasPermission('dashboard.view'),
+                'dashboard.management' => $user->hasPermission('dashboard.management')
+            ]
+        ]);
+
         $manifest = [
             'layout' => 'standard',
             'widgets' => [
