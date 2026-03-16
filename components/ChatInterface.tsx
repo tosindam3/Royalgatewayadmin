@@ -475,7 +475,7 @@ const ChatInterface: React.FC = () => {
                       placeholder="Search in channel..."
                       value={channelSearchTerm}
                       onChange={(e) => setChannelSearchTerm(e.target.value)}
-                      className="mr-2 md:mr-3 w-28 md:w-48 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/20 rounded-lg px-3 py-1.5 text-[10px] text-slate-900 dark:text-white outline-none focus:border-[#8252e9] transition-all animate-in slide-in-from-right-2 fade-in"
+                      className="mr-2 md:mr-3 w-24 sm:w-36 md:w-48 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/20 rounded-lg px-3 py-1.5 text-[10px] text-slate-900 dark:text-white outline-none focus:border-[#8252e9] transition-all animate-in slide-in-from-right-2 fade-in"
                     />
                   )}
                   <button
@@ -530,7 +530,7 @@ const ChatInterface: React.FC = () => {
             </div>
 
             {/* Message Feed */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-slate-50/50 dark:bg-[#0d0a1a]/50 dark:bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:bg-repeat dark:opacity-90">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar chat-scroll-lock bg-slate-50/50 dark:bg-[#0d0a1a]/50 dark:bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] dark:bg-repeat dark:opacity-90">
               {/* Load More Trigger */}
               <div ref={loadMoreRef} className="h-4 flex items-center justify-center pt-2">
                 {isFetchingNextPage && <div className="text-[10px] text-slate-500 animate-pulse font-bold tracking-widest uppercase">Loading history...</div>}
@@ -652,7 +652,7 @@ const ChatInterface: React.FC = () => {
             </div>
 
             {/* Input Area */}
-            <div className="p-3 md:p-6 bg-slate-50 dark:bg-black/10 border-t border-slate-200 dark:border-white/5">
+            <div className="p-3 md:p-6 bg-slate-50 dark:bg-black/10 border-t border-slate-200 dark:border-white/5 chat-input-area safe-area-bottom">
               <RichTextEditor
                 onSend={handleSendMessage}
                 onTyping={handleTyping}

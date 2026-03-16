@@ -209,3 +209,30 @@
 .container-responsive {
   @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
 }
+
+/* Team Chat Mobile Responsive */
+
+/* Ensure chat fills available height on mobile */
+@media (max-width: 767px) {
+  .chat-mobile-fill {
+    height: calc(100dvh - 4rem); /* subtract mobile header */
+  }
+
+  /* Prevent iOS rubber-band scroll on chat container */
+  .chat-scroll-lock {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Make message input font-size 16px to prevent iOS zoom */
+  .chat-input-area input,
+  .chat-input-area .ProseMirror {
+    font-size: 16px !important;
+  }
+
+  /* Touch-friendly message action buttons */
+  .message-actions-touch {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
