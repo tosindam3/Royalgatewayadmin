@@ -11,8 +11,7 @@ class UpdateBrandSettingsRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Only Super Admin and Admin can update brand settings
-        return $this->user()->hasAnyRole(['Super Admin', 'Admin', 'HR Admin']);
+        return $this->user()->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo']);
     }
 
     /**

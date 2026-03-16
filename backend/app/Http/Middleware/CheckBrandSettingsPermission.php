@@ -24,12 +24,12 @@ class CheckBrandSettingsPermission
             ], 401);
         }
 
-        // Define permission requirements
+        // Define permission requirements (role names must match DB snake_case values)
         $permissions = [
-            'view' => ['Super Admin', 'Admin', 'HR Admin', 'Manager', 'Employee'],
-            'update' => ['Super Admin', 'Admin', 'HR Admin'],
-            'reset' => ['Super Admin', 'Admin'],
-            'history' => ['Super Admin', 'Admin', 'HR Admin'],
+            'view'    => ['super_admin', 'admin', 'hr_manager', 'ceo', 'branch_manager', 'department_head', 'employee'],
+            'update'  => ['super_admin', 'admin', 'hr_manager', 'ceo'],
+            'reset'   => ['super_admin', 'admin'],
+            'history' => ['super_admin', 'admin', 'hr_manager', 'ceo'],
         ];
 
         $allowedRoles = $permissions[$action] ?? [];

@@ -153,7 +153,7 @@ class BrandSettingsController extends Controller
     {
         try {
             // Authorization check
-            if (!$request->user()->hasAnyRole(['Super Admin', 'Admin', 'HR Admin'])) {
+            if (!$request->user()->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo'])) {
                 return $this->error('Unauthorized to reset brand settings', 403);
             }
 
@@ -216,7 +216,7 @@ class BrandSettingsController extends Controller
     {
         try {
             // Authorization check
-            if (!$request->user()->hasAnyRole(['Super Admin', 'Admin', 'HR Admin'])) {
+            if (!$request->user()->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo'])) {
                 return $this->error('Unauthorized to view brand settings history', 403);
             }
 
