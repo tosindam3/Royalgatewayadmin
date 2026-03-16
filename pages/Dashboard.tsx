@@ -33,8 +33,9 @@ const Dashboard: React.FC = () => {
   });
 
   // Fetch employee summary data when the manifest says it's needed
+  const widgets: any[] = Array.isArray(manifest?.widgets) ? manifest.widgets : [];
   const isEmployee = manifest && !manifest?.meta?.is_management;
-  const employeeEndpoint = manifest?.widgets?.find((w: any) => w.type === 'employee_metrics')?.endpoint;
+  const employeeEndpoint = widgets.find((w: any) => w.type === 'employee_metrics')?.endpoint;
 
   const { data: employeeSummary, isLoading: isLoadingEmployeeSummary } = useQuery({
     queryKey: ['employee-summary', user?.id, selectedPeriod],
@@ -143,13 +144,13 @@ const Dashboard: React.FC = () => {
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36 rounded-2xl" />)}
             </div>
           ) : employeeSummary ? (
-            manifest?.widgets
+            widgets
               .filter((w: any) => w.type === 'employee_metrics' && w.authorized)
               .map((w: any) => renderWidget({ ...w, data: employeeSummary }))
           ) : null}
 
           {/* Milestones */}
-          {manifest?.widgets.filter((w: any) => w.type === 'list_milestones').map(renderWidget)}
+          {widgets.filter((w: any) => w.type === 'list_milestones').map(renderWidget)}
 
           {/* AI Advisory */}
           <GlassCard title="AI Performance Advisory" className="border-t-2 border-t-brand-primary/30">
@@ -159,20 +160,20 @@ const Dashboard: React.FC = () => {
       ) : (
         /* Management Dashboard */
         <div className="space-y-12">
-          {manifest?.widgets.filter((w: any) => w.type === 'metric_group' || w.type === 'employee_metrics').map(renderWidget)}
+          {widgets.filter((w: any) => w.type === 'metric_group' || w.type === 'employee_metrics').map(renderWidget)}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
             <div className="lg:col-span-8 space-y-8">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {manifest?.widgets.filter((w: any) => w.type === 'chart_area').map(renderWidget)}
-                {manifest?.widgets.filter((w: any) => w.type === 'chart_pie').map(renderWidget)}
+                {widgets.filter((w: any) => w.type === 'chart_area').map(renderWidget)}
+                {widgets.filter((w: any) => w.type === 'chart_pie').map(renderWidget)}
               </div>
               <GlassCard title="AI Strategic Summary" className="border-t-2 border-t-brand-primary/30">
                 <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
               </GlassCard>
             </div>
             <div className="lg:col-span-4 space-y-8">
-              {manifest?.widgets.filter((w: any) => w.type === 'demographics' || w.type === 'list_milestones').map(renderWidget)}
+              {widgets.filter((w: any) => w.type === 'demographics' || w.type === 'list_milestones').map(renderWidget)}
             </div>
           </div>
         </div>
