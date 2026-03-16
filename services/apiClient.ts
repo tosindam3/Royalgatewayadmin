@@ -41,24 +41,31 @@ apiClient.interceptors.response.use(
         const status = error.response?.status;
 
         if (status === 401) {
-            // Unauthorized: Clear session and redirect to login if necessary
-            localStorage.removeItem('royalgateway_auth_token');
-            localStorage.removeItem('royalgateway_user');
+            // Public endpoints that may receive a 401 when an expired token is
+            // passively sent — these should NOT trigger a full session logout.
+            const SKIP_LOGOUT_URLS = ['/brand-settings'];
+            const requestUrl = error.config?.url || '';
+            const isPublicEndpoint = SKIP_LOGOUT_URLS.some(u => requestUrl.includes(u));
+
             const isLoginRequest = error.config?.url?.includes('/login');
 
             if (isLoginRequest) {
                 toast.error('Authorization Failed', {
                     description: 'Invalid credentials detected. Please try again or reset password.'
                 });
-            } else {
-                // For Single Entry Point apps, we might trigger a global event or store update
+            } else if (!isPublicEndpoint) {
+                // Only nuke the session for genuinely protected-endpoint 401s
+                localStorage.removeItem('royalgateway_auth_token');
+                localStorage.removeItem('royalgateway_user');
                 toast.error('Session Decoupled', {
                     description: 'Authentication token expired. Please re-authorize access.',
                 });
                 if (window.location.hash !== '#/login') {
-                    window.location.hash = '#/login'; // Using HashRouter as per App.tsx
+                    window.location.hash = '#/login';
                 }
             }
+            // For public-endpoint 401s: silently swallow — callers have their own fallbacks
+
         } else if (status === 403) {
             toast.error('Access Restricted', {
                 description: message || 'Your identity role does not possess the required clearance.',

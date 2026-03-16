@@ -10,7 +10,6 @@ import AnalysisDetailModal from '../components/dashboard/AnalysisDetailModal';
 import apiClient from '../services/apiClient';
 
 const Dashboard: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
   const [aiInsight, setAiInsight] = useState<string>('');
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,15 +19,9 @@ const Dashboard: React.FC = () => {
 
   const [selectedPeriod, setSelectedPeriod] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
 
-  useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('royalgateway_user') || '{}');
-    if (storedUser.id) setUser(storedUser);
-  }, []);
-
   const { data: manifest, isLoading: isLoadingManifest } = useQuery({
-    queryKey: ['dashboard-manifest', user?.id],
+    queryKey: ['dashboard-manifest'],
     queryFn: () => dashboardService.getManifest() as unknown as any,
-    enabled: !!user?.id,
     staleTime: 30000,
   });
 
@@ -38,7 +31,7 @@ const Dashboard: React.FC = () => {
   const employeeEndpoint = widgets.find((w: any) => w.type === 'employee_metrics')?.endpoint;
 
   const { data: employeeSummary, isLoading: isLoadingEmployeeSummary } = useQuery({
-    queryKey: ['employee-summary', user?.id, selectedPeriod],
+    queryKey: ['employee-summary', selectedPeriod],
     queryFn: () => apiClient.get(`${employeeEndpoint}?period=${selectedPeriod}`) as unknown as any,
     enabled: !!isEmployee && !!employeeEndpoint,
     staleTime: 60000,
@@ -130,7 +123,7 @@ const Dashboard: React.FC = () => {
             </select>
           )}
           <div className="px-3 md:px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black text-brand-primary uppercase tracking-widest whitespace-nowrap">
-            Auth: {manifest?.meta?.user_role} {user?.department?.name ? `• ${user.department.name}` : ''}
+            Auth: {manifest?.meta?.user_role}
           </div>
         </div>
       </div>

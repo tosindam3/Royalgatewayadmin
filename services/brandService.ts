@@ -1,3 +1,4 @@
+import axios from 'axios';
 import apiClient from './apiClient';
 import { updateBrandColor, initBrandColors } from '../utils/brandColors';
 
@@ -29,7 +30,14 @@ class BrandService {
     }
 
     try {
-      const response = await apiClient.get('/brand-settings');
+      // Use raw axios (no Authorization header) so an expired token
+      // never causes a 401 → logout cascade on this public endpoint.
+      const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      const raw = await axios.get(`${baseURL}/brand-settings`, {
+        headers: { Accept: 'application/json' },
+      });
+      // Unwrap the standard {status, data} envelope if present
+      const response = (raw.data?.status === 'success' ? raw.data.data : raw.data) as any;
       
       // Transform the response to match our interface
       const transformedResponse: BrandSettings = {
@@ -78,7 +86,7 @@ class BrandService {
         secondaryColor: settings.secondary_color
       };
 
-      const response = await apiClient.put('/brand-settings', apiPayload);
+      const response = await apiClient.put('/brand-settings', apiPayload) as any;
       
       // Transform the response back to our interface
       const transformedResponse: BrandSettings = {

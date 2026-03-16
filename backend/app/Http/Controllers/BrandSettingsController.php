@@ -38,11 +38,16 @@ class BrandSettingsController extends Controller
      *   }
      * }
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
+            // PUBLIC endpoint — no auth required. Brand settings are global organisation
+            // configuration (colours, logo, company name) needed even on the login screen.
+            // The route intentionally has NO auth:sanctum middleware. If a caller sends
+            // an expired Bearer token, the token is simply ignored at the route level
+            // because there is no authentication middleware to validate it.
             $settings = $this->brandService->getBrandSettings();
-            
+
             return $this->success(
                 $settings,
                 'Brand settings retrieved successfully'
