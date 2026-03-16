@@ -47,15 +47,34 @@ class CreateAdminUser extends Command
             $this->info('Admin user already exists!');
         }
 
-        // Find or create admin role
-        $adminRole = Role::where('name', 'admin')->first();
+        // Find super_admin role (created by RolePermissionSeeder)
+        $adminRole = Role::whereIn('name', ['super_admin', 'admin', 'super-admin'])->first();
+
         if (!$adminRole) {
-            $adminRole = Role::where('name', 'super-admin')->first();
+            $this->warn("No admin role found. Creating super_admin role...");
+            $adminRole = Role::create([
+                'name' => 'super_admin',
+                'display_name' => 'Super Administrator',
+                'description' => 'Full system access with all permissions',
+                'default_scope' => 'all',
+                'is_system' => true,
+                'is_active' => true,
+            ]);
         }
-        
-        if ($adminRole && !$user->roles()->where('role_id', $adminRole->id)->exists()) {
-            $user->roles()->attach($adminRole->id);
-            $this->info("Admin role assigned!");
+
+        if ($adminRole) {
+            // Set as primary role
+            $user->primary_role_id = $adminRole->id;
+            $user->save();
+
+            // Also attach to roles pivot if not already there
+            if (!$user->roles()->where('roles.id', $adminRole->id)->exists()) {
+                $user->roles()->attach($adminRole->id, [
+                    'assigned_by' => $user->id,
+                    'assigned_at' => now(),
+                ]);
+            }
+            $this->info("Super admin role assigned and set as primary role!");
         }
 
         // Create employee profile if it doesn't exist

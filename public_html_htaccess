@@ -1,0 +1,32 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Serve static assets directly
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# API requests go to Laravel (index.php)
+RewriteRule ^api/(.*)$ /index.php [QSA,L]
+
+# Health check goes to Laravel
+RewriteRule ^health$ /index.php [QSA,L]
+
+# All other requests go to React app (index.html)
+RewriteRule ^(.*)$ /index.html [QSA,L]
+</IfModule>
+
+<IfModule mod_mime.c>
+AddType application/javascript .js
+AddType application/javascript .mjs
+AddType text/javascript .js
+AddType application/json .json
+AddType text/css .css
+</IfModule>
+
+<IfModule mod_deflate.c>
+AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>

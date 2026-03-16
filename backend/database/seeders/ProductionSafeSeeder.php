@@ -16,6 +16,9 @@ class ProductionSafeSeeder extends Seeder
     {
         Log::info('Starting ProductionSafeSeeder');
 
+        // Roles & Permissions — must run first so all other data is permission-aware
+        $this->runSeeder('RolePermissionSeeder', 'Roles and permissions (idempotent)');
+
         // Performance Template Seeder
         $this->runSeeder('PerformanceConfigSeeder', 'Performance templates and configurations');
         
