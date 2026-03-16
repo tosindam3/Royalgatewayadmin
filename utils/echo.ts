@@ -13,20 +13,30 @@ window.Pusher = Pusher;
 export const initEcho = (token: string | null) => {
     if (!token) return null;
 
-    // WebSockets are now enabled for production via Pusher
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
+    const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
+
+    if (!apiBaseUrl || !pusherKey || !pusherCluster) {
+        console.error('Missing Echo configuration environment variables');
+        return null;
+    }
 
     return new Echo({
         broadcaster: 'pusher',
-        key: import.meta.env.VITE_PUSHER_APP_KEY || '52b91711bf1f63cd7102',
-        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'eu',
+        key: pusherKey,
+        cluster: pusherCluster,
         forceTLS: true,
-        enabledTransports: ['ws'],
-        authEndpoint: `${window.location.protocol}//${window.location.hostname}:8000/api/v1/broadcasting/auth`,
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint: `${apiBaseUrl}/broadcasting/auth`,
         auth: {
             headers: {
                 Authorization: `Bearer ${token}`,
                 Accept: 'application/json',
             },
         },
+        // Connection error handling
+        enableStats: false,
+        enableLogging: import.meta.env.DEV,
     });
 };

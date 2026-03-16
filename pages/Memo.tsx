@@ -7,6 +7,8 @@ import { MemoListSkeleton, MemoDetailSkeleton, StatsSkeleton } from '../componen
 import { MemoErrorBoundary } from '../components/memo/MemoErrorBoundary';
 import MemoCompose from '../components/memo/MemoCompose';
 import { CHAT_LOG } from '../constants/chatData';
+import { sanitizeHtml } from '../utils/sanitize';
+import memoService from '../services/memoService';
 
 const MemoSystem: React.FC = () => {
   const { theme } = useTheme();
@@ -92,6 +94,22 @@ const MemoSystem: React.FC = () => {
   const handleForward = useCallback(() => {
     setComposeMode('forward');
     setIsComposeOpen(true);
+  }, []);
+
+  const handleDownloadAttachment = useCallback(async (attachment: any) => {
+    try {
+      const blob = await memoService.downloadAttachment(attachment.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', attachment.original_filename || 'attachment');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download attachment', err);
+    }
   }, []);
 
   const handleQuickReply = useCallback(async () => {
@@ -495,7 +513,7 @@ const MemoSystem: React.FC = () => {
                     className={`prose max-w-none ${isDark ? 'prose-invert' : 'prose-gray'
                       }`}
                     dangerouslySetInnerHTML={{
-                      __html: selectedMemo.body || selectedMemo.body_plain || 'No content available'
+                      __html: sanitizeHtml(selectedMemo.body || selectedMemo.body_plain || 'No content available')
                     }}
                   />
                 </div>
@@ -529,15 +547,15 @@ const MemoSystem: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex gap-3">
-                            <a
-                              href={`/api/v1/memos/attachments/${attachment.id}/download?token=${localStorage.getItem('royalgateway_auth_token')}`}
-                              className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark
+                            <button
+                              onClick={() => handleDownloadAttachment(attachment)}
+                              className={`text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer ${isDark
                                 ? 'text-slate-400 hover:text-[#8252e9]'
                                 : 'text-gray-600 hover:text-blue-600'
                                 }`}
                             >
                               Download
-                            </a>
+                            </button>
                           </div>
                         </div>
                       ))}

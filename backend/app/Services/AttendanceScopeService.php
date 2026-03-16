@@ -8,32 +8,21 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AttendanceScopeService
 {
+    protected $scopeEngine;
+
+    public function __construct(ScopeEngine $scopeEngine)
+    {
+        $this->scopeEngine = $scopeEngine;
+    }
+
     /**
      * Determine what attendance data a user can access
      */
     public function getAccessScope(User $user): array
     {
-        // Check roles first - using standardized slugs
-        $roles = $user->roles->pluck('name')->toArray();
+        $viewScope = $this->scopeEngine->getUserScope($user, 'attendance.view');
         
-        // Super Admin / CEO / HR Manager - Full access
-        // We check this BEFORE the employee profile check because admins may not have an employee record
-        if (in_array('super_admin', $roles) || in_array('admin', $roles) || in_array('ceo', $roles) || in_array('hr_manager', $roles)) {
-            return [
-                'scope' => 'all',
-                'employee_ids' => Employee::where('status', 'active')->pluck('id')->toArray(),
-                'department_ids' => [],
-                'branch_ids' => [],
-                'can_view_all' => true,
-                'can_manage_settings' => true,
-                'can_approve_corrections' => true,
-                'can_export' => true,
-            ];
-        }
-
-        $employee = $user->employeeProfile;
-        
-        if (!$employee) {
+        if ($viewScope === 'none') {
             return [
                 'scope' => 'none',
                 'employee_ids' => [],
@@ -45,77 +34,21 @@ class AttendanceScopeService
                 'can_export' => false,
             ];
         }
-        
-        // Branch Manager - Branch access
-        if (in_array('branch_manager', $roles)) {
-            $branchEmployees = Employee::where('status', 'active')
-                ->where('branch_id', $employee->branch_id)
-                ->pluck('id')
-                ->toArray();
-            
-            return [
-                'scope' => 'branch',
-                'employee_ids' => $branchEmployees,
-                'department_ids' => [],
-                'branch_ids' => [$employee->branch_id],
-                'can_view_all' => false,
-                'can_manage_settings' => false,
-                'can_approve_corrections' => true,
-                'can_export' => true,
-            ];
-        }
-        
-        // Department Head - Department access
-        if (in_array('department_head', $roles)) {
-            $departmentEmployees = Employee::where('status', 'active')
-                ->where('department_id', $employee->department_id)
-                ->pluck('id')
-                ->toArray();
-            
-            return [
-                'scope' => 'department',
-                'employee_ids' => $departmentEmployees,
-                'department_ids' => [$employee->department_id],
-                'branch_ids' => [],
-                'can_view_all' => false,
-                'can_manage_settings' => false,
-                'can_approve_corrections' => true,
-                'can_export' => true,
-            ];
-        }
-        
-        // Team Lead - Team access (direct reports)
-        if (in_array('team_lead', $roles)) {
-            $teamEmployees = Employee::where('status', 'active')
-                ->where('manager_id', $employee->id)
-                ->pluck('id')
-                ->toArray();
-            
-            // Include self
-            $teamEmployees[] = $employee->id;
-            
-            return [
-                'scope' => 'team',
-                'employee_ids' => $teamEmployees,
-                'department_ids' => [],
-                'branch_ids' => [],
-                'can_view_all' => false,
-                'can_manage_settings' => false,
-                'can_approve_corrections' => true,
-                'can_export' => false,
-            ];
-        }
-        
-        // Regular Employee - Self only
+
+        // Get employee IDs based on scope
+        $query = Employee::where('status', 'active');
+        $query = $this->scopeEngine->applyScopeLevel($query, $user, $viewScope);
+        $employeeIds = $query->pluck('id')->toArray();
+
         return [
-            'scope' => 'self',
-            'employee_ids' => [$employee->id],
-            'department_ids' => [],
-            'branch_ids' => [],
-            'can_view_all' => false,
-            'can_manage_settings' => false,
-            'can_approve_corrections' => false,
-            'can_export' => false,
+            'scope' => $viewScope,
+            'employee_ids' => $employeeIds,
+            'department_ids' => $viewScope === 'department' ? [$user->employeeProfile?->department_id] : [],
+            'branch_ids' => $viewScope === 'branch' ? [$user->employeeProfile?->branch_id] : [],
+            'can_view_all' => $viewScope === 'all',
+            'can_manage_settings' => $this->scopeEngine->hasPermission($user, 'attendance.settings'),
+            'can_approve_corrections' => $this->scopeEngine->hasPermission($user, 'attendance.approve-correction'),
+            'can_export' => $this->scopeEngine->hasPermission($user, 'attendance.export'),
         ];
     }
 
@@ -124,18 +57,19 @@ class AttendanceScopeService
      */
     public function applyScopeToQuery(Builder $query, User $user): Builder
     {
-        $scope = $this->getAccessScope($user);
+        $viewScope = $this->scopeEngine->getUserScope($user, 'attendance.view');
         
-        if ($scope['scope'] === 'all') {
-            return $query; // No restrictions
+        if ($viewScope === 'all') {
+            return $query;
         }
         
-        if ($scope['scope'] === 'none') {
-            return $query->whereRaw('1 = 0'); // Return nothing
+        if ($viewScope === 'none') {
+            return $query->whereRaw('1 = 0');
         }
-        
-        // Apply employee ID restrictions
-        return $query->whereIn('employee_id', $scope['employee_ids']);
+
+        // Filter by employees accessible within the scope
+        $accessibleEmployeeIds = $this->getAccessScope($user)['employee_ids'];
+        return $query->whereIn('employee_id', $accessibleEmployeeIds);
     }
 
     /**
@@ -144,11 +78,6 @@ class AttendanceScopeService
     public function canViewEmployee(User $user, int $employeeId): bool
     {
         $scope = $this->getAccessScope($user);
-        
-        if ($scope['can_view_all']) {
-            return true;
-        }
-        
         return in_array($employeeId, $scope['employee_ids']);
     }
 
@@ -157,8 +86,7 @@ class AttendanceScopeService
      */
     public function canManageSettings(User $user): bool
     {
-        $scope = $this->getAccessScope($user);
-        return $scope['can_manage_settings'];
+        return $this->scopeEngine->hasPermission($user, 'attendance.settings');
     }
 
     /**
@@ -166,8 +94,7 @@ class AttendanceScopeService
      */
     public function canApproveCorrections(User $user): bool
     {
-        $scope = $this->getAccessScope($user);
-        return $scope['can_approve_corrections'];
+        return $this->scopeEngine->hasPermission($user, 'attendance.approve-correction');
     }
 
     /**
@@ -175,8 +102,7 @@ class AttendanceScopeService
      */
     public function canExport(User $user): bool
     {
-        $scope = $this->getAccessScope($user);
-        return $scope['can_export'] ?? false;
+        return $this->scopeEngine->hasPermission($user, 'attendance.export');
     }
 
     /**
@@ -184,17 +110,9 @@ class AttendanceScopeService
      */
     public function getAccessibleEmployees(User $user): \Illuminate\Database\Eloquent\Collection
     {
-        $scope = $this->getAccessScope($user);
+        $viewScope = $this->scopeEngine->getUserScope($user, 'attendance.view');
+        $query = Employee::where('status', 'active')->with(['user', 'department', 'branch']);
         
-        if ($scope['scope'] === 'all') {
-            return Employee::where('status', 'active')
-                ->with(['user', 'department', 'branch'])
-                ->get();
-        }
-        
-        return Employee::whereIn('id', $scope['employee_ids'])
-            ->where('status', 'active')
-            ->with(['user', 'department', 'branch'])
-            ->get();
+        return $this->scopeEngine->applyScopeLevel($query, $user, $viewScope)->get();
     }
 }

@@ -156,8 +156,8 @@ const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onCreateCh
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-[#1c1633] border border-slate-200 dark:border-white/10 rounded-[32px] w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4">
+      <div className="bg-white dark:bg-[#1c1633] border border-slate-200 dark:border-white/10 rounded-t-[32px] sm:rounded-[32px] w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center">
           <h3 className="text-lg font-black text-slate-900 dark:text-white">New Chat</h3>
@@ -437,7 +437,7 @@ const NewChatModal: React.FC<NewChatModalProps> = ({ isOpen, onClose, onCreateCh
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-slate-200 dark:border-white/5 flex justify-end gap-3">
+        <div className="p-4 md:p-6 border-t border-slate-200 dark:border-white/5 flex flex-wrap justify-end gap-3">
           <button
             onClick={() => {
               handleReset();

@@ -5,28 +5,33 @@ import {
   JobOpeningsView,
   CandidatesView,
   OnboardingView,
+  OrientationView,
   SettingsView
 } from '../components/TalentSubViews';
 
 type TalentTab = 'dashboard' | 'jobs' | 'candidates' | 'onboarding' | 'settings';
 
 const TalentManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TalentTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<TalentTab>('jobs');
+  const user = JSON.parse(localStorage.getItem('royalgateway_user') || '{}');
+  const isManagement = user.primary_role_id <= 3; // HR Admin, Manager, CEO
 
-  const tabs: { id: TalentTab; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+  const allTabs: { id: TalentTab; label: string; icon: string; managementOnly?: boolean }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', managementOnly: true },
     { id: 'jobs', label: 'Job Openings', icon: '💼' },
-    { id: 'candidates', label: 'Candidates', icon: '👤' },
-    { id: 'onboarding', label: 'Onboarding', icon: '🎓' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'candidates', label: 'Candidates', icon: '👤', managementOnly: true },
+    { id: 'onboarding', label: 'Orientation', icon: '🎓' },
+    { id: 'settings', label: 'Settings', icon: '⚙️', managementOnly: true },
   ];
+
+  const tabs = allTabs.filter(tab => !tab.managementOnly || isManagement);
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardView />;
       case 'jobs': return <JobOpeningsView />;
       case 'candidates': return <CandidatesView />;
-      case 'onboarding': return <OnboardingView />;
+      case 'onboarding': return isManagement ? <OnboardingView /> : <OrientationView />;
       case 'settings': return <SettingsView />;
       default: return <DashboardView />;
     }

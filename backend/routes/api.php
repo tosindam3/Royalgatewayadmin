@@ -7,9 +7,12 @@ use Illuminate\Support\Facades\Route;
 require __DIR__.'/health.php';
 
 // API v1 Routes
-Route::prefix('v1')->group(function () {
-    // Authentication Routes
-    Route::post('/login', [App\Http\Controllers\AuthController::class, 'login']);
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
+    // Authentication Routes (stricter rate limit)
+    Route::middleware('throttle:auth')->group(function () {
+        Route::post('/login', [App\Http\Controllers\AuthController::class, 'login']);
+    });
+    
     Route::post('/logout', [App\Http\Controllers\AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('/user', [App\Http\Controllers\AuthController::class, 'user'])->middleware('auth:sanctum');
     Route::post('/change-password', [App\Http\Controllers\AuthController::class, 'changePassword'])->middleware('auth:sanctum');
@@ -18,12 +21,23 @@ Route::prefix('v1')->group(function () {
     Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
     // Dashboard Routes
-    Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware('auth:sanctum');
+    Route::middleware('auth:sanctum')->prefix('dashboard')->group(function () {
+        Route::get('/', [App\Http\Controllers\DashboardController::class, 'index']);
+        
+        // Granular Metrics for Independent Loading
+        Route::group(['prefix' => 'metrics'], function () {
+            Route::get('/quick-stats', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'quickStats']);
+            Route::get('/talent-trends', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'talentTrends']);
+            Route::get('/attendance-pulse', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'attendancePulse']);
+            Route::get('/demographics', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'demographics']);
+            Route::get('/employee-summary', [App\Http\Controllers\DashboardController::class, 'employeeSummary']);
+        });
+    });
 
     // HR Core Module Routes
     Route::prefix('hr-core')->group(function () {
         // Attendance System (ZKTeco + Mobile)
-        Route::prefix('attendance')->middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+        Route::prefix('attendance')->middleware(['auth:sanctum', 'throttle:attendance'])->group(function () {
             // Everyone can check in/out and view their own status
             Route::post('/check-in', [App\Http\Controllers\AttendanceController::class, 'checkIn']);
             Route::post('/check-out', [App\Http\Controllers\AttendanceController::class, 'checkOut']);
@@ -106,16 +120,24 @@ Route::prefix('v1')->group(function () {
 
         // Employee Routes
         Route::prefix('employees')->middleware('auth:sanctum')->group(function () {
-            Route::get('/metrics', [App\Http\Controllers\EmployeeController::class, 'metrics']);
-            Route::get('/department/{departmentId}', [App\Http\Controllers\EmployeeController::class, 'byDepartment']);
-            Route::get('/branch/{branchId}', [App\Http\Controllers\EmployeeController::class, 'byBranch']);
-            Route::get('/{id}/subordinates', [App\Http\Controllers\EmployeeController::class, 'subordinates']);
-            Route::get('/{id}', [App\Http\Controllers\EmployeeController::class, 'show']);
-            Route::get('/', [App\Http\Controllers\EmployeeController::class, 'index']);
-            Route::post('/', [App\Http\Controllers\EmployeeController::class, 'store']);
-            Route::put('/{id}', [App\Http\Controllers\EmployeeController::class, 'update']);
-            Route::patch('/{id}/status', [App\Http\Controllers\EmployeeController::class, 'updateStatus']);
-            Route::delete('/{id}', [App\Http\Controllers\EmployeeController::class, 'destroy']);
+            Route::get('/metrics', [App\Http\Controllers\EmployeeController::class, 'metrics'])->middleware('permission:employees.view,self');
+            Route::get('/department/{departmentId}', [App\Http\Controllers\EmployeeController::class, 'byDepartment'])->middleware('permission:employees.view,department');
+            Route::get('/branch/{branchId}', [App\Http\Controllers\EmployeeController::class, 'byBranch'])->middleware('permission:employees.view,branch');
+            Route::group(['middleware' => 'permission:employees.view,all'], function () {
+                Route::get('/', [App\Http\Controllers\EmployeeController::class, 'index']);
+                Route::post('/', [App\Http\Controllers\EmployeeController::class, 'store']);
+            });
+            Route::group(['middleware' => 'permission:employees.view,self'], function () {
+                Route::get('/{id}', [App\Http\Controllers\EmployeeController::class, 'show']);
+                Route::get('/{id}/subordinates', [App\Http\Controllers\EmployeeController::class, 'subordinates']);
+            });
+            Route::put('/{id}', [App\Http\Controllers\EmployeeController::class, 'update'])->middleware('permission:employees.update,self');
+            Route::post('/{id}/avatar', [App\Http\Controllers\EmployeeController::class, 'updateAvatar'])->middleware('permission:employees.update,self');
+
+            Route::middleware('permission:employees.update,all')->group(function () {
+                Route::patch('/{id}/status', [App\Http\Controllers\EmployeeController::class, 'updateStatus']);
+                Route::delete('/{id}', [App\Http\Controllers\EmployeeController::class, 'destroy']);
+            });
         });
 
         // Branch Routes
@@ -273,7 +295,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Leave Management Routes
-    Route::prefix('leave')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('leave')->middleware(['auth:sanctum', 'permission:leave.view,self'])->group(function () {
         // Dashboard & Statistics
         Route::get('/dashboard', [App\Http\Controllers\LeaveController::class, 'dashboard']);
         
@@ -285,10 +307,15 @@ Route::prefix('v1')->group(function () {
         
         // Leave Requests
         Route::get('/requests', [App\Http\Controllers\LeaveController::class, 'index']);
-        Route::post('/requests', [App\Http\Controllers\LeaveController::class, 'store']);
+        Route::post('/requests', [App\Http\Controllers\LeaveController::class, 'store'])->middleware('permission:leave.apply,self');
         Route::get('/requests/{leaveRequest}', [App\Http\Controllers\LeaveController::class, 'show']);
-        Route::post('/requests/{leaveRequest}/approve', [App\Http\Controllers\LeaveController::class, 'approve']);
-        Route::post('/requests/{leaveRequest}/reject', [App\Http\Controllers\LeaveController::class, 'reject']);
+        
+        // Admin/Manager Actions
+        Route::middleware('permission:leave.approve,department')->group(function () {
+            Route::post('/requests/{leaveRequest}/approve', [App\Http\Controllers\LeaveController::class, 'approve']);
+            Route::post('/requests/{leaveRequest}/reject', [App\Http\Controllers\LeaveController::class, 'reject']);
+        });
+        
         Route::post('/requests/{leaveRequest}/cancel', [App\Http\Controllers\LeaveController::class, 'cancel']);
     });
 
@@ -304,11 +331,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/drafts/save', [App\Http\Controllers\PerformanceController::class, 'saveDraft']);
 
         // Analytics & Leaderboard
-        Route::get('/analytics/personal', [App\Http\Controllers\PerformanceController::class, 'personalAnalytics']);
-        Route::get('/analytics/branch', [App\Http\Controllers\PerformanceController::class, 'branchAnalytics']);
-        Route::get('/leaderboard', [App\Http\Controllers\PerformanceController::class, 'leaderboard']);
-        Route::get('/department-summaries', [App\Http\Controllers\PerformanceController::class, 'departmentSummaries']);
-        Route::get('/analytics', [App\Http\Controllers\PerformanceController::class, 'analytics']);
+        Route::get('/analytics/personal', [App\Http\Controllers\PerformanceController::class, 'personalAnalytics'])->middleware('permission:performance.view,self');
+        Route::get('/analytics/branch', [App\Http\Controllers\PerformanceController::class, 'branchAnalytics'])->middleware('permission:performance.view,branch');
+        Route::get('/leaderboard', [App\Http\Controllers\PerformanceController::class, 'leaderboard'])->middleware('permission:performance.view,all');
+        Route::get('/department-summaries', [App\Http\Controllers\PerformanceController::class, 'departmentSummaries'])->middleware('permission:performance.view,department');
+        Route::get('/analytics', [App\Http\Controllers\PerformanceController::class, 'analytics'])->middleware('permission:performance.view,all');
 
         // Template resolution for employees (must be before /{id} routes)
         Route::get('/configs/for-employee', [App\Http\Controllers\PerformanceController::class, 'getConfigForEmployee']);
@@ -333,6 +360,7 @@ Route::prefix('v1')->group(function () {
         // Search & Stats (must be before /{id})
         Route::get('/search', [App\Http\Controllers\MemoController::class, 'search']);
         Route::get('/stats', [App\Http\Controllers\MemoController::class, 'stats']);
+        Route::get('/recipients', [App\Http\Controllers\MemoController::class, 'recipientList']);
         
         // Bulk operations (must be before /{id})
         Route::post('/bulk-send', [App\Http\Controllers\MemoController::class, 'bulkSend']);
@@ -340,18 +368,18 @@ Route::prefix('v1')->group(function () {
         Route::post('/bulk-read', [App\Http\Controllers\MemoController::class, 'bulkMarkAsRead']);
         
         // Main CRUD
-        Route::get('/', [App\Http\Controllers\MemoController::class, 'index']);
-        Route::post('/', [App\Http\Controllers\MemoController::class, 'store']);
-        Route::get('/{id}', [App\Http\Controllers\MemoController::class, 'show']);
-        Route::put('/{id}', [App\Http\Controllers\MemoController::class, 'update']);
-        Route::delete('/{id}', [App\Http\Controllers\MemoController::class, 'destroy']);
+        Route::get('/', [App\Http\Controllers\MemoController::class, 'index'])->middleware('permission:memo.view,self');
+        Route::post('/', [App\Http\Controllers\MemoController::class, 'store'])->middleware('permission:memo.create,all');
+        Route::get('/{id}', [App\Http\Controllers\MemoController::class, 'show'])->middleware('permission:memo.view,self');
+        Route::put('/{id}', [App\Http\Controllers\MemoController::class, 'update'])->middleware('permission:memo.update,self');
+        Route::delete('/{id}', [App\Http\Controllers\MemoController::class, 'destroy'])->middleware('permission:memo.delete,self');
         
         // Actions on specific memos
-        Route::post('/{id}/reply', [App\Http\Controllers\MemoController::class, 'reply']);
-        Route::post('/{id}/forward', [App\Http\Controllers\MemoController::class, 'forward']);
-        Route::post('/{id}/star', [App\Http\Controllers\MemoController::class, 'toggleStar']);
-        Route::post('/{id}/read', [App\Http\Controllers\MemoController::class, 'markAsRead']);
-        Route::post('/{id}/move', [App\Http\Controllers\MemoController::class, 'moveToFolder']);
+        Route::post('/{id}/reply', [App\Http\Controllers\MemoController::class, 'reply'])->middleware('permission:memo.create,all');
+        Route::post('/{id}/forward', [App\Http\Controllers\MemoController::class, 'forward'])->middleware('permission:memo.create,all');
+        Route::post('/{id}/star', [App\Http\Controllers\MemoController::class, 'toggleStar'])->middleware('permission:memo.view,self');
+        Route::post('/{id}/read', [App\Http\Controllers\MemoController::class, 'markAsRead'])->middleware('permission:memo.view,self');
+        Route::post('/{id}/move', [App\Http\Controllers\MemoController::class, 'moveToFolder'])->middleware('permission:memo.view,self');
         
         // Attachments (specific routes before parameterized ones)
         Route::get('/attachments/{attachmentId}/download', [App\Http\Controllers\MemoAttachmentController::class, 'download']);
@@ -390,6 +418,9 @@ Route::prefix('v1')->group(function () {
 
     // Team Chat Routes
     Route::prefix('chat')->middleware('auth:sanctum')->group(function () {
+        // Global Search
+        Route::get('/search', [App\Http\Controllers\ChatMessageController::class, 'globalSearch']);
+
         // Channels
         Route::get('/channels', [App\Http\Controllers\ChatChannelController::class, 'index']);
         Route::post('/channels', [App\Http\Controllers\ChatChannelController::class, 'store']);
@@ -436,5 +467,9 @@ Route::prefix('v1')->group(function () {
             Route::put('/blocked-keywords/{keyword}', [App\Http\Controllers\ChatAdminController::class, 'updateBlockedKeyword']);
             Route::delete('/blocked-keywords/{keyword}', [App\Http\Controllers\ChatAdminController::class, 'deleteBlockedKeyword']);
         });
+
+        // WebPush Notifications
+        Route::post('/push-subscriptions', [App\Http\Controllers\PushSubscriptionController::class, 'update']);
+        Route::delete('/push-subscriptions', [App\Http\Controllers\PushSubscriptionController::class, 'destroy']);
     });
 });

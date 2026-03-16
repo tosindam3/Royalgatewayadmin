@@ -27,7 +27,10 @@ apiClient.interceptors.response.use(
         // If response has the standard API wrapper format {status, message, data}
         // unwrap it to just return the data
         if (response.data && response.data.status === 'success') {
-            // Return the data field, or empty object if undefined
+            // Paginated response: has both data (items) and meta (pagination)
+            if (response.data.meta && Array.isArray(response.data.data)) {
+                return { data: response.data.data, meta: response.data.meta };
+            }
             return response.data.data !== undefined ? response.data.data : {};
         }
         // For direct responses (like paginated data), return as-is
@@ -40,6 +43,7 @@ apiClient.interceptors.response.use(
         if (status === 401) {
             // Unauthorized: Clear session and redirect to login if necessary
             localStorage.removeItem('royalgateway_auth_token');
+            localStorage.removeItem('royalgateway_user');
             const isLoginRequest = error.config?.url?.includes('/login');
 
             if (isLoginRequest) {

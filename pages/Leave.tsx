@@ -19,6 +19,10 @@ import { format, parseISO } from 'date-fns';
 
 const Leave: React.FC = () => {
   const queryClient = useQueryClient();
+  const user = JSON.parse(localStorage.getItem('royalgateway_user') || '{}');
+  const userPermissions = JSON.parse(localStorage.getItem('royalgateway_permissions') || '[]');
+  const isManagement = userPermissions.includes('leave.approve') || userPermissions.includes('leave.reject');
+  
   const [activeTab, setActiveTab] = useState('Leave Dashboard');
   const [selectedStatus, setSelectedStatus] = useState<LeaveRequestStatus | 'all'>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -148,13 +152,17 @@ const Leave: React.FC = () => {
   const requestsMeta = requestsData?.meta;
   const pendingRequests = requests.filter((r) => r.status === 'pending').slice(0, 5);
 
-  const tabs = [
+  const allTabs = [
     'Leave Dashboard',
     'Leave Requests',
     'Leave Policies',
     'Absence Tracking',
     'Holiday Calendar',
   ];
+
+  const tabs = isManagement 
+    ? allTabs 
+    : ['Leave Dashboard', 'Leave Requests', 'Holiday Calendar', 'Leave Policies'];
 
   // ==================== RENDER ====================
 
@@ -208,7 +216,7 @@ const Leave: React.FC = () => {
                     <StatsCardSkeleton key={i} />
                   ))}
                 </>
-              ) : (
+              ) : isManagement ? (
                 <>
                   <LeaveStatsCard
                     label="Employees on Leave Today"
@@ -246,6 +254,43 @@ const Leave: React.FC = () => {
                     icon="📅"
                     color="border-l-blue-500"
                     action="View List"
+                  />
+                </>
+              ) : (
+                <>
+                  <LeaveStatsCard
+                    label="Used Days (MTD)"
+                    value={dashboardStats?.used_this_month || 0}
+                    icon="📁"
+                    color="border-l-emerald-500"
+                  />
+                  <LeaveStatsCard
+                    label="Pending My Requests"
+                    value={dashboardStats?.pending_mine || 0}
+                    icon="📝"
+                    color="border-l-amber-500"
+                    action="View List"
+                    onClick={() => {
+                      setActiveTab('Leave Requests');
+                    }}
+                  />
+                  <LeaveStatsCard
+                    label="Sick Leave Used"
+                    value={dashboardStats?.sick_used || 0}
+                    icon="🩹"
+                    color="border-l-purple-500"
+                  />
+                  <LeaveStatsCard
+                    label="Upcoming My Leave"
+                    value={dashboardStats?.upcoming_mine || 0}
+                    icon="📅"
+                    color="border-l-blue-500"
+                  />
+                  <LeaveStatsCard
+                    label="Total Remaining"
+                    value={dashboardStats?.total_remaining || 0}
+                    icon="✨"
+                    color="border-l-pink-500"
                   />
                 </>
               )}

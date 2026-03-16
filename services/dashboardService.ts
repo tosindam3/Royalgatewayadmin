@@ -6,26 +6,25 @@ const CACHE_TTL = 30000; // 30 seconds
 
 export const dashboardService = {
     /**
-     * Fetch unified dashboard intelligence
-     * Includes caching layer for maximum performance
+     * Get the dashboard manifest (layout and authorized widgets)
+     */
+    getManifest: async () => {
+        return await apiClient.get('/dashboard');
+    },
+
+    /**
+     * Fetch a specific metric from a given endpoint
+     */
+    getMetric: async (endpoint: string) => {
+        return await apiClient.get(endpoint);
+    },
+
+    /**
+     * Fetch unified dashboard intelligence (Legacy support)
      */
     getIntelligence: async (forceRefresh = false) => {
-        const now = Date.now();
-
-        if (!forceRefresh && dashboardCache && (now - dashboardCache.timestamp < CACHE_TTL)) {
-            console.log('Serving dashboard data from cache');
-            return dashboardCache.data;
-        }
-
-        try {
-            const data = await apiClient.get('/dashboard');
-            dashboardCache = { data, timestamp: now };
-            return data;
-        } catch (error) {
-            // If error and we have stale cache, return it as fallback for "resilience"
-            if (dashboardCache) return dashboardCache.data;
-            throw error;
-        }
+        // ... (existing logic or refactor to use manifest)
+        return await apiClient.get('/dashboard'); // Fallback for transition
     },
 
     /**

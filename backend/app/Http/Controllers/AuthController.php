@@ -30,8 +30,8 @@ class AuthController extends Controller
         // Create token
         $token = $user->createToken('auth-token')->plainTextToken;
 
-        // Flatten permissions from all roles
-        $permissions = $user->roles->flatMap(function ($role) {
+        // Flatten permissions from all roles (including primary)
+        $permissions = $user->all_roles->flatMap(function ($role) {
             return $role->permissions;
         })->unique('id')->values();
 
@@ -48,6 +48,11 @@ class AuthController extends Controller
         // Delete all tokens for the user
         $request->user()->tokens()->delete();
 
+        // Invalidate session if using stateful authentication
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
         return response()->json(['message' => 'Logged out successfully']);
     }
 
@@ -63,8 +68,8 @@ class AuthController extends Controller
         $passwordChangeRequired = $user->employeeProfile &&
             $user->employeeProfile->password_change_required;
 
-        // Flatten permissions from all roles
-        $permissions = $user->roles->flatMap(function ($role) {
+        // Flatten permissions from all roles (including primary)
+        $permissions = $user->all_roles->flatMap(function ($role) {
             return $role->permissions;
         })->unique('id')->values();
 

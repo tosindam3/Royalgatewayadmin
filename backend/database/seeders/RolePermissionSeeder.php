@@ -12,22 +12,14 @@ class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        // Disable foreign key checks to truncate safely
-        Schema::disableForeignKeyConstraints();
-        DB::table('role_permissions')->truncate();
-        DB::table('user_roles')->truncate();
-        DB::table('permissions')->truncate();
-        DB::table('roles')->truncate();
-        Schema::enableForeignKeyConstraints();
-
         DB::transaction(function () {
-            // Create Permissions
+            // Create/Update Permissions
             $permissions = $this->createPermissions();
             
-            // Create Roles
+            // Create/Update Roles
             $roles = $this->createRoles();
             
-            // Assign Permissions to Roles
+            // Assign Permissions to Roles (Idempotent sync)
             $this->assignPermissions($roles, $permissions);
         });
     }
@@ -49,6 +41,10 @@ class RolePermissionSeeder extends Seeder
             'workflows' => ['view', 'create', 'update', 'delete'],
             'reports' => ['view', 'export'],
             'analytics' => ['view'],
+            'chat' => ['view', 'create-channel', 'admin', 'compliance'],
+            'dashboard' => ['view', 'management'],
+            'organization' => ['view', 'update', 'delete'],
+            'memo' => ['view', 'create', 'update', 'delete', 'manage'],
         ];
 
         $permissions = [];
@@ -57,15 +53,17 @@ class RolePermissionSeeder extends Seeder
             foreach ($actions as $action) {
                 $availableScopes = $this->getAvailableScopes($module, $action);
                 
-                $permission = Permission::create([
-                    'name' => "{$module}.{$action}",
-                    'display_name' => ucwords(str_replace('-', ' ', $action)) . ' ' . ucfirst($module),
-                    'module' => $module,
-                    'action' => $action,
-                    'description' => "Permission to {$action} {$module}",
-                    'available_scopes' => $availableScopes,
-                    'is_system' => true,
-                ]);
+                $permission = Permission::updateOrCreate(
+                    ['name' => "{$module}.{$action}"],
+                    [
+                        'display_name' => ucwords(str_replace('-', ' ', $action)) . ' ' . ucfirst($module),
+                        'module' => $module,
+                        'action' => $action,
+                        'description' => "Permission to {$action} {$module}",
+                        'available_scopes' => $availableScopes,
+                        'is_system' => true,
+                    ]
+                );
 
                 $permissions["{$module}.{$action}"] = $permission;
             }
@@ -88,59 +86,71 @@ class RolePermissionSeeder extends Seeder
     private function createRoles(): array
     {
         return [
-            'super_admin' => Role::create([
-                'name' => 'super_admin',
-                'display_name' => 'Super Administrator',
-                'description' => 'Full system access with all permissions',
-                'default_scope' => 'all',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'super_admin' => Role::updateOrCreate(
+                ['name' => 'super_admin'],
+                [
+                    'display_name' => 'Super Administrator',
+                    'description' => 'Full system access with all permissions',
+                    'default_scope' => 'all',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
 
-            'ceo' => Role::create([
-                'name' => 'ceo',
-                'display_name' => 'CEO',
-                'description' => 'Executive level oversight and organizational reporting',
-                'default_scope' => 'all',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'ceo' => Role::updateOrCreate(
+                ['name' => 'ceo'],
+                [
+                    'display_name' => 'CEO',
+                    'description' => 'Executive level oversight and organizational reporting',
+                    'default_scope' => 'all',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
             
-            'hr_manager' => Role::create([
-                'name' => 'hr_manager',
-                'display_name' => 'HR Manager',
-                'description' => 'HR operations and employee management',
-                'default_scope' => 'all',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'hr_manager' => Role::updateOrCreate(
+                ['name' => 'hr_manager'],
+                [
+                    'display_name' => 'HR Manager',
+                    'description' => 'HR operations and employee management',
+                    'default_scope' => 'all',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
             
-            'branch_manager' => Role::create([
-                'name' => 'branch_manager',
-                'display_name' => 'Branch Manager',
-                'description' => 'Branch-level management and operations',
-                'default_scope' => 'branch',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'branch_manager' => Role::updateOrCreate(
+                ['name' => 'branch_manager'],
+                [
+                    'display_name' => 'Branch Manager',
+                    'description' => 'Branch-level management and operations',
+                    'default_scope' => 'branch',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
             
-            'department_head' => Role::create([
-                'name' => 'department_head',
-                'display_name' => 'Department Head',
-                'description' => 'Department-level management',
-                'default_scope' => 'department',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'department_head' => Role::updateOrCreate(
+                ['name' => 'department_head'],
+                [
+                    'display_name' => 'Department Head',
+                    'description' => 'Department-level management',
+                    'default_scope' => 'department',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
             
-            'employee' => Role::create([
-                'name' => 'employee',
-                'display_name' => 'Employee',
-                'description' => 'Standard employee access',
-                'default_scope' => 'self',
-                'is_system' => true,
-                'is_active' => true,
-            ]),
+            'employee' => Role::updateOrCreate(
+                ['name' => 'employee'],
+                [
+                    'display_name' => 'Employee',
+                    'description' => 'Standard employee access',
+                    'default_scope' => 'self',
+                    'is_system' => true,
+                    'is_active' => true,
+                ]
+            ),
         ];
     }
 
@@ -192,12 +202,25 @@ class RolePermissionSeeder extends Seeder
         // Employee
         $employeeModules = [
             'employees.view' => 'self',
+            'employees.update' => 'self',
             'attendance.view' => 'self',
             'attendance.clock' => 'self',
             'attendance.correct' => 'self',
             'leave.view' => 'self',
             'leave.apply' => 'self',
             'performance.view' => 'self',
+            'performance.update' => 'self',
+            'chat.view' => 'all',
+            'chat.create-channel' => 'all',
+            'memo.view' => 'all',
+            'memo.create' => 'all',
+            'onboarding.view' => 'self',
+            'onboarding.update' => 'self',
+            'dashboard.view' => 'self',
+            'organization.view' => 'all',
+            'branches.view' => 'all',
+            'departments.view' => 'all',
+            'designations.view' => 'all',
         ];
         $empPerms = [];
         foreach ($employeeModules as $key => $scope) {

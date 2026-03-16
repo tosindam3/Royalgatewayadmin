@@ -54,17 +54,42 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
     }
   }, [errors]);
 
+  // Normalize a section so it always has a `fields` array.
+  // FormBuilder saves sections as { fields: Question[] }
+  // The seeder stores sections as { metrics: [{ label, max_score }] }
+  // Handle all three shapes.
+  const normalizeSection = (section: any) => {
+    // Already has fields with content
+    if (section.fields?.length) return section;
+    // FormBuilder in-memory shape uses 'questions'
+    if (section.questions?.length) return { ...section, fields: section.questions };
+    // Seeder shape uses 'metrics'
+    const metrics: any[] = section.metrics || [];
+    return {
+      ...section,
+      fields: metrics.map((m: any) => ({
+        id: m.label.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        label: m.label,
+        type: 'rating',
+        max: m.max_score ?? 10,
+        min: 0,
+        required: true,
+      })),
+    };
+  };
+
+  const normalizedSections = config.sections?.map(normalizeSection) ?? [];
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    config.sections?.forEach((section: any) => {
+    normalizedSections.forEach((section: any) => {
       section.fields?.forEach((field: any) => {
-        if (field.required && !formData[field.id]) {
+        if (field.required && (formData[field.id] === undefined || formData[field.id] === null || formData[field.id] === '')) {
           newErrors[field.id] = `${field.label} is required`;
         }
 
-        // Validate min/max for numeric fields
-        if (field.type === 'number' || field.type === 'currency' || field.type === 'percentage') {
+        if (field.type === 'number' || field.type === 'currency' || field.type === 'percentage' || field.type === 'rating') {
           const value = parseFloat(formData[field.id]);
           if (!isNaN(value)) {
             if (field.min !== undefined && value < field.min) {
@@ -99,8 +124,18 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
     };
 
     switch (field.type) {
+      // FormBuilder types
+      case 'short_text':
       case 'text':
         return <TextField key={field.id} {...commonProps} />;
+      case 'paragraph':
+      case 'textarea':
+        return <TextAreaField key={field.id} {...commonProps} />;
+      case 'multiple_choice':
+      case 'checkboxes':
+      case 'dropdown':
+      case 'select':
+        return <SelectField key={field.id} {...commonProps} />;
       case 'number':
         return <NumberField key={field.id} {...commonProps} />;
       case 'currency':
@@ -109,20 +144,32 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
         return <PercentageField key={field.id} {...commonProps} />;
       case 'rating':
         return <RatingField key={field.id} {...commonProps} />;
-      case 'textarea':
-        return <TextAreaField key={field.id} {...commonProps} />;
-      case 'select':
-        return <SelectField key={field.id} {...commonProps} />;
       case 'date':
         return <DateField key={field.id} {...commonProps} />;
+      // file type — render a basic file input inline
+      case 'file':
+        return (
+          <div key={field.id}>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+              {field.label}{field.required && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            <input
+              type="file"
+              onChange={(e) => handleFieldChange(field.id, e.target.files?.[0]?.name || '')}
+              className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+            />
+            {errors[field.id] && <p className="text-xs text-red-500 mt-1">{errors[field.id]}</p>}
+          </div>
+        );
       default:
-        return null;
+        // Unknown type — render as text so nothing is silently hidden
+        return <TextField key={field.id} {...commonProps} />;
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {config.sections?.map((section: any, index: number) => (
+      {normalizedSections.map((section: any, index: number) => (
         <GlassCard key={index}>
           <div className="mb-4">
             <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">

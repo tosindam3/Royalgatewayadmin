@@ -18,7 +18,9 @@ const StaffPortal: React.FC<StaffPortalProps> = ({ onNotify }) => {
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod());
 
   useEffect(() => {
-    loadData();
+    if (submissions.length === 0 && !config) {
+      loadData();
+    }
   }, []);
 
   useEffect(() => {
@@ -54,29 +56,22 @@ const StaffPortal: React.FC<StaffPortalProps> = ({ onNotify }) => {
     try {
       setIsLoading(true);
 
-      // Get user's department from localStorage
       const user = JSON.parse(localStorage.getItem('royalgateway_user') || '{}');
       const departmentId = user.employee_profile?.department_id;
 
-      if (!departmentId) {
-        console.warn('StaffPortal: no department_id found for user');
-        setIsLoading(false);
-        return;
-      }
-
-      // Load submissions and draft concurrently; config may not exist yet
-      const [submissionsData, draftData] = await Promise.all([
+      // Load config and submissions concurrently — config uses server-side resolution
+      // (department > branch > global) so department_id is not required here
+      const [submissionsData, configResult] = await Promise.all([
         performanceService.getSubmissions({ per_page: 10 }),
-        performanceService.getDraft(departmentId, selectedPeriod).catch(() => null)
+        performanceService.getConfigForEmployee().catch(() => null),
       ]);
 
-      // Config is optional — gracefully handle employee with no active template
-      try {
-        const configData = await performanceService.getConfigForEmployee();
-        setConfig(configData);
-      } catch {
-        setConfig(null); // No active config yet — admin hasn't published one
-      }
+      setConfig(configResult);
+
+      // Draft requires department_id — skip gracefully if not available
+      const draftData = departmentId
+        ? await performanceService.getDraft(departmentId, selectedPeriod).catch(() => null)
+        : null;
 
       // Submissions can come back as array or paginated object
       const list = Array.isArray(submissionsData)

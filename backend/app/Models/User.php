@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasPushSubscriptions;
 
     /**
      * The attributes that are mass assignable.
@@ -34,8 +35,8 @@ class User extends Authenticatable
         'manager_id',
     ];
 
-    protected $with = ['roles.permissions', 'employeeProfile'];
-    protected $appends = ['employee_id', 'display_name'];
+    protected $with = ['roles.permissions', 'primaryRole.permissions', 'employeeProfile'];
+    protected $appends = ['employee_id', 'display_name', 'all_roles'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -119,6 +120,23 @@ class User extends Authenticatable
     }
 
     /**
+     * Unified roles accessor
+     */
+    public function getAllRolesAttribute()
+    {
+        $all = collect();
+        if ($this->primaryRole) {
+            $all->push($this->primaryRole);
+        }
+        foreach ($this->roles as $role) {
+            if (!$all->contains('id', $role->id)) {
+                $all->push($role);
+            }
+        }
+        return $all;
+    }
+
+    /**
      * Attendance logs relationship
      */
     public function attendanceLogs()
@@ -131,7 +149,9 @@ class User extends Authenticatable
      */
     public function hasRole(string $roleName): bool
     {
-        // Internal consistency: roles are saved as slugs now
+        if ($this->primaryRole?->name === $roleName) {
+            return true;
+        }
         return $this->roles->contains('name', $roleName);
     }
 
@@ -140,6 +160,9 @@ class User extends Authenticatable
      */
     public function hasAnyRole(array $roleNames): bool
     {
+        if ($this->primaryRole && in_array($this->primaryRole->name, $roleNames)) {
+            return true;
+        }
         return $this->roles->whereIn('name', $roleNames)->isNotEmpty();
     }
 
@@ -148,12 +171,17 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission, string $scope = null): bool
     {
-        // 1. Super Admin, CEO & HR Manager Bypass
+        // 1. Privileged Roles Bypass (Super Admin, Admin, CEO, HR Manager)
         if ($this->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
             return true;
         }
 
-        // 2. Check explicitly assigned roles
+        // 2. Check primary role
+        if ($this->primaryRole?->hasPermission($permission, $scope)) {
+            return true;
+        }
+
+        // 3. Check explicitly assigned extra roles
         foreach ($this->roles as $role) {
             if ($role->hasPermission($permission, $scope)) {
                 return true;
@@ -204,13 +232,20 @@ class User extends Authenticatable
      */
     public function getPermissionScope(string $permission): ?string
     {
-        // Super Admin & CEO Bypass
-        if ($this->hasAnyRole(['super_admin', 'ceo'])) {
+        // 1. Privileged Roles Bypass (Super Admin, Admin, CEO, HR Manager)
+        if ($this->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
             return 'all';
         }
 
         $scopes = [];
 
+        // Check primary role
+        $primaryScope = $this->primaryRole?->getPermissionScope($permission);
+        if ($primaryScope) {
+            $scopes[] = $primaryScope;
+        }
+
+        // Check other roles
         foreach ($this->roles as $role) {
             $scope = $role->getPermissionScope($permission);
             if ($scope) {

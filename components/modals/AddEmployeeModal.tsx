@@ -21,6 +21,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     
+    // Get current user permissions
+    const permissions = JSON.parse(localStorage.getItem('user_permissions') || '[]');
+    const isAdmin = permissions.some((p: any) => 
+        ['employees.all', 'employees.update'].includes(p.name) && p.pivot?.scope_level !== 'self'
+    );
+    
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -779,11 +785,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                     </label>
                                     <select
                                         value={formData.branch_id}
+                                        disabled={!isAdmin && isEditMode}
                                         onChange={(e) => {
                                             setFormData({ ...formData, branch_id: e.target.value });
                                             if (errors.branch_id) setErrors({ ...errors, branch_id: '' });
                                         }}
-                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.branch_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.branch_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <option value="">Select Branch</option>
                                         {branches.map((b: any) => (
@@ -805,11 +812,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                     </label>
                                     <select
                                         value={formData.department_id}
+                                        disabled={!isAdmin && isEditMode}
                                         onChange={(e) => {
                                             setFormData({ ...formData, department_id: e.target.value });
                                             if (errors.department_id) setErrors({ ...errors, department_id: '' });
                                         }}
-                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.department_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.department_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <option value="">Select Department</option>
                                         {departments.map((d: any) => (
@@ -832,11 +840,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                 </label>
                                 <select
                                     value={formData.designation_id}
+                                    disabled={!isAdmin && isEditMode}
                                     onChange={(e) => {
                                         setFormData({ ...formData, designation_id: e.target.value });
                                         if (errors.designation_id) setErrors({ ...errors, designation_id: '' });
                                     }}
-                                    className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.designation_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all`}
+                                    className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.designation_id ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <option value="">Select Designation</option>
                                     {designations.map((d: any) => (
@@ -857,8 +866,9 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Employment Type</label>
                                     <select
                                         value={formData.employment_type}
+                                        disabled={!isAdmin && isEditMode}
                                         onChange={(e) => setFormData({ ...formData, employment_type: e.target.value as any })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all"
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <option value="full-time">Full-Time</option>
                                         <option value="part-time">Part-Time</option>
@@ -869,8 +879,9 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Work Mode</label>
                                     <select
                                         value={formData.work_mode}
+                                        disabled={!isAdmin && isEditMode}
                                         onChange={(e) => setFormData({ ...formData, work_mode: e.target.value as any })}
-                                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all"
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none appearance-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         <option value="onsite">Onsite</option>
                                         <option value="remote">Remote</option>
@@ -892,11 +903,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ isOpen, onClose, em
                                     <input
                                         type="date"
                                         value={formData.hire_date}
+                                        disabled={!isAdmin && isEditMode}
                                         onChange={(e) => {
                                             setFormData({ ...formData, hire_date: e.target.value });
                                             if (errors.hire_date) setErrors({ ...errors, hire_date: '' });
                                         }}
-                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.hire_date ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all`}
+                                        className={`w-full bg-slate-50 dark:bg-white/5 border ${errors.hire_date ? 'border-red-500' : 'border-slate-200 dark:border-white/10'} rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white focus:border-purple-500 outline-none transition-all ${(!isAdmin && isEditMode) ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     />
                                     {errors.hire_date && (
                                         <p className="text-xs text-red-500 mt-1 flex items-center gap-1">

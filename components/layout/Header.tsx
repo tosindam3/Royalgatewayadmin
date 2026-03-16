@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
 import { UserProfile, Notification } from '../../types';
@@ -28,6 +29,8 @@ const Header: React.FC<HeaderProps> = ({
     onBranchScopeChange,
     onOpenClockModal,
 }) => {
+    const navigate = useNavigate();
+    const [showProfileMenu, setShowProfileMenu] = React.useState(false);
     const { data: overview } = useAttendanceOverview();
     const presentCount = overview?.todayPresent ?? '—';
     const totalCount   = overview?.totalEmployees ?? '—';
@@ -70,17 +73,58 @@ const Header: React.FC<HeaderProps> = ({
 
                 <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} />
 
-                <div className="flex items-center gap-3 group cursor-pointer p-1 rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all" onClick={onLogout}>
-                    <div className="text-right hidden sm:block">
-                        <p className="text-xs font-black text-slate-900 dark:text-white">{userProfile.name}</p>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Logout</p>
-                    </div>
-                    {userProfile.avatar ? (
-                        <img src={userProfile.avatar} className="w-10 h-10 rounded-2xl border-2 border-orange-500 shadow-lg object-cover" alt="Profile" />
-                    ) : (
-                        <div className="w-10 h-10 rounded-2xl border-2 border-orange-500 bg-orange-500/20 flex items-center justify-center text-orange-500 font-black italic shadow-lg">
-                            {userProfile.name.charAt(0)}
+
+                <div className="relative">
+                    <div 
+                        className="flex items-center gap-3 group cursor-pointer p-1 rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-all" 
+                        onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    >
+                        <div className="text-right hidden sm:block">
+                            <p className="text-xs font-black text-slate-900 dark:text-white">{userProfile.name}</p>
+                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                {userProfile.employee_profile?.designation?.name || 'Employee'}
+                            </p>
                         </div>
+                        {userProfile.avatar ? (
+                            <img src={userProfile.avatar} className="w-10 h-10 rounded-2xl border-2 border-orange-500 shadow-lg object-cover" alt="Profile" />
+                        ) : (
+                            <div className="w-10 h-10 rounded-2xl border-2 border-orange-500 bg-orange-500/20 flex items-center justify-center text-orange-500 font-black italic shadow-lg">
+                                {userProfile.name.charAt(0)}
+                            </div>
+                        )}
+                    </div>
+
+                    {showProfileMenu && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)} />
+                            <div className="absolute right-0 mt-3 w-56 bg-white dark:bg-[#0d0a1a] border border-slate-200 dark:border-white/10 rounded-[30px] shadow-2xl z-20 py-3 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
+                                <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 mb-2">
+                                    <p className="text-xs font-black text-slate-900 dark:text-white uppercase italic">{userProfile.name}</p>
+                                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">{userProfile.email}</p>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const profileId = userProfile.employee_profile?.id;
+                                        if (profileId) navigate(`/employees/${profileId}`);
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-6 py-3 text-left text-xs font-black text-slate-600 dark:text-slate-400 hover:text-purple-500 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-all uppercase tracking-widest"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" strokeWidth="2.5"/></svg>
+                                    My Profile
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        onLogout();
+                                        setShowProfileMenu(false);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-6 py-3 text-left text-xs font-black text-rose-500 hover:bg-rose-500/5 transition-all uppercase tracking-widest"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeWidth="2.5"/></svg>
+                                    Log Out
+                                </button>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>

@@ -17,7 +17,7 @@ interface PayrollDashboardProps {
 
 // ─── Skeleton components ─────────────────────────────────────────────────────
 const SkeletonBox = ({ className = '' }: { className?: string }) => (
-    <div className={`animate-pulse bg-slate-200 dark:bg-white/10 rounded-2xl ${className}`} />
+    <div className={`animate-pulse bg-slate-300 dark:bg-white/10 rounded-2xl ${className}`} />
 );
 
 const DashboardSkeleton = () => (

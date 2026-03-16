@@ -10,14 +10,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
+use App\Services\ScopeEngine;
 
 class PerformanceController extends Controller
 {
     protected $scoringEngine;
+    protected $scopeEngine;
 
-    public function __construct(PerformanceScoringEngine $scoringEngine)
+    public function __construct(PerformanceScoringEngine $scoringEngine, ScopeEngine $scopeEngine)
     {
         $this->scoringEngine = $scoringEngine;
+        $this->scopeEngine = $scopeEngine;
     }
 
     private function applyDateFilters($query, Request $request)
@@ -73,13 +76,8 @@ class PerformanceController extends Controller
         
         $query = PerformanceSubmission::with(['employee', 'department']);
 
-        // Check if user has an admin role
-        $isAdmin = $user->hasAnyRole(['super_admin', 'admin', 'hr_admin', 'ceo']);
-
-        // If not admin, only show their own submissions
-        if (!$isAdmin) {
-            $query->where('employee_id', $user->employee_id);
-        }
+        // Apply dynamic scoping
+        $query = $this->scopeEngine->applyScope($query, $user, 'performance.view');
 
         if ($request->status) {
             $query->where('status', $request->status);
@@ -211,6 +209,9 @@ class PerformanceController extends Controller
             ->where('status', 'submitted')
             ->whereNotNull('score');
 
+            // Apply dynamic scoping
+            $query = $this->scopeEngine->applyScope($query, $request->user(), 'performance.view');
+
             $this->applyDateFilters($query, $request);
 
             return $query->groupBy('employee_id')
@@ -253,6 +254,9 @@ class PerformanceController extends Controller
             ->where('status', 'submitted')
             ->whereNotNull('score');
 
+            // Apply dynamic scoping
+            $query = $this->scopeEngine->applyScope($query, $request->user(), 'performance.view');
+
             $this->applyDateFilters($query, $request);
 
             return $query->groupBy('department_id')
@@ -289,6 +293,11 @@ class PerformanceController extends Controller
     public function personalAnalytics(Request $request)
     {
         $user = $request->user();
+        
+        if (!$this->scopeEngine->hasPermission($user, 'performance.view')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         if (!$user->employee_id) {
             return response()->json(['success' => false, 'message' => 'Not an employee'], 403);
         }
@@ -348,8 +357,10 @@ class PerformanceController extends Controller
     public function branchAnalytics(Request $request)
     {
         $user = $request->user();
-        if (!$user->employee_id) {
-            return response()->json(['success' => false, 'message' => 'Not an employee'], 403);
+        
+        // Use explicit permission check for analytics
+        if (!$this->scopeEngine->hasPermission($user, 'performance.view', 'branch')) {
+            return response()->json(['success' => false, 'message' => 'Insufficient permissions for branch analytics'], 403);
         }
 
         $employee = Employee::find($user->employee_id);
@@ -385,7 +396,7 @@ class PerformanceController extends Controller
         $deptGroups = $branchSubmissions->groupBy('department_id');
         $departmentAverages = $deptGroups->map(function ($subs) {
             return [
-                'department' => compact('subs')->first()->department->name ?? 'Unknown',
+                'department' => $subs->first()->department->name ?? 'Unknown',
                 'average_score' => round($subs->avg('score'), 2),
                 'staff_count' => $subs->unique('employee_id')->count()
             ];
@@ -419,9 +430,12 @@ class PerformanceController extends Controller
         $query = PerformanceConfig::with(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']);
 
         if ($request->filled('department_id')) {
-            $query->where(function($q) use ($request) {
-                $q->where('department_id', $request->department_id)
-                  ->orWhereHas('departments', fn($subQ) => $subQ->where('departments.id', $request->department_id));
+            $deptId = $request->department_id;
+            $query->where(function($q) use ($deptId) {
+                $q->where('department_id', '=', $deptId)
+                  ->orWhereHas('departments', function($subQ) use ($deptId) {
+                      $subQ->where('departments.id', '=', $deptId);
+                  });
             });
         }
         if ($request->filled('branch_id')) {
@@ -478,6 +492,10 @@ class PerformanceController extends Controller
     // Create a new config (Admin only)
     public function createConfig(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'performance.update')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
             'description'    => 'nullable|string',
@@ -525,6 +543,10 @@ class PerformanceController extends Controller
     // Update an existing config (Admin only) — auto-reverts published → draft
     public function updateConfig(Request $request, $id)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'performance.update')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $config = PerformanceConfig::findOrFail($id);
 
         $validated = $request->validate([
@@ -571,6 +593,10 @@ class PerformanceController extends Controller
     // Delete a config — only if it's a draft
     public function deleteConfig($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'performance.delete')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $config = PerformanceConfig::findOrFail($id);
 
         if ($config->status !== 'draft') {
@@ -787,7 +813,15 @@ class PerformanceController extends Controller
      */
     public function getConfigForEmployee(Request $request)
     {
-        $user     = $request->user();
+        $user = $request->user();
+
+        if (!$user->employee_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No employee profile linked to this account.',
+            ], 404);
+        }
+
         $employee = Employee::findOrFail($user->employee_id);
 
         $config = PerformanceConfig::resolveForEmployee($employee);

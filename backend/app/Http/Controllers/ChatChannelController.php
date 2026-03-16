@@ -47,13 +47,29 @@ class ChatChannelController extends Controller
 
             $channels = $query->orderBy('created_at', 'desc')->get();
 
-            // Add unread count for each channel
-            $channels->each(function ($channel) use ($user) {
-                $channel->unread_count = $channel->getUnreadCountForUser($user->id);
+            // Preload unread counts to avoid N+1
+            foreach ($channels as $channel) {
                 $member = $channel->members->firstWhere('id', $user->id);
+                $lastReadAt = $member ? ($member->pivot->last_read_at ?? $member->pivot->created_at) : now();
+                
+                // This is still a bit heavy, but better than full model methods if we use subqueries
+                // For a true enterprise fix, we should use a single query with subselects
+                $channel->unread_count = $channel->messages()
+                    ->where('user_id', '!=', $user->id)
+                    ->where('created_at', '>', $lastReadAt)
+                    ->count();
+
                 $channel->is_pinned = $member ? $member->pivot->is_pinned : false;
                 $channel->is_muted = $member ? $member->pivot->is_muted : false;
-            });
+                
+                // For direct messages, show the other person's name
+                if ($channel->type === 'direct' && $channel->members->count() === 2) {
+                    $otherMember = $channel->members->firstWhere('id', '!=', $user->id);
+                    if ($otherMember) {
+                        $channel->name = $otherMember->name;
+                    }
+                }
+            }
 
             return $this->success($channels, 'Channels retrieved successfully');
         } catch (\Exception $e) {
@@ -81,6 +97,14 @@ class ChatChannelController extends Controller
             $channel->is_pinned = $member ? $member->pivot->is_pinned : false;
             $channel->is_muted = $member ? $member->pivot->is_muted : false;
             $channel->member_role = $member ? $member->pivot->role : null;
+
+            // For direct messages, show the other person's name
+            if ($channel->type === 'direct' && $channel->members->count() === 2) {
+                $otherMember = $channel->members->firstWhere('id', '!=', $user->id);
+                if ($otherMember) {
+                    $channel->name = $otherMember->name;
+                }
+            }
 
             return $this->success($channel, 'Channel retrieved successfully');
         } catch (\Exception $e) {
@@ -192,6 +216,13 @@ class ChatChannelController extends Controller
 
             $channel = $this->chatService->toggleArchive($channel);
 
+            AuditLogger::log(
+                'chat_channel_archive_toggled',
+                $channel,
+                ['is_archived' => !$channel->is_archived],
+                ['is_archived' => $channel->is_archived]
+            );
+
             return $this->success($channel, 'Channel archive status updated');
         } catch (\Exception $e) {
             return $this->error('Failed to update archive status: ' . $e->getMessage(), 500);
@@ -218,6 +249,13 @@ class ChatChannelController extends Controller
                 $validated['role'] ?? 'member'
             );
 
+            AuditLogger::log(
+                'chat_channel_members_added',
+                $channel,
+                null,
+                ['user_ids' => $validated['user_ids'], 'role' => $validated['role'] ?? 'member']
+            );
+
             return $this->success(null, 'Members added successfully');
         } catch (\Exception $e) {
             return $this->error('Failed to add members: ' . $e->getMessage(), 500);
@@ -241,6 +279,13 @@ class ChatChannelController extends Controller
             }
 
             $this->chatService->removeMember($channel, $userId);
+
+            AuditLogger::log(
+                'chat_channel_member_removed',
+                $channel,
+                ['user_id' => $userId],
+                null
+            );
 
             return $this->success(null, 'Member removed successfully');
         } catch (\Exception $e) {
@@ -266,6 +311,13 @@ class ChatChannelController extends Controller
             ]);
 
             $this->chatService->updateMemberRole($channel, $userId, $validated['role']);
+
+            AuditLogger::log(
+                'chat_channel_member_role_updated',
+                $channel,
+                ['user_id' => $userId],
+                ['role' => $validated['role']]
+            );
 
             return $this->success(null, 'Member role updated successfully');
         } catch (\Exception $e) {

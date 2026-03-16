@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeService } from '../../services/employeeService';
@@ -15,7 +15,20 @@ const EmployeeProfile: React.FC = () => {
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('Overview');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isSelfEditOpen, setIsSelfEditOpen] = useState(false);
+    const [selfEditForm, setSelfEditForm] = useState({ phone: '', dob: '', blood_group: '', genotype: '', academics: '' });
     const [openActionsMenu, setOpenActionsMenu] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Get current user role and employee ID
+    const userStr = localStorage.getItem('royalgateway_user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+    const permissions = JSON.parse(localStorage.getItem('user_permissions') || '[]');
+    
+    const isAdmin = permissions.some((p: any) => 
+        ['employees.all', 'employees.update'].includes(p.name) && p.pivot?.scope_level !== 'self'
+    );
+    const isOwnProfile = currentUser?.employee_profile?.id?.toString() === id;
 
     const { data: employee, isLoading } = useQuery({
         queryKey: ['employee', id],
@@ -44,6 +57,38 @@ const EmployeeProfile: React.FC = () => {
         },
         onError: (error: any) => {
             toast.error('Failed to update status', { description: error.message });
+        }
+    });
+
+    const avatarMutation = useMutation({
+        mutationFn: (file: File) => employeeService.uploadAvatar(id!, file),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['employee', id], data);
+            
+            // Sync with local storage user if it's the current user's profile
+            if (isOwnProfile) {
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                user.avatar = data.avatar;
+                localStorage.setItem('user', JSON.stringify(user));
+                window.dispatchEvent(new Event('storage')); // Trigger header refresh
+            }
+
+            toast.success('Avatar Updated', { description: 'Profile picture has been updated successfully.' });
+        },
+        onError: (error: any) => {
+            toast.error('Upload Failed', { description: error.message });
+        }
+    });
+
+    const selfUpdateMutation = useMutation({
+        mutationFn: (data: any) => employeeService.updateSelf(id!, data),
+        onSuccess: (data) => {
+            queryClient.setQueryData(['employee', id], data);
+            setIsSelfEditOpen(false);
+            toast.success('Profile updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error('Update failed', { description: error.message });
         }
     });
 
@@ -76,6 +121,28 @@ const EmployeeProfile: React.FC = () => {
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 2 * 1024 * 1024) {
+                toast.error('File too large', { description: 'Maximum avatar size is 2MB.' });
+                return;
+            }
+            avatarMutation.mutate(file);
+        }
+    };
+
+    const openSelfEdit = () => {
+        setSelfEditForm({
+            phone: employee?.phone || '',
+            dob: employee?.dob ? String(employee.dob).split('T')[0] : '',
+            blood_group: employee?.blood_group || '',
+            genotype: employee?.genotype || '',
+            academics: employee?.academics || '',
+        });
+        setIsSelfEditOpen(true);
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
             {/* Header */}
@@ -99,14 +166,44 @@ const EmployeeProfile: React.FC = () => {
             {/* Profile Header */}
             <div className="flex flex-col md:flex-row gap-8 items-center md:items-start p-8 bg-white/[0.03] rounded-[40px] border border-white/5 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-transparent to-transparent" />
-                <div className="w-32 h-32 rounded-[40px] bg-purple-500/10 border-4 border-white/10 shadow-2xl overflow-hidden flex items-center justify-center">
-                    {employee.avatar ? (
-                        <img src={employee.avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                        <span className="text-4xl font-black text-purple-500">
-                            {employee.first_name[0]}{employee.last_name[0]}
-                        </span>
-                    )}
+                
+                <div className="relative group/avatar">
+                    <div className="w-32 h-32 rounded-[40px] bg-purple-500/10 border-4 border-white/10 shadow-2xl overflow-hidden flex items-center justify-center relative">
+                        {employee.avatar ? (
+                            <img src={employee.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-4xl font-black text-purple-500">
+                                {employee.first_name[0]}{employee.last_name[0]}
+                            </span>
+                        )}
+                        
+                        {/* Avatar Upload Overlay */}
+                        {(isAdmin || isOwnProfile) && (
+                            <div 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-all flex flex-col items-center justify-center cursor-pointer backdrop-blur-sm"
+                            >
+                                {avatarMutation.isPending ? (
+                                    <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <svg className="w-6 h-6 text-white mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <span className="text-[8px] font-black uppercase text-white tracking-widest">Update</span>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        className="hidden" 
+                        accept="image/*"
+                    />
                 </div>
                 <div className="flex-1 text-center md:text-left space-y-4">
                     <div>
@@ -133,78 +230,83 @@ const EmployeeProfile: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex gap-2 relative">
-                    <Button 
-                        variant="secondary" 
-                        size="sm"
-                        onClick={() => setIsEditModalOpen(true)}
-                    >
-                        Edit Profile
-                    </Button>
-                    <div className="relative">
+                    {(isAdmin || isOwnProfile) && (
                         <Button 
-                            variant="ghost" 
+                            variant="secondary" 
                             size="sm"
-                            onClick={() => setOpenActionsMenu(!openActionsMenu)}
+                            onClick={() => isAdmin ? setIsEditModalOpen(true) : openSelfEdit()}
                         >
-                            •••
+                            Edit Profile
                         </Button>
-                        {openActionsMenu && (
-                            <>
-                                <div 
-                                    className="fixed inset-0 z-10" 
-                                    onClick={() => setOpenActionsMenu(false)}
-                                />
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <button
-                                        onClick={() => {
-                                            setIsEditModalOpen(true);
-                                            setOpenActionsMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>✏️</span> Edit Profile
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            toast.info('Export', { description: 'Export feature coming soon' });
-                                            setOpenActionsMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>📄</span> Export Profile
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            toast.info('Print', { description: 'Print feature coming soon' });
-                                            setOpenActionsMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>🖨️</span> Print Profile
-                                    </button>
-                                    <div className="border-t border-slate-200 dark:border-white/10" />
-                                    <button
-                                        onClick={() => {
-                                            handleStatusChange('suspended');
-                                            setOpenActionsMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>⏸️</span> Suspend Employee
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            handleDelete();
-                                            setOpenActionsMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors flex items-center gap-2"
-                                    >
-                                        <span>🗑️</span> Delete Employee
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    )}
+                    
+                    {isAdmin && (
+                        <div className="relative">
+                            <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setOpenActionsMenu(!openActionsMenu)}
+                            >
+                                •••
+                            </Button>
+                            {openActionsMenu && (
+                                <>
+                                    <div 
+                                        className="fixed inset-0 z-10" 
+                                        onClick={() => setOpenActionsMenu(false)}
+                                    />
+                                    <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <button
+                                            onClick={() => {
+                                                setIsEditModalOpen(true);
+                                                setOpenActionsMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                        >
+                                            <span>✏️</span> Edit Profile
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                toast.info('Export', { description: 'Export feature coming soon' });
+                                                setOpenActionsMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                        >
+                                            <span>📄</span> Export Profile
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                toast.info('Print', { description: 'Print feature coming soon' });
+                                                setOpenActionsMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                        >
+                                            <span>🖨️</span> Print Profile
+                                        </button>
+                                        <div className="border-t border-slate-200 dark:border-white/10" />
+                                        <button
+                                            onClick={() => {
+                                                handleStatusChange('suspended');
+                                                setOpenActionsMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors flex items-center gap-2"
+                                        >
+                                            <span>⏸️</span> Suspend Employee
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                handleDelete();
+                                                setOpenActionsMenu(false);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                                        >
+                                            <span>🗑️</span> Delete Employee
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -523,6 +625,93 @@ const EmployeeProfile: React.FC = () => {
                 onClose={() => setIsEditModalOpen(false)}
                 employee={employee}
             />
+
+            {/* Self-service profile edit modal for employees */}
+            {isSelfEditOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-[#1c1633] border border-slate-200 dark:border-white/10 rounded-[32px] w-full max-w-lg shadow-2xl">
+                        <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center">
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Edit My Profile</h3>
+                            <button onClick={() => setIsSelfEditOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Phone</label>
+                                <input
+                                    type="tel"
+                                    value={selfEditForm.phone}
+                                    onChange={e => setSelfEditForm(f => ({ ...f, phone: e.target.value }))}
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:border-purple-500/50 transition-all"
+                                    placeholder="+1 234 567 8900"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Date of Birth</label>
+                                <input
+                                    type="date"
+                                    value={selfEditForm.dob}
+                                    onChange={e => setSelfEditForm(f => ({ ...f, dob: e.target.value }))}
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:border-purple-500/50 transition-all"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Blood Group</label>
+                                    <select
+                                        value={selfEditForm.blood_group}
+                                        onChange={e => setSelfEditForm(f => ({ ...f, blood_group: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:border-purple-500/50 transition-all"
+                                    >
+                                        <option value="">Select</option>
+                                        {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Genotype</label>
+                                    <select
+                                        value={selfEditForm.genotype}
+                                        onChange={e => setSelfEditForm(f => ({ ...f, genotype: e.target.value }))}
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:border-purple-500/50 transition-all"
+                                    >
+                                        <option value="">Select</option>
+                                        {['AA','AS','AC','SS','SC'].map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Academic Background</label>
+                                <textarea
+                                    value={selfEditForm.academics}
+                                    onChange={e => setSelfEditForm(f => ({ ...f, academics: e.target.value }))}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:border-purple-500/50 transition-all resize-none"
+                                    placeholder="Degrees, certifications, institutions..."
+                                />
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-200 dark:border-white/5 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsSelfEditOpen(false)}
+                                className="px-5 py-2.5 bg-slate-100 dark:bg-white/5 text-slate-900 dark:text-white rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => selfUpdateMutation.mutate(selfEditForm)}
+                                disabled={selfUpdateMutation.isPending}
+                                className="px-5 py-2.5 bg-purple-600 text-white rounded-xl text-xs font-bold hover:bg-purple-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {selfUpdateMutation.isPending && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

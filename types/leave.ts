@@ -101,11 +101,19 @@ export interface Holiday {
 }
 
 export interface LeaveDashboardStats {
-  on_leave_today: number;
-  pending_requests: number;
-  approved_this_month: number;
-  rejected_this_month: number;
-  upcoming_leaves: number;
+  // Management stats
+  on_leave_today?: number;
+  pending_requests?: number;
+  approved_this_month?: number;
+  rejected_this_month?: number;
+  upcoming_leaves?: number;
+  
+  // Employee stats
+  used_this_month?: number;
+  pending_mine?: number;
+  sick_used?: number;
+  upcoming_mine?: number;
+  total_remaining?: number;
 }
 
 export interface PaginationMeta {

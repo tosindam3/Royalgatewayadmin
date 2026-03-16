@@ -1,116 +1,114 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import GlassCard from '../components/GlassCard';
-import MetricCard from '../components/ui/MetricCard';
-import AIInsight from '../components/AIInsight';
-import Skeleton from '../components/Skeleton';
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-} from 'recharts';
-import { UserRole } from '../types';
-import { generateHRAssistantResponse } from '../services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '../services/dashboardService';
+import { renderWidget } from '../components/dashboard/widgets/WidgetRegistry';
+import Skeleton from '../components/Skeleton';
+import AIInsight from '../components/AIInsight';
+import GlassCard from '../components/GlassCard';
+import { generateHRAssistantResponse } from '../services/geminiService';
 import AnalysisDetailModal from '../components/dashboard/AnalysisDetailModal';
-import { getTooltipStyles } from '../utils/chartTheme';
-import { useBrandSettings } from '../hooks/useBrandSettings';
+import apiClient from '../services/apiClient';
 
 const Dashboard: React.FC = () => {
   const [user, setUser] = useState<any>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole>(UserRole.EMPLOYEE);
   const [aiInsight, setAiInsight] = useState<string>('');
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState<any>(null);
-
-  // Brand settings hook
-  const { brandSettings } = useBrandSettings();
-
-  // Interactive Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalData, setModalData] = useState<any>(null);
   const [modalRec, setModalRec] = useState('');
 
-  // Theme detection for tooltips
-  const isDark = document.documentElement.classList.contains('dark');
-  const tooltipStyles = getTooltipStyles(isDark);
-
-  const fetchDashboardData = async () => {
-    setIsLoading(true);
-    try {
-      const data = await dashboardService.getIntelligence();
-      setDashboardData(data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard intelligence', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [selectedPeriod, setSelectedPeriod] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('royalgateway_user') || '{}');
-    if (storedUser.id) {
-      setUser(storedUser);
-      const roleName = storedUser.roles?.[0]?.name?.toUpperCase() || 'EMPLOYEE';
-      if (roleName.includes('SUPER_ADMIN')) setCurrentUserRole(UserRole.SUPER_ADMIN);
-      else if (roleName.includes('HR_MANAGER')) setCurrentUserRole(UserRole.MANAGER);
-      else if (roleName.includes('BRANCH_MANAGER')) setCurrentUserRole(UserRole.MANAGER);
-      else if (roleName.includes('ADMIN')) setCurrentUserRole(UserRole.ADMIN);
-      else setCurrentUserRole(UserRole.EMPLOYEE);
-
-      fetchDashboardData();
-    }
+    if (storedUser.id) setUser(storedUser);
   }, []);
 
+  const { data: manifest, isLoading: isLoadingManifest } = useQuery({
+    queryKey: ['dashboard-manifest', user?.id],
+    queryFn: () => dashboardService.getManifest() as unknown as any,
+    enabled: !!user?.id,
+    staleTime: 30000,
+  });
+
+  // Fetch employee summary data when the manifest says it's needed
+  const isEmployee = manifest && !manifest?.meta?.is_management;
+  const employeeEndpoint = manifest?.widgets?.find((w: any) => w.type === 'employee_metrics')?.endpoint;
+
+  const { data: employeeSummary, isLoading: isLoadingEmployeeSummary } = useQuery({
+    queryKey: ['employee-summary', user?.id, selectedPeriod],
+    queryFn: () => apiClient.get(`${employeeEndpoint}?period=${selectedPeriod}`) as unknown as any,
+    enabled: !!isEmployee && !!employeeEndpoint,
+    staleTime: 60000,
+  });
+
   const fetchInsight = async () => {
-    if (!dashboardData) return;
+    if (!manifest) return;
     setIsLoadingInsight(true);
     try {
-      const stats = dashboardData.stats.map((s: any) => `${s.label}: ${s.val}`).join(', ');
-      const context = `Dashboard View: ${currentUserRole}. Current Stats: ${stats}.`;
-      const response = await generateHRAssistantResponse("Provide a 1-sentence strategic insight for the organizational health based on these real-time metrics.", context);
-      setAiInsight(response || "Organization operating at optimal capacity. Focus on maintaining current retention trajectory.");
-    } catch (e) {
-      setAiInsight("AI Engine analysis temporarily unavailable. Synchronizing data stacks...");
+      const response = await generateHRAssistantResponse(
+        "Provide a 1-sentence strategic insight for organizational health based on the current dashboard context.",
+        `User Role: ${manifest.meta?.user_role}. Dashboard Type: ${manifest.layout}.`
+      );
+      setAiInsight(response || "Organization operating at optimal capacity.");
+    } catch {
+      setAiInsight("AI Engine analysis temporarily unavailable.");
     } finally {
       setIsLoadingInsight(false);
     }
   };
 
   useEffect(() => {
-    if (dashboardData) fetchInsight();
-  }, [dashboardData, currentUserRole]);
+    if (manifest) fetchInsight();
+  }, [manifest]);
 
   const handleStatClick = (label: string, value: string) => {
     setModalTitle(label);
     setModalData({
       stats: [
-        { label: 'Current ' + label, value: value, color: 'text-[#8252e9]' },
-        { label: 'Target', value: label === 'Retention' ? '98%' : 'N/A', color: 'text-emerald-500' },
+        { label: 'Current ' + label, value, color: 'text-[#8252e9]' },
+        { label: 'Target', value: '98%', color: 'text-emerald-500' },
         { label: 'Industry Avg', value: '85%', color: 'text-slate-400' }
       ]
     });
-    setModalRec(`Real-time audit for ${label} shows a reading of ${value}. Strategic recommendation: Implement pulse surveys to validate this metric against regional benchmarks.`);
+    setModalRec(`Real-time audit for ${label} shows a reading of ${value}. Recommendation: Monitor trends against regional benchmarks.`);
     setIsModalOpen(true);
   };
 
-  const dashboardLabel = useMemo(() => {
-    if (currentUserRole === UserRole.SUPER_ADMIN || currentUserRole === UserRole.ADMIN) return 'Nexus Global';
-    if (currentUserRole === UserRole.MANAGER) return 'Management Hub';
-    return 'Personal Nexus';
-  }, [currentUserRole]);
+  if (isLoadingManifest) {
+    return (
+      <div className="space-y-8 pb-10">
+        <Skeleton className="h-20 w-1/3 rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Skeleton className="h-[300px] rounded-2xl" />
+          <Skeleton className="h-[300px] rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
 
-  const subLabel = useMemo(() => {
-    if (currentUserRole === UserRole.SUPER_ADMIN || currentUserRole === UserRole.ADMIN) return 'Real-time Organizational Intelligence';
-    if (currentUserRole === UserRole.MANAGER) return 'Branch & Team Performance Oversight';
-    return 'Personal Performance & Career Trajectory';
-  }, [currentUserRole]);
+  const dashboardLabel = manifest?.meta?.is_management ? 'Nexus Global' : 'Personal Nexus';
+  const subLabel = manifest?.meta?.is_management ? 'Real-time Organizational Intelligence' : `${employeeSummary?.period || 'Performance Tracking'}`;
+
+  // Helper to get past 6 months for the selector
+  const periods = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    return {
+      value: d.toISOString().substring(0, 7),
+      label: d.toLocaleString('default', { month: 'long', year: 'numeric' })
+    };
+  });
 
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-200 dark:border-white/10 pb-4 md:pb-6">
-        <div>
+        <div className="flex-1">
           <h2 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
             Control <span className="text-brand-primary">{dashboardLabel}</span>
           </h2>
@@ -118,303 +116,67 @@ const Dashboard: React.FC = () => {
             {subLabel}
           </p>
         </div>
-
-        <div className="px-3 md:px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black text-brand-primary uppercase tracking-widest">
-          Role: {currentUserRole} {user?.department?.name ? `• ${user.department.name}` : ''}
-        </div>
-      </div>
-
-      {/* Main Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {isLoading ? (
-          [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-2xl" />)
-        ) : (
-          dashboardData?.stats.map((s: any, i: number) => {
-            // Determine color based on metric type
-            const getMetricColor = (label: string) => {
-              if (label.toLowerCase().includes('retention')) return 'success';
-              if (label.toLowerCase().includes('burnout') || label.toLowerCase().includes('turnover')) return 'warning';
-              if (label.toLowerCase().includes('headcount') || label.toLowerCase().includes('employees')) return 'info';
-              return 'primary';
-            };
-
-            // Determine trend based on delta
-            const getTrend = (delta: string) => {
-              if (delta.includes('+')) return 'up';
-              if (delta.includes('-')) return 'down';
-              return 'neutral';
-            };
-
-            return (
-              <MetricCard
-                key={i}
-                title={s.label}
-                value={s.val}
-                delta={s.delta}
-                trend={getTrend(s.delta)}
-                color={getMetricColor(s.label)}
-                onClick={() => handleStatClick(s.label, s.val)}
-              />
-            );
-          })
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-        <div className="lg:col-span-8 space-y-6 md:space-y-8">
-          {/* Main Chart Section - Talent & Turnover */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <GlassCard
-              title="Talent Trends"
-              className="cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
-              onClick={() => handleStatClick('Talent Trends', 'Live Data Sync')}
-              action={<button className="text-[10px] font-black text-brand-primary uppercase tracking-widest hover:underline">View Historical ›</button>}
+        <div className="flex items-center gap-3">
+          {isEmployee && (
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="px-4 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:border-brand-primary transition-all"
             >
-              <div className="h-[250px] w-full mt-4">
-                {isLoading ? (
-                  <Skeleton className="w-full h-full rounded-xl" />
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dashboardData?.talent_trends}>
-                      <defs>
-                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="var(--brand-primary)" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="var(--brand-primary)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#00000008" vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                      <YAxis hide />
-                      <Tooltip {...tooltipStyles} />
-                      <Area type="monotone" dataKey="val" stroke="var(--brand-primary)" strokeWidth={3} fill="url(#chartGrad)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </GlassCard>
-
-            {currentUserRole !== UserRole.EMPLOYEE && (
-              <GlassCard
-                title="Turnover Dynamics"
-                onClick={() => handleStatClick('Turnover', 'Operational Flow')}
-              >
-                <div className="h-[250px] w-full mt-4">
-                  {isLoading ? (
-                    <Skeleton className="w-full h-full rounded-xl" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={dashboardData?.turnover_data}
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="val"
-                          stroke="none"
-                        >
-                          {dashboardData?.turnover_data?.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                  {dashboardData?.turnover_data?.map((d: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                      <span className="text-[9px] font-bold text-slate-500 uppercase">{d.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </GlassCard>
-            )}
-          </div>
-
-          {/* Hiring Funnel & Analytics Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            {currentUserRole !== UserRole.EMPLOYEE && (
-              <GlassCard title="Hiring Funnel (Discovery)">
-                <div className="space-y-4 py-2">
-                  {isLoading ? (
-                    [1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full rounded-xl" />)
-                  ) : (
-                    dashboardData?.hiring_funnel?.map((item: any, i: number) => (
-                      <div key={i} className="space-y-2">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center text-[8px] text-slate-900 dark:text-white font-black">{item.val}%</span>
-                            {item.label}
-                          </div>
-                          <span>{item.current}</span>
-                        </div>
-                        <div className="h-2 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                          <div className={`h-full ${item.color} opacity-40 transition-all duration-1000`} style={{ width: `${item.val}%` }} />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </GlassCard>
-            )}
-
-            {currentUserRole !== UserRole.EMPLOYEE && (
-              <GlassCard title="Absenteeism Trend">
-                <div className="h-[200px] w-full mt-4">
-                  {isLoading ? (
-                    <Skeleton className="w-full h-full rounded-xl" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={dashboardData?.absenteeism}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#00000008" vertical={false} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} />
-                        <YAxis hide />
-                        <Tooltip {...tooltipStyles} />
-                        <Area type="monotone" dataKey="rate" stroke="#ef4444" strokeWidth={2} fill="#ef444410" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-                <p className="text-[9px] text-slate-400 font-bold uppercase text-center mt-2 italic">Avg Rate: 2.7% • Targeted Reduction -15%</p>
-              </GlassCard>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <GlassCard
-              title="AI Strategic Summary"
-              className="border-t-2 border-t-brand-primary/30 hover:bg-brand-primary-10 cursor-pointer transition-all"
-              onClick={() => handleStatClick('AI Strategic Intelligence', aiInsight)}
-            >
-              <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
-            </GlassCard>
-
-            <GlassCard
-              title="Attendance Health"
-              className="cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
-              onClick={() => handleStatClick('Attendance Health', 'Live Synchronization')}
-            >
-              <div className="flex h-48 items-center w-full">
-                {isLoading ? (
-                  <Skeleton className="w-full h-full rounded-full max-w-[150px] mx-auto" />
-                ) : (
-                  <>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={dashboardData?.attendance_health} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                          {dashboardData?.attendance_health.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-2 flex-shrink-0 pr-4">
-                      {dashboardData?.attendance_health.map((d: any, i: number) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                          <span className="text-[10px] font-bold text-slate-500 uppercase">{d.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            </GlassCard>
-          </div>
-        </div>
-
-        <div className="lg:col-span-4 space-y-6 md:space-y-8">
-          {/* Demographics Card */}
-          {currentUserRole !== UserRole.EMPLOYEE && (
-            <GlassCard title="Demographics Insight">
-              {isLoading ? (
-                <Skeleton className="h-48 w-full rounded-3xl" />
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-around py-4">
-                    {dashboardData?.demographics?.gender.map((g: any, i: number) => (
-                      <div key={i} className="text-center">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl mb-2 ${g.name === 'Male' ? 'bg-blue-500/10 text-blue-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                          {g.name === 'Male' ? '👨' : '👩'}
-                        </div>
-                        <p className="text-xl font-black text-slate-900 dark:text-white">{g.pct}</p>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{g.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-white/5">
-                    {dashboardData?.demographics?.age_groups.map((age: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{age.name} Yrs</span>
-                        <div className="flex-1 mx-4 h-1.5 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-primary" style={{ width: `${age.value}%` }} />
-                        </div>
-                        <span className="text-[10px] font-black text-slate-900 dark:text-white">{age.value}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </GlassCard>
+              {periods.map(p => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
           )}
+          <div className="px-3 md:px-4 py-2 bg-brand-primary-10 border border-brand-primary/20 rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-black text-brand-primary uppercase tracking-widest whitespace-nowrap">
+            Auth: {manifest?.meta?.user_role} {user?.department?.name ? `• ${user.department.name}` : ''}
+          </div>
+        </div>
+      </div>
 
-          <GlassCard title="Upcoming Milestones">
-            <div className="space-y-6">
-              {isLoading ? (
-                [1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)
-              ) : (
-                dashboardData?.milestones?.map((item: any, i: number) => (
-                  <div key={i} className={`p-4 rounded-2xl bg-black/5 dark:bg-white/5 border-l-4 ${item.c} group hover:bg-brand-primary-10 transition-all cursor-pointer`}>
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">{item.t}</h4>
-                      <span className="text-xl">{item.i}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase">{item.d}</p>
-                  </div>
-                ))
-              )}
+      {/* Employee Dashboard */}
+      {isEmployee ? (
+        <div className="space-y-8">
+          {/* Employee Summary Metrics */}
+          {isLoadingEmployeeSummary ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-36 rounded-2xl" />)}
             </div>
+          ) : employeeSummary ? (
+            manifest?.widgets
+              .filter((w: any) => w.type === 'employee_metrics' && w.authorized)
+              .map((w: any) => renderWidget({ ...w, data: employeeSummary }))
+          ) : null}
+
+          {/* Milestones */}
+          {manifest?.widgets.filter((w: any) => w.type === 'list_milestones').map(renderWidget)}
+
+          {/* AI Advisory */}
+          <GlassCard title="AI Performance Advisory" className="border-t-2 border-t-brand-primary/30">
+            <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
           </GlassCard>
-
-          {/* Optimization Pulse */}
-          {currentUserRole !== UserRole.EMPLOYEE && (
-            <div className="p-8 rounded-[32px] bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-xl overflow-hidden group">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                  🚀
-                </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight italic">Optimization Pulse</h4>
-                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Automated efficiency tracking</p>
-                </div>
-              </div>
-              {isLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-2 w-full" />
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-end">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Process Velocity</span>
-                      <span className="text-sm font-black text-emerald-500">{dashboardData?.optimization_pulse?.velocity}</span>
-                    </div>
-                    <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 shadow-[0_0_8px_#10b981]"
-                        style={{ width: `${dashboardData?.optimization_pulse?.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed mt-6 italic">
-                    "{dashboardData?.optimization_pulse?.insight}"
-                  </p>
-                </>
-              )}
-            </div>
-          )}
         </div>
-      </div>
+      ) : (
+        /* Management Dashboard */
+        <div className="space-y-12">
+          {manifest?.widgets.filter((w: any) => w.type === 'metric_group' || w.type === 'employee_metrics').map(renderWidget)}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+            <div className="lg:col-span-8 space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {manifest?.widgets.filter((w: any) => w.type === 'chart_area').map(renderWidget)}
+                {manifest?.widgets.filter((w: any) => w.type === 'chart_pie').map(renderWidget)}
+              </div>
+              <GlassCard title="AI Strategic Summary" className="border-t-2 border-t-brand-primary/30">
+                <AIInsight content={aiInsight} isLoading={isLoadingInsight} onRefresh={fetchInsight} />
+              </GlassCard>
+            </div>
+            <div className="lg:col-span-4 space-y-8">
+              {manifest?.widgets.filter((w: any) => w.type === 'demographics' || w.type === 'list_milestones').map(renderWidget)}
+            </div>
+          </div>
+        </div>
+      )}
 
       <AnalysisDetailModal
         isOpen={isModalOpen}

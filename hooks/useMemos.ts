@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Memo, MemoStats, MemoFolder, MemoFilters, PaginatedMemos } from '../types/memo';
 import memoService from '../services/memoService';
+import { playMessageSentSound } from '../utils/soundUtils';
+import { showSuccessToast, showErrorToast } from '../utils/toastUtils';
 
 interface UsMemosResult {
   memos: Memo[];
@@ -40,13 +42,18 @@ export const useMemos = (filters: MemoFilters = {}): UsMemosResult => {
         memoService.getFolders()
       ]);
 
-      setMemos(memosData.data);
+      // Handle both paginated { data: [] } and plain array responses
+      const memoList: Memo[] = Array.isArray(memosData)
+        ? memosData
+        : (memosData as any)?.data ?? [];
+
+      setMemos(memoList);
       setStats(statsData);
-      setFolders(foldersData);
+      setFolders(Array.isArray(foldersData) ? foldersData : []);
 
       // Auto-select first memo if none selected
-      if (memosData.data.length > 0 && !selectedMemoId) {
-        setSelectedMemoId(memosData.data[0].id);
+      if (memoList.length > 0 && !selectedMemoId) {
+        setSelectedMemoId(memoList[0].id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load memo data');
@@ -66,7 +73,7 @@ export const useMemos = (filters: MemoFilters = {}): UsMemosResult => {
       setLoading(true);
       setError(null);
       const results = await memoService.searchMemos(query);
-      setMemos(results);
+      setMemos(Array.isArray(results) ? results : (results as any)?.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
       console.error('Search failed:', err);
@@ -133,11 +140,14 @@ export const useMemos = (filters: MemoFilters = {}): UsMemosResult => {
     try {
       setLoading(true);
       const newMemo = await memoService.createMemo(data);
+      playMessageSentSound(); // Play sound on successful send
+      showSuccessToast('Memo sent successfully');
       await loadMemoData(); // Refresh list and stats
       return newMemo;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create memo';
       setError(msg);
+      showErrorToast(msg);
       throw new Error(msg);
     } finally {
       setLoading(false);
@@ -148,11 +158,14 @@ export const useMemos = (filters: MemoFilters = {}): UsMemosResult => {
     try {
       setLoading(true);
       const newMemo = await memoService.replyToMemo(id, data);
+      playMessageSentSound(); // Play sound on successful reply
+      showSuccessToast('Reply sent successfully');
       await loadMemoData();
       return newMemo;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to reply to memo';
       setError(msg);
+      showErrorToast(msg);
       throw new Error(msg);
     } finally {
       setLoading(false);
@@ -163,11 +176,14 @@ export const useMemos = (filters: MemoFilters = {}): UsMemosResult => {
     try {
       setLoading(true);
       const newMemo = await memoService.forwardMemo(id, data);
+      playMessageSentSound(); // Play sound on successful forward
+      showSuccessToast('Memo forwarded successfully');
       await loadMemoData();
       return newMemo;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to forward memo';
       setError(msg);
+      showErrorToast(msg);
       throw new Error(msg);
     } finally {
       setLoading(false);

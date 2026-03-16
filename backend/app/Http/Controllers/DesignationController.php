@@ -14,10 +14,12 @@ class DesignationController extends Controller
     use ApiResponse;
 
     protected $auditLogger;
+    protected $scopeEngine;
 
-    public function __construct(AuditLogger $auditLogger)
+    public function __construct(AuditLogger $auditLogger, \App\Services\ScopeEngine $scopeEngine)
     {
         $this->auditLogger = $auditLogger;
+        $this->scopeEngine = $scopeEngine;
     }
 
     /**
@@ -25,6 +27,10 @@ class DesignationController extends Controller
      */
     public function index(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $query = Designation::query();
 
         // Search
@@ -65,6 +71,10 @@ class DesignationController extends Controller
      */
     public function store(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:designations,code',
@@ -102,6 +112,10 @@ class DesignationController extends Controller
      */
     public function show($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $designation = Designation::with('employees')->findOrFail($id);
         return $this->success($designation);
     }
@@ -111,6 +125,10 @@ class DesignationController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $designation = Designation::findOrFail($id);
 
         $validated = $request->validate([
@@ -156,6 +174,10 @@ class DesignationController extends Controller
      */
     public function destroy($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.delete')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             DB::beginTransaction();
 

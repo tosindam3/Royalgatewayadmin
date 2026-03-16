@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, UserPlus, Paperclip, AlertCircle, Loader2, FileText, Trash2 } from 'lucide-react';
 import { CreateMemoRequest, MemoUser } from '../../types/memo';
-import { employeeService } from '../../services/employeeService';
 import { memoService } from '../../services/memoService';
+import apiClient from '../../services/apiClient';
 import RichTextEditor from './RichTextEditor';
 import { toast } from 'sonner';
 
@@ -36,8 +36,9 @@ const MemoCompose: React.FC<MemoComposeProps> = ({ isOpen, onClose, onSubmit, is
     useEffect(() => {
         const fetchEmployees = async () => {
             try {
-                const response = await employeeService.getDirectory({ per_page: 1000 });
-                setEmployees(response.data);
+                const response: any = await apiClient.get('/memos/recipients');
+                const list = Array.isArray(response) ? response : response?.data ?? [];
+                setEmployees(list);
             } catch (err) {
                 console.error('Failed to fetch employees', err);
             }

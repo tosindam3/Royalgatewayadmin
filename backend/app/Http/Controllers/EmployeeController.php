@@ -37,11 +37,11 @@ class EmployeeController extends Controller
             return $this->error('Unauthorized', 403);
         }
 
-        $scope = $user->getPermissionScope('employees.view');
+        $scope = $user->getPermissionScope('employees.view') ?? 'self';
         $query = Employee::with(['branch', 'department', 'designation', 'manager']);
 
         // Apply RBAC scoping
-        if ($scope !== 'all') {
+        if ($scope && $scope !== 'all') {
             $this->scopeEngine->applyScopeLevel($query, $user, $scope);
         }
 
@@ -161,7 +161,7 @@ class EmployeeController extends Controller
             return $this->error('Unauthorized', 403);
         }
 
-        $scope = $user->getPermissionScope('employees.view');
+        $scope = $user->getPermissionScope('employees.view') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
             return $this->error('Unauthorized to view this employee', 403);
         }
@@ -179,7 +179,7 @@ class EmployeeController extends Controller
             return $this->error('Unauthorized', 403);
         }
 
-        $scope = $user->getPermissionScope('employees.update');
+        $scope = $user->getPermissionScope('employees.update') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
             return $this->error('Unauthorized to update this employee', 403);
         }
@@ -200,13 +200,19 @@ class EmployeeController extends Controller
             return $this->error('Unauthorized', 403);
         }
 
-        $scope = $user->getPermissionScope('employees.delete');
+        $scope = $user->getPermissionScope('employees.delete') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
             return $this->error('Unauthorized to delete this employee', 403);
         }
 
         try {
-            $employee = Employee::findOrFail($id);
+            $employee = Employee::with('user')->findOrFail($id);
+
+            // Protect Superadmin from deletion
+            if ($employee->user && $employee->user->hasRole('super_admin')) {
+                return $this->error('The Super Administrator profile is protected and cannot be deleted.', 403);
+            }
+
             $this->employeeService->deleteEmployee($employee);
             return $this->success(null, 'Employee deleted successfully');
         } catch (\Exception $e) {
@@ -254,6 +260,31 @@ class EmployeeController extends Controller
             return $this->success($employee, 'Employee status updated successfully');
         } catch (\Exception $e) {
             return $this->error('Failed to update status: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function updateAvatar(Request $request, $id)
+    {
+        $user = auth()->user();
+        if (!$user->hasPermission('employees.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
+        $scope = $user->getPermissionScope('employees.update') ?? 'self';
+        if ($scope !== 'all' && !$this->canAccessEmployee($id, $scope, $user)) {
+            return $this->error('Unauthorized to update this employee\'s avatar', 403);
+        }
+
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        try {
+            $employee = Employee::findOrFail($id);
+            $employee = $this->employeeService->updateAvatar($employee, $request->file('avatar'));
+            return $this->success($employee, 'Avatar updated successfully');
+        } catch (\Exception $e) {
+            return $this->error('Failed to update avatar: ' . $e->getMessage(), 500);
         }
     }
 

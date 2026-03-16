@@ -272,20 +272,56 @@ class LeaveService
     /**
      * Get leave statistics for dashboard
      */
-    public function getDashboardStats(): array
+    public function getDashboardStats(?int $branchId = null, ?int $departmentId = null, ?int $employeeId = null): array
     {
-        return Cache::remember('leave_dashboard_stats', 300, function () {
+        $cacheKey = "leave_stats_b{$branchId}_d{$departmentId}_e{$employeeId}";
+        
+        return Cache::remember($cacheKey, 300, function () use ($branchId, $departmentId, $employeeId) {
+            if ($employeeId) {
+                $baseQuery = LeaveRequest::where('employee_id', $employeeId);
+                $balances = LeaveBalance::where('employee_id', $employeeId)->where('year', now()->year)->get();
+                
+                return [
+                    'used_this_month' => (clone $baseQuery)->where('status', 'approved')
+                        ->whereMonth('start_date', Carbon::now()->month)
+                        ->sum('total_days'),
+                    'pending_mine' => (clone $baseQuery)->where('status', 'pending')->count(),
+                    'sick_used' => (clone $baseQuery)->where('status', 'approved')
+                        ->whereHas('leaveType', fn($q) => $q->where('code', 'SICK'))
+                        ->whereYear('start_date', now()->year)
+                        ->sum('total_days'),
+                    'upcoming_mine' => (clone $baseQuery)->where('status', 'approved')
+                        ->where('start_date', '>', Carbon::now())
+                        ->whereBetween('start_date', [now(), now()->addDays(30)])
+                        ->count(),
+                    'total_remaining' => $balances->sum('available'),
+                ];
+            }
+
+            $baseQuery = LeaveRequest::query();
+            
+            if ($branchId) {
+                $baseQuery->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
+            }
+            if ($departmentId) {
+                $baseQuery->whereHas('employee', fn($q) => $q->where('department_id', $departmentId));
+            }
+
             return [
-                'on_leave_today' => LeaveRequest::ongoing()->count(),
-                'pending_requests' => LeaveRequest::pending()->count(),
-                'approved_this_month' => LeaveRequest::approved()
-                    ->whereMonth('approved_at', now()->month)
+                'on_leave_today' => (clone $baseQuery)->where('start_date', '<=', now())
+                    ->where('end_date', '>=', now())
+                    ->where('status', 'approved')
                     ->count(),
-                'rejected_this_month' => LeaveRequest::where('status', 'rejected')
-                    ->whereMonth('approved_at', now()->month)
+                'pending_requests' => (clone $baseQuery)->where('status', 'pending')->count(),
+                'approved_this_month' => (clone $baseQuery)->where('status', 'approved')
+                    ->whereMonth('start_date', Carbon::now()->month)
                     ->count(),
-                'upcoming_leaves' => LeaveRequest::upcoming()
-                    ->whereBetween('start_date', [now(), now()->addDays(7)])
+                'rejected_this_month' => (clone $baseQuery)->where('status', 'rejected')
+                    ->whereMonth('start_date', Carbon::now()->month)
+                    ->count(),
+                'upcoming_leaves' => (clone $baseQuery)->where('status', 'approved')
+                    ->where('start_date', '>', Carbon::now())
+                    ->where('start_date', '<=', Carbon::now()->addDays(7))
                     ->count(),
             ];
         });

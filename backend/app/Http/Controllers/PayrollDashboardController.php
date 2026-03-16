@@ -17,14 +17,29 @@ class PayrollDashboardController extends Controller
     {
         try {
             // 1. KPI Stats
-            $monthlyPayroll = PayrollRun::approved()
+            // Get data for current month
+            $currentApprovedRun = PayrollRun::approved()
                 ->whereHas('period', function($q) {
                     $q->where('month', now()->month)->where('year', now()->year);
                 })
-                ->sum('total_net');
+                ->first();
+
+            if ($currentApprovedRun) {
+                $monthlyPayroll = PayrollRun::approved()
+                    ->whereHas('period', function($q) {
+                        $q->where('month', now()->month)->where('year', now()->year);
+                    })
+                    ->sum('total_net');
+            } else {
+                // Fallback to latest approved run from any period
+                $latestRun = PayrollRun::approved()
+                    ->with('period')
+                    ->orderBy('id', 'desc')
+                    ->first();
+                $monthlyPayroll = $latestRun ? (float) $latestRun->total_net : 0;
+            }
 
             $totalEmployees = Employee::operational()->count();
-
             $averagePay = $totalEmployees > 0 ? $monthlyPayroll / $totalEmployees : 0;
 
             // Recently approved runs for trend

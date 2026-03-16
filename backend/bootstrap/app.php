@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'attendance.access' => \App\Http\Middleware\AttendanceAccessMiddleware::class,
             'performance.access' => \App\Http\Middleware\PerformanceAccessMiddleware::class,
+            'permission' => \App\Http\Middleware\PermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

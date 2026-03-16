@@ -6,6 +6,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\LeaveBalance;
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\LeaveService;
 use App\Services\ScopeEngine;
 use App\Traits\ApiResponse;
@@ -33,11 +34,20 @@ class LeaveController extends Controller
         $user = $request->user();
         
         // Check permission
-        if (!$user->hasPermission('leave.view')) {
-            return $this->error('Unauthorized', 403);
+        $scope = $user->getPermissionScope('leave.view') ?? 'self';
+        
+        $branchId = null;
+        $deptId = null;
+        $employeeId = null;
+
+        if ($scope === 'self') {
+            $employeeId = $user->employeeProfile?->id;
+        } else {
+            $branchId = in_array($scope, ['branch', 'department', 'team']) ? $user->employeeProfile?->branch_id : null;
+            $deptId = in_array($scope, ['department', 'team']) ? $user->employeeProfile?->department_id : null;
         }
         
-        $stats = $this->leaveService->getDashboardStats();
+        $stats = $this->leaveService->getDashboardStats($branchId, $deptId, $employeeId);
         
         return $this->success($stats, 'Dashboard statistics retrieved.');
     }
@@ -53,13 +63,13 @@ class LeaveController extends Controller
             return $this->error('Unauthorized', 403);
         }
         
-        $scope = $user->getPermissionScope('leave.view');
+        $scope = $user->getPermissionScope('leave.view') ?? 'self';
         
         $query = LeaveRequest::with(['employee.branch', 'employee.department', 'leaveType', 'approver'])
             ->orderByDesc('created_at');
         
         // Apply RBAC scoping based on employee relationship
-        if ($scope !== 'all') {
+        if ($scope && $scope !== 'all') {
             $query->whereHas('employee', function ($q) use ($scope, $user) {
                 $this->scopeEngine->applyScopeLevel($q, $user, $scope);
             });
@@ -109,7 +119,7 @@ class LeaveController extends Controller
         }
         
         // Check scope access
-        $scope = $user->getPermissionScope('leave.view');
+        $scope = $user->getPermissionScope('leave.view') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($leaveRequest->employee_id, $scope, $user)) {
             return $this->error('Unauthorized to view this leave request', 403);
         }
@@ -145,7 +155,7 @@ class LeaveController extends Controller
         }
         
         // Check if user can apply for this employee
-        $scope = $user->getPermissionScope('leave.apply');
+        $scope = $user->getPermissionScope('leave.apply') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($request->employee_id, $scope, $user)) {
             return $this->error('Unauthorized to apply leave for this employee', 403);
         }
@@ -170,7 +180,7 @@ class LeaveController extends Controller
         }
         
         // Check scope access
-        $scope = $user->getPermissionScope('leave.approve');
+        $scope = $user->getPermissionScope('leave.approve') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($leaveRequest->employee_id, $scope, $user)) {
             return $this->error('Unauthorized to approve this leave request', 403);
         }
@@ -212,7 +222,7 @@ class LeaveController extends Controller
         }
         
         // Check scope access
-        $scope = $user->getPermissionScope('leave.reject');
+        $scope = $user->getPermissionScope('leave.reject') ?? 'self';
         if ($scope !== 'all' && !$this->canAccessEmployee($leaveRequest->employee_id, $scope, $user)) {
             return $this->error('Unauthorized to reject this leave request', 403);
         }
@@ -289,14 +299,14 @@ class LeaveController extends Controller
             return $this->error('Unauthorized', 403);
         }
         
-        $scope = $user->getPermissionScope('leave.view');
+        $scope = $user->getPermissionScope('leave.view') ?? 'self';
         $year = $request->input('year', now()->year);
         
         $query = LeaveBalance::with(['employee', 'leaveType'])
             ->where('year', $year);
         
         // Apply RBAC scoping based on employee relationship
-        if ($scope !== 'all') {
+        if ($scope && $scope !== 'all') {
             $query->whereHas('employee', function ($q) use ($scope, $user) {
                 $this->scopeEngine->applyScopeLevel($q, $user, $scope);
             });

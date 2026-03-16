@@ -18,7 +18,7 @@ const RoleManagement: React.FC = () => {
         name: '',
         display_name: '',
         description: '',
-        default_scope: 'self' as const,
+        default_scope: 'self' as 'all' | 'branch' | 'department' | 'team' | 'self',
     });
 
     const { data: rolesData, isLoading: isRolesLoading } = useQuery({
@@ -145,12 +145,10 @@ const RoleManagement: React.FC = () => {
 
     const handleDelete = (role: Role) => {
         if (role.is_system) {
-            const confirmed = confirm(
-                `⚠️ WARNING: "${role.display_name}" is a SYSTEM ROLE!\n\n` +
-                `Deleting this role may affect system functionality and users assigned to it.\n\n` +
-                `Are you absolutely sure you want to delete this role?`
-            );
-            if (!confirmed) return;
+            toast.error('System Role Protected', { 
+                description: 'System roles cannot be deleted as they are critical for application logic.' 
+            });
+            return;
         }
 
         const finalConfirm = confirm(
@@ -302,17 +300,19 @@ const RoleManagement: React.FC = () => {
                                             </svg>
                                             Edit
                                         </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDelete(role)}
-                                            className="text-rose-500 hover:bg-rose-500/10 text-[9px]"
-                                        >
-                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            Delete
-                                        </Button>
+                                        {!role.is_system && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleDelete(role)}
+                                                className="text-rose-500 hover:bg-rose-500/10 text-[9px]"
+                                            >
+                                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Delete
+                                            </Button>
+                                        )}
                                     </div>
                                 </GlassCard>
                             ))

@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Memo;
 use App\Models\MemoRecipient;
+use App\Models\Employee;
 use App\Services\MemoService;
+use App\Services\AuditLogger;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 
 class MemoController extends Controller
 {
@@ -53,6 +56,16 @@ class MemoController extends Controller
 
     public function store(Request $request)
     {
+        $userId = Auth::id();
+        
+        // Rate limiting: 20 memos per hour
+        $key = 'send-memo:' . $userId;
+        if (RateLimiter::tooManyAttempts($key, 20)) {
+            return $this->error('Too many memos sent. Please try again later.', 429);
+        }
+        
+        RateLimiter::hit($key, 3600); // 1 hour
+        
         $validated = $request->validate([
             'subject' => 'required|string|max:255',
             'body' => 'required|string',
@@ -69,7 +82,20 @@ class MemoController extends Controller
             'requires_read_receipt' => 'nullable|boolean',
         ]);
         
-        $memo = $this->memoService->createMemo(Auth::id(), $validated);
+        $memo = $this->memoService->createMemo($userId, $validated);
+        
+        // Audit logging
+        AuditLogger::log(
+            'memo_sent',
+            'Memo',
+            $memo->id,
+            null,
+            [
+                'subject' => $memo->subject,
+                'recipients' => $memo->recipients->pluck('recipient_id')->toArray(),
+                'priority' => $memo->priority
+            ]
+        );
         
         return $this->success($memo->load(['sender', 'recipients.recipient', 'attachments']), 'Memo created successfully', 201);
     }
@@ -274,5 +300,31 @@ class MemoController extends Controller
         $results = $this->memoService->searchMemos($userId, $validated['q']);
         
         return $this->success($results);
+    }
+
+    /**
+     * Return a lightweight list of employees for the memo compose recipient picker.
+     * Accessible to all authenticated users — no employees.view permission required.
+     */
+    public function recipientList(Request $request)
+    {
+        $search = $request->get('search', '');
+
+        $query = Employee::with('user:id')
+            ->where('status', 'active')
+            ->whereNotNull('user_id')
+            ->select('id', 'first_name', 'last_name', 'email', 'user_id', 'department_id');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "{$search}%")
+                  ->orWhere('last_name', 'like', "{$search}%")
+                  ->orWhere('email', 'like', "{$search}%");
+            });
+        }
+
+        $employees = $query->orderBy('first_name')->limit(200)->get();
+
+        return $this->success($employees);
     }
 }

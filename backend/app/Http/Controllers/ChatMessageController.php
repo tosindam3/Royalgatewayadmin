@@ -45,7 +45,13 @@ class ChatMessageController extends Controller
             } else {
                 $messages = $channel->messages()
                     ->notDeleted()
-                    ->with(['user:id,name', 'attachments', 'reactions.user:id,name', 'parentMessage'])
+                    ->with([
+                        'user:id,name',
+                        'attachments:id,message_id,file_name,file_path,file_size,mime_type',
+                        'reactions',
+                        'parentMessage:id,content,user_id'
+                    ])
+                    ->select('id', 'channel_id', 'user_id', 'parent_message_id', 'content', 'type', 'is_edited', 'created_at', 'updated_at')
                     ->orderBy('created_at', 'desc')
                     ->paginate($perPage);
             }
@@ -63,6 +69,13 @@ class ChatMessageController extends Controller
     {
         try {
             $user = $request->user();
+
+            // Rate limiting: 10 messages per minute
+            $key = 'send-message:' . $user->id;
+            if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 10)) {
+                return $this->error('Too many messages. Please slow down.', 429);
+            }
+            \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
 
             // Check if user is a member
             if (!$channel->hasMember($user->id)) {
@@ -249,6 +262,26 @@ class ChatMessageController extends Controller
     }
 
     /**
+     * Mark messages as read in a channel
+     */
+    public function markAsRead(Request $request, ChatChannel $channel): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$channel->hasMember($user->id)) {
+                return $this->error('Unauthorized', 403);
+            }
+
+            $this->chatService->markChannelAsRead($channel, $user->id);
+
+            return $this->success(null, 'Messages marked as read');
+        } catch (\Exception $e) {
+            return $this->error('Failed to mark as read: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Get typing users in a channel
      */
     public function getTypingUsers(Request $request, ChatChannel $channel): JsonResponse
@@ -265,6 +298,40 @@ class ChatMessageController extends Controller
             return $this->success($typingUsers, 'Typing users retrieved successfully');
         } catch (\Exception $e) {
             return $this->error('Failed to retrieve typing users: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Search messages across all joined channels
+     */
+    public function globalSearch(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $query = $request->get('query');
+            $perPage = $request->get('per_page', 20);
+
+            if (!$query) {
+                return $this->error('Search query is required', 400);
+            }
+
+            // Get channels user is a member of
+            $channelIds = $user->chatChannels()->pluck('chat_channels.id');
+
+            $messages = ChatMessage::whereIn('channel_id', $channelIds)
+                ->notDeleted()
+                ->where('content', 'like', "%{$query}%")
+                ->with([
+                    'user:id,name',
+                    'channel:id,name,type',
+                    'attachments:id,message_id,file_name,file_path,file_size,mime_type'
+                ])
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return $this->success($messages, 'Global search results retrieved');
+        } catch (\Exception $e) {
+            return $this->error('Global search failed: ' . $e->getMessage(), 500);
         }
     }
 }

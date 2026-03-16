@@ -151,7 +151,7 @@ class ChatService
         // Check for blocked keywords
         $this->checkBlockedKeywords($data['content']);
 
-        return DB::transaction(function () use ($channel, $data, $userId) {
+        $message = DB::transaction(function () use ($channel, $data, $userId) {
             $message = ChatMessage::create([
                 'channel_id' => $channel->id,
                 'user_id' => $userId,
@@ -168,12 +168,67 @@ class ChatService
                 }
             }
 
-            $message = $message->load(['user', 'attachments', 'reactions']);
-
-            broadcast(new MessageSent($message))->toOthers();
+            // Mark as read for the sender
+            $this->markMessageAsRead($message, $userId);
 
             return $message;
         });
+
+        $message = $message->load(['user', 'attachments', 'reactions']);
+
+        try {
+            broadcast(new MessageSent($message))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Chat broadcast failed: ' . $e->getMessage());
+        }
+
+        return $message;
+    }
+
+    /**
+     * Mark a specific message as read
+     */
+    public function markMessageAsRead(ChatMessage $message, $userId): void
+    {
+        $read = \App\Models\ChatMessageRead::firstOrCreate([
+            'message_id' => $message->id,
+            'user_id' => $userId,
+        ]);
+        
+        // Also update the pivot for channel unread count logic
+        $message->channel->markAsReadForUser($userId);
+
+        // Broadcast read event
+        broadcast(new \App\Events\MessageRead($message->id, $userId, $message->channel_id))->toOthers();
+    }
+
+    /**
+     * Mark all messages in a channel as read
+     */
+    public function markChannelAsRead(ChatChannel $channel, $userId): void
+    {
+        $lastReadAt = now();
+        
+        // Update pivot table
+        $channel->markAsReadForUser($userId);
+
+        // Get unread messages (optimized to only ones NOT sent by the current user)
+        $unreadMessages = $channel->messages()
+            ->where('user_id', '!=', $userId)
+            ->whereDoesntHave('reads', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->get();
+
+        foreach ($unreadMessages as $message) {
+            \App\Models\ChatMessageRead::firstOrCreate([
+                'message_id' => $message->id,
+                'user_id' => $userId,
+            ]);
+
+            // Broadcast individual read event (could be throttled if many, but usually fine for simple chat)
+            broadcast(new \App\Events\MessageRead($message->id, $userId, $channel->id))->toOthers();
+        }
     }
 
     /**
@@ -192,7 +247,11 @@ class ChatService
 
         $message = $message->fresh(['user', 'attachments', 'reactions']);
 
-        broadcast(new MessageUpdated($message))->toOthers();
+        try {
+            broadcast(new MessageUpdated($message))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Update broadcast failed: ' . $e->getMessage());
+        }
 
         return $message;
     }
@@ -207,7 +266,11 @@ class ChatService
 
         $message->softDelete();
 
-        broadcast(new MessageDeleted($channelId, $messageId))->toOthers();
+        try {
+            broadcast(new MessageDeleted($channelId, $messageId))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Delete broadcast failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -221,7 +284,11 @@ class ChatService
             'emoji' => $emoji,
         ]);
 
-        broadcast(new ReactionAdded($reaction->load('message')))->toOthers();
+        try {
+            broadcast(new ReactionAdded($reaction->load('message')))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Reaction broadcast failed: ' . $e->getMessage());
+        }
 
         return $reaction;
     }
@@ -239,7 +306,11 @@ class ChatService
             ->where('emoji', $emoji)
             ->delete();
 
-        broadcast(new ReactionRemoved($channelId, $messageId, $userId, $emoji))->toOthers();
+        try {
+            broadcast(new ReactionRemoved($channelId, $messageId, $userId, $emoji))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Remove reaction broadcast failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -257,11 +328,19 @@ class ChatService
             ]
         );
 
+        // Clear cache
+        Cache::forget("typing_users_{$channel->id}");
+
         $user = \App\Models\User::find($userId);
-        broadcast(new TypingIndicatorUpdated($channel->id, [
-            'id' => $user->id,
-            'name' => $user->name
-        ]))->toOthers();
+
+        try {
+            broadcast(new TypingIndicatorUpdated($channel->id, [
+                'id' => $user->id,
+                'name' => $user->name
+            ]))->toOthers();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Typing broadcast failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -269,12 +348,14 @@ class ChatService
      */
     public function getTypingUsers(ChatChannel $channel): array
     {
-        return $channel->typingIndicators()
-            ->active()
-            ->with('user:id,name')
-            ->get()
-            ->pluck('user')
-            ->toArray();
+        return Cache::remember("typing_users_{$channel->id}", 5, function () use ($channel) {
+            return $channel->typingIndicators()
+                ->where('expires_at', '>', now())
+                ->with('user:id,name')
+                ->get()
+                ->pluck('user')
+                ->toArray();
+        });
     }
 
     /**
@@ -282,13 +363,41 @@ class ChatService
      */
     protected function attachFile(ChatMessage $message, $file): ChatMessageAttachment
     {
-        $path = $file->store('chat/attachments', 'public');
+        // Validate file
+        if ($file->getSize() > 1024 * 1024 * 10) { // 10MB
+            throw new \Exception("File too large. Max size is 10MB.");
+        }
+
+        $allowedMimes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'text/plain',
+        ];
+
+        if (!in_array($file->getMimeType(), $allowedMimes)) {
+            throw new \Exception("Invalid file type. Allowed: PDF, DOCX, XLSX, Images, Text.");
+        }
+
+        // Sanitize filename
+        $originalName = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+        $basename = pathinfo($originalName, PATHINFO_FILENAME);
+        $sanitizedName = \Illuminate\Support\Str::slug($basename) . '.' . $extension;
+
+        // Store in private disk for better security
+        $path = $file->storeAs('chat/attachments', $sanitizedName, 'private');
 
         return ChatMessageAttachment::create([
             'message_id' => $message->id,
-            'file_name' => $file->getClientOriginalName(),
+            'file_name' => $originalName,
             'file_path' => $path,
-            'file_type' => $file->getClientOriginalExtension(),
+            'file_type' => $extension,
             'file_size' => $file->getSize(),
             'mime_type' => $file->getMimeType(),
         ]);

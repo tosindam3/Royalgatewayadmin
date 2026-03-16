@@ -41,4 +41,21 @@ export const employeeService = {
     getSubordinates: async (managerId: string): Promise<Employee[]> => {
         return apiClient.get(`/hr-core/employees/${managerId}/subordinates`);
     },
+    uploadAvatar: async (id: string | number, file: File): Promise<Employee> => {
+        const formData = new FormData();
+        formData.append('avatar', file);
+        return apiClient.post(`/hr-core/employees/${id}/avatar`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+
+    updateSelf: async (id: string | number, data: {
+        phone?: string;
+        dob?: string;
+        blood_group?: string;
+        genotype?: string;
+        academics?: string;
+    }): Promise<Employee> => {
+        return apiClient.put(`/hr-core/employees/${id}`, data);
+    },
 };

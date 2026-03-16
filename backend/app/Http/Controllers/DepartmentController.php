@@ -14,10 +14,12 @@ class DepartmentController extends Controller
     use ApiResponse;
 
     protected $auditLogger;
+    protected $scopeEngine;
 
-    public function __construct(AuditLogger $auditLogger)
+    public function __construct(AuditLogger $auditLogger, \App\Services\ScopeEngine $scopeEngine)
     {
         $this->auditLogger = $auditLogger;
+        $this->scopeEngine = $scopeEngine;
     }
 
     /**
@@ -25,6 +27,10 @@ class DepartmentController extends Controller
      */
     public function index(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+        
         $query = Department::with('branch');
 
         // Filter by branch
@@ -70,6 +76,10 @@ class DepartmentController extends Controller
      */
     public function store(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:departments,code',
@@ -108,6 +118,10 @@ class DepartmentController extends Controller
      */
     public function show($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $department = Department::with(['branch', 'employees'])->findOrFail($id);
         return $this->success($department);
     }
@@ -117,6 +131,10 @@ class DepartmentController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $department = Department::findOrFail($id);
 
         $validated = $request->validate([
@@ -163,6 +181,10 @@ class DepartmentController extends Controller
      */
     public function destroy($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.delete')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             DB::beginTransaction();
 

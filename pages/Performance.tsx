@@ -92,7 +92,7 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
 
     const filterHash = JSON.stringify(filters);
     if (loadedPeriods[activeTab] === filterHash) {
-      return;
+      return; // already loaded — no re-fetch, no loading flash
     }
 
     const apiFilters: any = {};
@@ -111,10 +111,14 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
     try {
       setIsLoading(true);
       if (activeTab === 'overview') {
-        const [leaderboardData, summariesData] = await Promise.all([
-          performanceService.getLeaderboard(10, apiFilters),
-          performanceService.getDepartmentSummaries(apiFilters)
-        ]);
+        const promises: Promise<any>[] = [
+          performanceService.getLeaderboard(10, apiFilters)
+        ];
+        // Only fetch department summaries if user has sufficient scope
+        if (userRole !== UserRole.EMPLOYEE) {
+          promises.push(performanceService.getDepartmentSummaries(apiFilters));
+        }
+        const [leaderboardData, summariesData] = await Promise.all(promises);
         setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
         setDepartmentSummaries(Array.isArray(summariesData) ? summariesData : []);
       } else if (activeTab === 'staff') {
@@ -165,7 +169,12 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
   };
 
   useEffect(() => {
-    if (roleResolved && userRole !== UserRole.EMPLOYEE) {
+    if (roleResolved) {
+      // Employees only have the 'staff' and 'analytics' tabs — skip overview/branch fetches
+      if (userRole === UserRole.EMPLOYEE && (activeTab === 'overview' || activeTab === 'branch')) {
+        setIsLoading(false);
+        return;
+      }
       loadData();
     }
   }, [activeTab, filters, roleResolved]);
@@ -185,40 +194,40 @@ const Performance: React.FC<PerformanceProps> = ({ onNotify, userRole: initialUs
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3 italic uppercase">
               <div className="p-2.5 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg shadow-purple-500/20">
                 <LayoutDashboard className="w-6 h-6 text-white" />
               </div>
-              My Performance
+              Performance HQ
             </h1>
-            <p className="text-slate-400 mt-1">Manage your evaluations and track growth</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-1 font-bold tracking-widest text-[10px] uppercase ml-14">Personal Strategy & Growth Track</p>
           </div>
         </div>
 
-        <GlassCard className="p-2">
+        <GlassCard className="p-1 max-w-fit">
           <nav className="flex space-x-1">
             <button
               onClick={() => setActiveTab('staff')}
-              className={`px-4 py-2 text-sm font-bold uppercase tracking-widest rounded-lg transition-all ${activeTab === 'staff' || activeTab === 'overview' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800'}`}
+              className={`px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'staff' || activeTab === 'overview' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}
             >
-              My Evaluations
+              Evaluation Desk
             </button>
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-4 py-2 text-sm font-bold uppercase tracking-widest rounded-lg transition-all ${activeTab === 'analytics' ? 'bg-purple-500/10 text-purple-400' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800'}`}
+              className={`px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'analytics' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}
             >
-              My Analytics
+              Intelligence Hub
             </button>
           </nav>
         </GlassCard>
 
-        {(activeTab === 'staff' || activeTab === 'overview') && (
+        <div className={activeTab === 'staff' || activeTab === 'overview' ? 'block' : 'hidden'}>
           <StaffPortal onNotify={onNotify} />
-        )}
+        </div>
 
-        {activeTab === 'analytics' && (
+        <div className={activeTab === 'analytics' ? 'block' : 'hidden'}>
           <PersonalAnalytics data={analytics} />
-        )}
+        </div>
       </div>
     );
   }

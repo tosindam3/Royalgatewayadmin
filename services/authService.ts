@@ -10,16 +10,21 @@ export const authService = {
         if (response.user) {
             localStorage.setItem('royalgateway_user', JSON.stringify(response.user));
         }
-        return response.user;
+        return response; // return full response so permissions are available
     },
 
     logout: async () => {
+        // Clear locally first and synchronously to prevent race conditions on refresh
+        localStorage.removeItem('royalgateway_auth_token');
+        localStorage.removeItem('royalgateway_user');
+        
         try {
             await apiClient.post('/logout');
-        } catch (e) {
-            console.error("Logout error", e);
-        } finally {
-            localStorage.removeItem('royalgateway_auth_token');
+        } catch (e: any) {
+            // 401 means token already expired — not a real error
+            if (e?.response?.status !== 401) {
+                console.error("Logout error", e);
+            }
         }
     },
 

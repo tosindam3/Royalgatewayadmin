@@ -53,26 +53,26 @@ const INITIAL_NOTIFICATIONS: Notification[] = [
 ];
 
 const SIDEBAR_CONFIG = [
-  { label: 'Dashboard', icon: <ICONS.Dashboard />, route: '/', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE] },
+  { label: 'Dashboard', icon: <ICONS.Dashboard />, route: '/', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE], permissions: ['dashboard.view', 'dashboard.management'] },
   { label: 'PEOPLE', isHeader: true, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
-  { label: 'Employees', icon: <ICONS.People />, route: '/employees', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
-  { label: 'Role Management', icon: <ICONS.Administration />, route: '/roles', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { label: 'Branches', icon: <ICONS.Analytics />, route: '/branches', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { label: 'Employees', icon: <ICONS.People />, route: '/employees', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER], permissions: ['employees.view'] },
+  { label: 'Role Management', icon: <ICONS.Administration />, route: '/roles', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN], permissions: ['roles.view'] },
+  { label: 'Branches', icon: <ICONS.Analytics />, route: '/branches', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN], permissions: ['branches.view'] },
   { label: 'OPERATIONS', isHeader: true },
-  { label: 'My Attendance', icon: <ICONS.Attendance />, route: '/me/attendance', roles: [UserRole.EMPLOYEE] },
-  { label: 'Attendance', icon: <ICONS.Attendance />, route: '/attendance', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER] },
-  { label: 'Leave', icon: <ICONS.Leave />, route: '/leave' },
+  { label: 'My Profile', icon: <ICONS.People />, route: '/employees/me', roles: [UserRole.EMPLOYEE] },
+  { label: 'My Attendance', icon: <ICONS.Leave />, route: '/me/attendance', roles: [UserRole.EMPLOYEE] },
+  { label: 'Leave', icon: <ICONS.Leave />, route: '/leave', permissions: ['leave.view'] },
   { label: 'My Approvals', icon: <ICONS.Performance />, route: '/approvals' },
-  { label: 'Payroll', icon: <ICONS.Payroll />, route: '/payroll', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { label: 'Payroll', icon: <ICONS.Payroll />, route: '/payroll', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN], permissions: ['payroll.view'] },
   { label: 'TALENT', isHeader: true },
-  { label: 'Performance', icon: <ICONS.Performance />, route: '/performance' },
-  { label: 'Talent Management', icon: <ICONS.Talent />, route: '/talent' },
+  { label: 'Performance', icon: <ICONS.Performance />, route: '/performance', permissions: ['performance.view'] },
+  { label: 'Talent Management', icon: <ICONS.Talent />, route: '/talent', permissions: ['onboarding.view'] },
   { label: 'COMMUNICATION', isHeader: true },
-  { label: 'Team Chat', icon: <ICONS.Chat />, route: '/communication/chat', badge: 12 },
+  { label: 'Team Chat', icon: <ICONS.Chat />, route: '/communication/chat', badge: 12, permissions: ['chat.view'] },
   { label: 'Memo', icon: <ICONS.Memo />, route: '/communication/memo' },
   { label: 'SYSTEM', isHeader: true, roles: [UserRole.SUPER_ADMIN] },
-  { label: 'Brand Settings', icon: <ICONS.Administration />, route: '/settings' },
-  { label: 'Automation & AI', icon: <ICONS.Automation />, route: '/automation' },
+  { label: 'Brand Settings', icon: <ICONS.Administration />, route: '/settings', permissions: ['settings.view'] },
+  { label: 'Automation & AI', icon: <ICONS.Automation />, route: '/automation', permissions: ['workflows.view'] },
   { label: 'Integrations', icon: <ICONS.Integrations />, route: '/integrations' },
 ];
 
@@ -83,16 +83,42 @@ const MainApp: React.FC<{
   userProfile: UserProfile;
   currentUserRole: UserRole;
   onUpdateProfile: (p: UserProfile) => void;
+  userPermissions: string[];
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
-}> = ({ onLogout, brand, onUpdateBrand, userProfile, currentUserRole, onUpdateProfile, theme, onToggleTheme }) => {
+}> = ({ onLogout, brand, onUpdateBrand, userProfile, currentUserRole, onUpdateProfile, userPermissions, theme, onToggleTheme }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [selectedBranchScope, setSelectedBranchScope] = useState('All Branches');
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
 
-  const filteredMenu = SIDEBAR_CONFIG.filter(item => !item.roles || item.roles.includes(currentUserRole));
+  const filteredMenu = SIDEBAR_CONFIG.filter(item => {
+    // 1. Check Role Match
+    const roleMatch = !item.roles || item.roles.includes(currentUserRole);
+    if (!roleMatch) return false;
+
+    // 2. Check Permission Match (if specified)
+    if (item.permissions && item.permissions.length > 0) {
+      // User must have at least one of the required permissions for this module
+      const hasPermission = item.permissions.some(p => userPermissions.includes(p));
+      if (!hasPermission) return false;
+    }
+
+    return true;
+  });
+
+  // Filter out empty headers (headers with no visible items below them)
+  const finalMenu = filteredMenu.filter((item, index) => {
+    if (item.isHeader) {
+      // Check if there's any visible item between this header and the next header
+      const nextItems = filteredMenu.slice(index + 1);
+      const nextHeaderIdx = nextItems.findIndex(i => i.isHeader);
+      const itemsUnderHeader = nextHeaderIdx === -1 ? nextItems : nextItems.slice(0, nextHeaderIdx);
+      return itemsUnderHeader.length > 0;
+    }
+    return true;
+  });
 
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
@@ -113,25 +139,36 @@ const MainApp: React.FC<{
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#0d0a1a] selection:bg-purple-500/30">
-      <Toaster position="top-right" richColors closeButton />
+      <Toaster 
+        position="top-right" 
+        richColors 
+        closeButton 
+        expand={false}
+        duration={4000}
+        toastOptions={{
+          style: {
+            maxWidth: '400px',
+          },
+        }}
+      />
 
       {/* Desktop Sidebar */}
       <Sidebar
         brand={brand}
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-        menuItems={filteredMenu}
+        menuItems={finalMenu}
       />
 
       {/* Mobile Sidebar */}
       <MobileSidebar
         brand={brand}
-        menuItems={filteredMenu}
+        menuItems={finalMenu}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-x-hidden relative">
         {/* Desktop Header */}
         <Header
           userProfile={userProfile}
@@ -160,7 +197,7 @@ const MainApp: React.FC<{
 
         <main className="flex-1 overflow-y-auto relative p-3 sm:p-4 md:p-10 scroll-smooth no-scrollbar text-slate-900 dark:text-white">
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-[var(--brand-primary)]/5 blur-[160px] rounded-full pointer-events-none -z-10 animate-pulse" />
-          <div className="max-w-[1400px] mx-auto animate-fade-in">
+          <div className="max-w-[1400px] mx-auto animate-fade-in h-full flex flex-col">
             <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -168,10 +205,15 @@ const MainApp: React.FC<{
                 {/* My Attendance - Available to all users */}
                 <Route path="/me/attendance" element={<MyAttendance />} />
 
+                <Route path="/employees/me" element={
+                  userProfile.employee_id ? <Navigate to={`/employees/${userProfile.employee_id}`} replace /> : <Navigate to="/" replace />
+                } />
+
+                <Route path="/employees/:id" element={<EmployeeProfile />} />
+
                 {currentUserRole !== UserRole.EMPLOYEE && (
                   <>
                     <Route path="/employees" element={<Employees />} />
-                    <Route path="/employees/:id" element={<EmployeeProfile />} />
                     <Route path="/attendance" element={<AttendanceWorkspace />} />
                   </>
                 )}
@@ -224,10 +266,12 @@ const App: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>(UserRole.EMPLOYEE);
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: '',
     username: '',
-    avatar: ''
+    avatar: '',
+    employee_id: undefined
   });
 
   // Use brand settings hook
@@ -265,9 +309,18 @@ const App: React.FC = () => {
             setUserProfile({
               name: user.display_name || user.name,
               username: user.email,
-              avatar: user.employee_profile?.avatar || ''
+              avatar: user.employee_profile?.avatar || '',
+              employee_id: user.employee_profile?.id
             });
-            setCurrentUserRole(mapBackendRoleToUserRole(user.roles));
+            setCurrentUserRole(mapBackendRoleToUserRole(user.all_roles || user.roles));
+            
+            // Extract and normalize permissions
+            if (response.permissions && Array.isArray(response.permissions)) {
+              setUserPermissions(response.permissions.map((p: any) => p.name));
+            } else {
+              setUserPermissions([]);
+            }
+            
             setIsAuthenticated(true);
           } else {
             localStorage.removeItem('royalgateway_auth_token');
@@ -281,15 +334,26 @@ const App: React.FC = () => {
     initSession();
   }, []);
 
-  const handleLoginSuccess = async (user: any) => {
+  const handleLoginSuccess = async (response: any) => {
     setIsAuthenticated(true);
+    // authService.login now returns the full response (same shape as getUser)
+    const user = response?.user ?? response;
     if (user) {
       setUserProfile({
         name: user.display_name || user.name,
         username: user.email,
-        avatar: user.employee_profile?.avatar || ''
+        avatar: user.employee_profile?.avatar || '',
+        employee_id: user.employee_profile?.id
       });
-      setCurrentUserRole(mapBackendRoleToUserRole(user.roles));
+      setCurrentUserRole(mapBackendRoleToUserRole(user.all_roles || user.roles));
+
+      // Permissions live at the top-level response, not inside user
+      const perms = response?.permissions ?? user.permissions;
+      if (perms && Array.isArray(perms)) {
+        setUserPermissions(perms.map((p: any) => typeof p === 'string' ? p : p.name));
+      } else {
+        setUserPermissions([]);
+      }
     }
   };
 
@@ -331,6 +395,7 @@ const App: React.FC = () => {
         }}
         userProfile={userProfile}
         currentUserRole={currentUserRole}
+        userPermissions={userPermissions}
         onUpdateProfile={setUserProfile}
         onLogout={() => {
           setIsAuthenticated(false);

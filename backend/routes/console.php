@@ -24,3 +24,8 @@ Schedule::command('attendance:mark-absent')
 Schedule::command('attendance:aggregate --today')
     ->dailyAt('01:00')
     ->appendOutputTo(storage_path('logs/aggregation.log'));
+
+// Clean up expired typing indicators every minute
+Schedule::command('chat:cleanup-typing')
+    ->everyMinute()
+    ->withoutOverlapping();

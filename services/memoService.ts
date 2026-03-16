@@ -112,7 +112,15 @@ class MemoService {
   }
 
   // Download attachment
+  async downloadAttachment(attachmentId: number): Promise<Blob> {
+    const response = await apiClient.get(`/memos/attachments/${attachmentId}/download`, {
+      responseType: 'blob',
+    });
+    return response;
+  }
+
   getAttachmentDownloadUrl(attachmentId: number): string {
+    // Deprecated: Use downloadAttachment() instead for secure downloads
     return `/api/v1/memos/attachments/${attachmentId}/download?token=${localStorage.getItem('royalgateway_auth_token')}`;
   }
 }

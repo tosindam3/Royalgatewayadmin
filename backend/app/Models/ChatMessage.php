@@ -61,6 +61,11 @@ class ChatMessage extends Model
         return $this->hasMany(ChatMessageReaction::class, 'message_id');
     }
 
+    public function reads(): HasMany
+    {
+        return $this->hasMany(ChatMessageRead::class, 'message_id');
+    }
+
     public function scopeInChannel($query, $channelId)
     {
         return $query->where('channel_id', $channelId);
@@ -78,7 +83,8 @@ class ChatMessage extends Model
 
     public function scopeSearch($query, $searchTerm)
     {
-        return $query->where('content', 'like', "%{$searchTerm}%");
+        return $query->where('content', 'like', "%{$searchTerm}%")
+                     ->where('is_deleted', false);
     }
 
     public function markAsEdited(): void
@@ -108,5 +114,10 @@ class ChatMessage extends Model
             ->where('user_id', $userId)
             ->where('emoji', $emoji)
             ->exists();
+    }
+
+    public function isReadByUser($userId): bool
+    {
+        return $this->reads()->where('user_id', $userId)->exists();
     }
 }

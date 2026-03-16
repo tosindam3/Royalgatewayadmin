@@ -324,6 +324,72 @@ export const CandidatesView: React.FC = () => {
     );
 };
 
+export const OrientationView: React.FC = () => {
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+            <ViewHeader title="My Orientation" count={1} />
+            
+            <GlassCard>
+                <div className="flex flex-col md:flex-row justify-between gap-8 p-4">
+                    <div className="space-y-4 flex-1">
+                        <div>
+                            <h4 className="text-xl font-black text-white tracking-tight">Onboarding Journey</h4>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Welcome to Royalgateway</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                <span className="text-slate-400">Total Completion</span>
+                                <span className="text-orange-500">65%</span>
+                            </div>
+                            <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <div className="h-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]" style={{ width: '65%' }} />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                            {[
+                                { t: 'Document Verification', s: 'Completed', i: '✅' },
+                                { t: 'Security Briefing', s: 'In Progress', i: '⏳' },
+                                { t: 'IT Access Provisioning', s: 'Pending', i: '⚙️' },
+                                { t: 'Culture & Values', s: 'Completed', i: '✅' },
+                            ].map((task, i) => (
+                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                                    <span className="text-lg">{task.i}</span>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-white">{task.t}</p>
+                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{task.s}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="w-full md:w-80 space-y-6">
+                        <GlassCard className="bg-orange-500/5 border-orange-500/20">
+                            <h5 className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-4">Upload Documents</h5>
+                            <div className="space-y-4">
+                                <div className="p-4 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-orange-500/30 transition-all cursor-pointer group">
+                                    <span className="text-2xl group-hover:scale-110 transition-transform">📄</span>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Drop files to upload</p>
+                                </div>
+                                <div className="space-y-2">
+                                    {['ID_Card_Front.jpg', 'Contract_Signed.pdf'].map(f => (
+                                        <div key={f} className="flex items-center justify-between p-2 rounded-lg bg-black/20">
+                                            <span className="text-[9px] text-slate-300 font-medium">{f}</span>
+                                            <span className="text-[8px] text-emerald-500 font-black uppercase">Verified</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </GlassCard>
+                    </div>
+                </div>
+            </GlassCard>
+        </div>
+    );
+};
+
 export const OnboardingView: React.FC = () => {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">

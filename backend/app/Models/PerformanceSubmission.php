@@ -13,6 +13,7 @@ class PerformanceSubmission extends Model
     protected $fillable = [
         'employee_id',
         'department_id',
+        'branch_id',
         'period',
         'form_data',
         'score',

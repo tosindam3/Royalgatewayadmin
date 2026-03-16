@@ -9,7 +9,9 @@ export enum UserRole {
 export const mapBackendRoleToUserRole = (roles?: { name: string }[]): UserRole => {
   if (!roles || roles.length === 0) return UserRole.EMPLOYEE;
 
-  const roleNames = roles.map(r => r.name.toLowerCase().replace(/\s+/g, '_'));
+  // Handle both slug and name from backend, and normalize for matching
+  const roleNames = roles.map(r => (r.name || '').toLowerCase().replace(/\s+/g, '_'));
+  
   if (roleNames.includes('super_admin')) return UserRole.SUPER_ADMIN;
   if (roleNames.includes('admin') || roleNames.includes('hr_admin')) return UserRole.ADMIN;
   if (roleNames.includes('hr_manager') || roleNames.includes('branch_manager') || roleNames.includes('department_head') || roleNames.includes('team_lead') || roleNames.includes('manager')) return UserRole.MANAGER;
@@ -35,7 +37,10 @@ export interface User {
 export interface UserProfile {
   name: string;
   username: string;
+  email: string;
   avatar: string;
+  employee_id?: string | number;
+  employee_profile?: Employee;
 }
 
 // Enterprise Attendance Types
@@ -432,6 +437,7 @@ export interface Employee {
   employee_code: string;
   first_name: string;
   last_name: string;
+  full_name?: string;
   email: string;
   phone?: string;
   branch_id: string;

@@ -30,7 +30,7 @@ class ChatAdminController extends Controller
     {
         try {
             // Check admin permission
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -48,7 +48,7 @@ class ChatAdminController extends Controller
     public function getBlockedKeywords(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -68,7 +68,7 @@ class ChatAdminController extends Controller
     public function addBlockedKeyword(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -106,7 +106,7 @@ class ChatAdminController extends Controller
     public function updateBlockedKeyword(Request $request, ChatBlockedKeyword $keyword): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -141,7 +141,7 @@ class ChatAdminController extends Controller
     public function deleteBlockedKeyword(Request $request, ChatBlockedKeyword $keyword): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -171,7 +171,7 @@ class ChatAdminController extends Controller
     public function messageActivity(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -197,7 +197,7 @@ class ChatAdminController extends Controller
     public function topChannels(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -225,7 +225,7 @@ class ChatAdminController extends Controller
     public function topUsers(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo', 'hr_manager'])) {
+            if (!$request->user()->hasPermission('chat.admin')) {
                 return $this->error('Unauthorized access', 403);
             }
 
@@ -252,7 +252,7 @@ class ChatAdminController extends Controller
     public function getComplianceSettings(Request $request): JsonResponse
     {
         try {
-            if (!$request->user()->hasAnyRole(['super_admin', 'ceo'])) {
+            if (!$request->user()->hasPermission('chat.compliance')) {
                 return $this->error('Unauthorized access', 403);
             }
 

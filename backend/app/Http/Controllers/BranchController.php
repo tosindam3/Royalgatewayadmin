@@ -16,10 +16,12 @@ class BranchController extends Controller
     use ApiResponse;
 
     protected $auditLogger;
+    protected $scopeEngine;
 
-    public function __construct(AuditLogger $auditLogger)
+    public function __construct(AuditLogger $auditLogger, \App\Services\ScopeEngine $scopeEngine)
     {
         $this->auditLogger = $auditLogger;
+        $this->scopeEngine = $scopeEngine;
     }
 
     /**
@@ -27,6 +29,10 @@ class BranchController extends Controller
      */
     public function index(Request $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+        
         $query = Branch::with(['manager', 'departments']);
 
         // Search functionality
@@ -87,6 +93,10 @@ class BranchController extends Controller
      */
     public function store(StoreBranchRequest $request)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -133,6 +143,10 @@ class BranchController extends Controller
      */
     public function show($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.view')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         $branch = Branch::with([
             'manager', 
             'departments', 
@@ -150,6 +164,10 @@ class BranchController extends Controller
      */
     public function update(UpdateBranchRequest $request, $id)
     {
+        if (!$this->scopeEngine->hasPermission($request->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -195,6 +213,10 @@ class BranchController extends Controller
      */
     public function destroy($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.delete')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -251,6 +273,10 @@ class BranchController extends Controller
      */
     public function restore($id)
     {
+        if (!$this->scopeEngine->hasPermission(request()->user(), 'organization.update')) {
+            return $this->error('Unauthorized', 403);
+        }
+
         try {
             $branch = Branch::withTrashed()->findOrFail($id);
 

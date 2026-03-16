@@ -145,8 +145,53 @@ class EmployeeService
         });
     }
 
+    public function updateAvatar(Employee $employee, $file): Employee
+    {
+        return DB::transaction(function () use ($employee, $file) {
+            $oldData = $employee->toArray();
+            
+            // Delete old avatar if exists and not default
+            if ($employee->avatar && !str_contains($employee->avatar, 'default')) {
+                $oldPath = public_path($employee->avatar);
+                if (file_exists($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+
+            // Store new avatar
+            $filename = time() . '_' . $employee->id . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('avatars'), $filename);
+            $path = '/avatars/' . $filename;
+
+            $employee->update(['avatar' => $path]);
+
+            // Sync with User account if exists
+            if ($employee->user) {
+                $employee->user->update(['avatar' => $path]);
+            }
+
+            // Log audit trail
+            if (class_exists(\App\Services\AuditLogger::class)) {
+                app(\App\Services\AuditLogger::class)->log(
+                    'employee_avatar_updated',
+                    Employee::class,
+                    $employee->id,
+                    $oldData,
+                    $employee->fresh()->toArray()
+                );
+            }
+
+            return $employee->fresh(['branch', 'department', 'designation', 'manager', 'user']);
+        });
+    }
+
     public function deleteEmployee(Employee $employee): bool
     {
+        // Service-level protection for Superadmin
+        if ($employee->user && $employee->user->hasRole('super_admin')) {
+            throw new \Exception('The Super Administrator profile is protected at the service level and cannot be deleted.');
+        }
+
         return DB::transaction(function () use ($employee) {
             $oldData = $employee->toArray();
             $result = $employee->delete();

@@ -14,7 +14,8 @@ class AttendanceController extends Controller
 
     public function __construct(
         protected AttendanceService $attendance,
-        protected GeofenceService $geo
+        protected GeofenceService $geo,
+        protected \App\Services\AttendanceScopeService $scopeService
     ) {}
 
     public function checkIn(Request $request)
@@ -188,7 +189,7 @@ class AttendanceController extends Controller
     public function getScope(Request $request)
     {
         $user = $request->user();
-        $scope = app(\App\Services\AttendanceScopeService::class)->getAccessScope($user);
+        $scope = $this->scopeService->getAccessScope($user);
         
         return $this->success($scope, 'Access scope retrieved.');
     }
@@ -215,15 +216,20 @@ class AttendanceController extends Controller
         return $this->success($logs, 'Attendance history retrieved.');
     }
 
-    public function liveAttendance()
+    public function liveAttendance(Request $request)
     {
         $today = now()->toDateString();
+        $user = $request->user();
 
-        $logs = \App\Models\AttendanceLog::with(['employee' => function ($q) {
+        $query = \App\Models\AttendanceLog::with(['employee' => function ($q) {
             $q->with('user:id,name');
         }])
-            ->whereDate('timestamp', $today)
-            ->get()
+            ->whereDate('timestamp', $today);
+            
+        // Apply Scoping
+        $query = $this->scopeService->applyScopeToQuery($query, $user);
+
+        $logs = $query->get()
             ->groupBy('employee_id')
             ->map(function ($entries) {
                 $checkIn  = $entries->firstWhere('check_type', 'check_in');
@@ -248,12 +254,20 @@ class AttendanceController extends Controller
         return $this->success($logs, 'Live attendance retrieved.');
     }
 
-    public function overview()
+    public function overview(Request $request)
     {
         $today = now()->toDateString();
-        $totalEmployees = \App\Models\Employee::operational()->count();
+        $user = $request->user();
+        
+        // Scope employees count
+        $accessibleEmployees = $this->scopeService->getAccessibleEmployees($user);
+        $totalEmployees = $accessibleEmployees->count();
+        $employeeIds = $accessibleEmployees->pluck('id');
 
-        $todayLogs = \App\Models\AttendanceLog::whereDate('timestamp', $today)->get();
+        $query = \App\Models\AttendanceLog::whereDate('timestamp', $today);
+        $query = $this->scopeService->applyScopeToQuery($query, $user);
+        $todayLogs = $query->get();
+        
         $presentIds = $todayLogs->where('check_type', 'check_in')->pluck('employee_id')->unique();
         $lateIds    = $todayLogs->where('check_type', 'check_in')->where('status', 'late')->pluck('employee_id')->unique();
 
@@ -284,13 +298,19 @@ class AttendanceController extends Controller
     public function dailySummary(Request $request)
     {
         $date = $request->get('date', now()->toDateString());
-        $totalEmployees = \App\Models\Employee::operational()->count();
+        $user = $request->user();
+        
+        $accessibleEmployees = $this->scopeService->getAccessibleEmployees($user);
+        $totalEmployees = $accessibleEmployees->count();
 
-        $logs = \App\Models\AttendanceLog::with(['employee' => function ($q) {
+        $query = \App\Models\AttendanceLog::with(['employee' => function ($q) {
             $q->with(['user:id,name', 'department:id,name']);
         }])
-            ->whereDate('timestamp', $date)
-            ->get()
+            ->whereDate('timestamp', $date);
+            
+        $query = $this->scopeService->applyScopeToQuery($query, $user);
+
+        $logs = $query->get()
             ->groupBy('employee_id');
 
         $records = $logs->map(function ($entries) {
@@ -344,12 +364,16 @@ class AttendanceController extends Controller
     {
         $startDate = $request->get('start_date', now()->startOfMonth()->toDateString());
         $endDate   = $request->get('end_date', now()->toDateString());
+        $user = $request->user();
 
-        $logs = \App\Models\AttendanceLog::with(['employee' => function ($q) {
+        $query = \App\Models\AttendanceLog::with(['employee' => function ($q) {
             $q->with(['user:id,name', 'workSchedule']);
         }])
-            ->whereBetween(\DB::raw('DATE(timestamp)'), [$startDate, $endDate])
-            ->get()
+            ->whereBetween(\DB::raw('DATE(timestamp)'), [$startDate, $endDate]);
+            
+        $query = $this->scopeService->applyScopeToQuery($query, $user);
+
+        $logs = $query->get()
             ->groupBy(fn($l) => $l->employee_id . '_' . $l->timestamp->toDateString());
 
         $results = [];
@@ -485,10 +509,9 @@ class AttendanceController extends Controller
     public function getIPWhitelist()
     {
         $user = request()->user();
-        $scopeService = app(\App\Services\AttendanceScopeService::class);
         
-        // Return empty array for employees
-        if (!$scopeService->canManageSettings($user)) {
+        // Check if user can manage settings
+        if (!$this->scopeService->canManageSettings($user)) {
             return $this->success([], 'IP whitelist retrieved.');
         }
         

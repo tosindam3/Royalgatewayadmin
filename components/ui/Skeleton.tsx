@@ -27,24 +27,24 @@ const Skeleton: React.FC<SkeletonProps> = ({
   return (
     <div
       style={baseStyle}
-      className={`animate-pulse bg-slate-200/50 dark:bg-white/5 overflow-hidden relative ${variantClass} ${className}`}
+      className={`animate-pulse bg-slate-300 dark:bg-white/5 overflow-hidden relative ${variantClass} ${className}`}
     >
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/60 dark:via-white/5 to-transparent" />
     </div>
   );
 };
 
 
 export const CardSkeleton: React.FC = () => (
-  <div className="bg-white/5 border border-white/5 rounded-[32px] p-6 space-y-4">
+  <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[32px] p-6 space-y-4">
     <Skeleton width="40%" height="12px" />
     <Skeleton width="70%" height="24px" />
   </div>
 );
 
 export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({ rows = 5, cols = 4 }) => (
-  <div className="w-full bg-white/5 border border-white/5 rounded-[32px] overflow-hidden">
-    <div className="p-6 border-b border-white/5 flex gap-4">
+  <div className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[32px] overflow-hidden">
+    <div className="p-6 border-b border-slate-200 dark:border-white/5 flex gap-4">
       {Array(cols).fill(0).map((_, i) => (
         <Skeleton key={i} width={`${100 / cols}%`} height="16px" />
       ))}
@@ -65,7 +65,7 @@ export const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = ({ rows
 );
 
 export const ProfileHeaderSkeleton: React.FC = () => (
-  <div className="flex flex-col md:flex-row gap-8 items-center md:items-start p-8 bg-white/5 rounded-[40px] border border-white/5 mb-8">
+  <div className="flex flex-col md:flex-row gap-8 items-center md:items-start p-8 bg-slate-100 dark:bg-white/5 rounded-[40px] border border-slate-200 dark:border-white/5 mb-8">
     <Skeleton width="128px" height="128px" className="!rounded-[40px]" />
     <div className="flex-1 space-y-4 text-center md:text-left">
       <div className="space-y-2">

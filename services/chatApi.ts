@@ -100,6 +100,10 @@ const chatApi = {
     return apiClient.get(`/chat/channels/${channelId}/messages/${messageId}`);
   },
 
+  globalSearch: async (query: string, page: number = 1): Promise<PaginatedResponse<Message>> => {
+    return apiClient.get('/chat/search', { params: { query, page } });
+  },
+
   sendMessage: async (channelId: number, data: SendMessageRequest): Promise<Message> => {
     // Handle file uploads with FormData
     if (data.attachments && data.attachments.length > 0) {

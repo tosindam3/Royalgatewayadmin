@@ -262,8 +262,8 @@ const Payroll: React.FC = () => {
   // Generic skeleton renderer for list items
   const SkeletonCard = () => (
     <div className="animate-pulse bg-slate-100 dark:bg-white/5 rounded-2xl p-4 space-y-3">
-      <div className="h-3 bg-slate-200 dark:bg-white/10 rounded w-32" />
-      <div className="h-2 bg-slate-200 dark:bg-white/10 rounded w-20" />
+      <div className="h-3 bg-slate-300 dark:bg-white/10 rounded w-32" />
+      <div className="h-2 bg-slate-300 dark:bg-white/10 rounded w-20" />
     </div>
   );
 

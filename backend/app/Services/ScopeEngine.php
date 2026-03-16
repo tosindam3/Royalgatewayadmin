@@ -22,12 +22,24 @@ class ScopeEngine
      */
     public function getUserScope(User $user, string $permission): string
     {
-        if ($user->hasAnyRole(['super_admin', 'ceo'])) {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'ceo', 'hr_manager'])) {
             return 'all';
         }
 
         $scopes = [];
+
+        // Check primary role
+        if ($user->primaryRole) {
+            $rolePermission = $user->primaryRole->permissions()
+                ->where('permissions.name', $permission)
+                ->first();
+                
+            if ($rolePermission) {
+                $scopes[] = $rolePermission->pivot->scope_level;
+            }
+        }
         
+        // Check extra roles
         foreach ($user->roles as $role) {
             $rolePermission = $role->permissions()
                 ->where('permissions.name', $permission)
@@ -92,7 +104,8 @@ class ScopeEngine
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('branch_id', $user->employee->branch_id);
+        $column = $this->getColumnForModel($query->getModel(), 'branch_id');
+        return $query->where($column, $user->employee->branch_id);
     }
 
     /**
@@ -104,7 +117,8 @@ class ScopeEngine
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('department_id', $user->employee->department_id);
+        $column = $this->getColumnForModel($query->getModel(), 'department_id');
+        return $query->where($column, $user->employee->department_id);
     }
 
     /**
@@ -116,7 +130,8 @@ class ScopeEngine
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('manager_id', $user->employee->id);
+        $column = $this->getColumnForModel($query->getModel(), 'manager_id');
+        return $query->where($column, $user->employee->id);
     }
 
     /**
@@ -128,7 +143,31 @@ class ScopeEngine
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->where('id', $user->employee->id);
+        $column = $this->getColumnForModel($query->getModel(), 'employee_id');
+        return $query->where($column, $user->employee->id);
+    }
+
+    /**
+     * Get column name for a model based on generic scope requirements
+     */
+    protected function getColumnForModel($model, string $genericField): string
+    {
+        $class = get_class($model);
+        
+        $mappings = [
+            \App\Models\PerformanceSubmission::class => [
+                'employee_id' => 'employee_id',
+                'branch_id' => 'branch_id',
+                'department_id' => 'department_id',
+            ],
+            \App\Models\Employee::class => [
+                'employee_id' => 'id',
+                'branch_id' => 'branch_id',
+                'department_id' => 'department_id',
+            ]
+        ];
+
+        return $mappings[$class][$genericField] ?? $genericField;
     }
 
     /**
@@ -187,7 +226,7 @@ class ScopeEngine
     /**
      * Check if user's scope is sufficient for required scope
      */
-    protected function isScopeSufficient(string $userScope, string $requiredScope): bool
+    public function isScopeSufficient(string $userScope, string $requiredScope): bool
     {
         $scopeHierarchy = [
             'all' => 5,
@@ -207,7 +246,21 @@ class ScopeEngine
     public function getUserPermissions(User $user): array
     {
         $permissions = [];
+
+        // Process primary role
+        if ($user->primaryRole) {
+            foreach ($user->primaryRole->permissions as $permission) {
+                $scope = $permission->pivot->scope_level;
+                $permissionName = $permission->name;
+                
+                if (!isset($permissions[$permissionName]) || 
+                    $this->isScopeSufficient($scope, $permissions[$permissionName])) {
+                    $permissions[$permissionName] = $scope;
+                }
+            }
+        }
         
+        // Process extra roles
         foreach ($user->roles as $role) {
             foreach ($role->permissions as $permission) {
                 $scope = $permission->pivot->scope_level;

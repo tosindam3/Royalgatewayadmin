@@ -63,6 +63,7 @@ export interface Message {
   user?: User;
   attachments?: MessageAttachment[];
   reactions?: MessageReaction[];
+  reads?: { user_id: number; read_at?: string }[];
   replies?: Message[];
   parentMessage?: Message;
   metadata?: Record<string, any>;
