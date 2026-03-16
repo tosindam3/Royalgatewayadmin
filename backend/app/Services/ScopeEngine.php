@@ -23,11 +23,9 @@ class ScopeEngine
     public function getUserScope(User $user, string $permission): string
     {
         $privilegedRoles = ['super_admin', 'admin', 'ceo', 'hr_manager'];
-        $legacyRole = $user->attributes['role'] ?? null;
-        if (($legacyRole && in_array($legacyRole, $privilegedRoles)) || $user->hasAnyRole($privilegedRoles)) {
+        if (in_array($user->role, $privilegedRoles) || $user->hasAnyRole($privilegedRoles)) {
             return 'all';
         }
-
         $scopes = [];
 
         // Check primary role

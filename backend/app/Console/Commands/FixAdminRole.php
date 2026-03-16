@@ -82,7 +82,7 @@ class FixAdminRole extends Command
                 if ($legacyRole) $targetRole = $legacyRole;
             }
 
-            // Set primary_role_id and legacy role column
+            // Set primary_role_id and convenience role column
             $user->primary_role_id = $targetRole->id;
             $user->role = $targetRole->name;
             $user->save();
