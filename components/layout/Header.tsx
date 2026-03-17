@@ -2,12 +2,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import NotificationCenter from './NotificationCenter';
-import { UserProfile, Notification } from '../../types';
+import { UserProfile, Notification, UserRole } from '../../types';
 import HeaderClockPanel from '../attendance/HeaderClockPanel';
 import { useAttendanceOverview } from '../../hooks/useAttendanceData';
 
 interface HeaderProps {
     userProfile: UserProfile;
+    userRole?: UserRole;
     theme: 'dark' | 'light';
     onToggleTheme: () => void;
     onLogout: () => void;
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({
     userProfile,
+    userRole,
     theme,
     onToggleTheme,
     onLogout,
@@ -82,7 +84,10 @@ const Header: React.FC<HeaderProps> = ({
                         <div className="text-right hidden sm:block">
                             <p className="text-xs font-black text-slate-900 dark:text-white">{userProfile.name}</p>
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                                {userProfile.employee_profile?.designation?.name || 'Employee'}
+                                {userRole === UserRole.SUPER_ADMIN ? 'Super Admin' : 
+                                 userRole === UserRole.ADMIN ? 'Admin' :
+                                 userRole === UserRole.MANAGER ? 'Manager' :
+                                 userProfile.employee_profile?.designation?.name || 'Employee'}
                             </p>
                         </div>
                         {userProfile.avatar ? (
@@ -100,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="absolute right-0 mt-3 w-56 bg-white dark:bg-[#0d0a1a] border border-slate-200 dark:border-white/10 rounded-[30px] shadow-2xl z-20 py-3 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="px-6 py-4 border-b border-slate-100 dark:border-white/5 mb-2">
                                     <p className="text-xs font-black text-slate-900 dark:text-white uppercase italic">{userProfile.name}</p>
-                                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">{userProfile.email}</p>
+                                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">{userProfile.username}</p>
                                 </div>
                                 <button 
                                     onClick={() => {

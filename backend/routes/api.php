@@ -22,15 +22,12 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
     // Dashboard Routes
     Route::middleware('auth:sanctum')->prefix('dashboard')->group(function () {
-        Route::get('/', [App\Http\Controllers\DashboardController::class, 'index']);
-        
         // Granular Metrics for Independent Loading
         Route::group(['prefix' => 'metrics'], function () {
             Route::get('/quick-stats', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'quickStats']);
             Route::get('/talent-trends', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'talentTrends']);
             Route::get('/attendance-pulse', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'attendancePulse']);
             Route::get('/demographics', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'demographics']);
-            Route::get('/employee-summary', [App\Http\Controllers\DashboardController::class, 'employeeSummary']);
         });
     });
 

@@ -11,7 +11,15 @@ class UpdateBrandSettingsRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo']);
+        $user = $this->user();
+        if (!$user) return false;
+        
+        // Check via Spatie roles
+        if (method_exists($user, 'hasAnyRole')) {
+            return $user->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo']);
+        }
+        
+        return false;
     }
 
     /**
@@ -21,8 +29,8 @@ class UpdateBrandSettingsRequest extends FormRequest
     {
         return [
             'companyName' => 'required|string|min:2|max:255',
-            'logoUrl' => 'nullable|string|url|max:2048',
-            'primaryColor' => 'required|string|regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/',
+            'logoUrl' => 'nullable|string|max:2048',
+            'primaryColor' => ['required', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
         ];
     }
 

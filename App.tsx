@@ -172,6 +172,7 @@ const MainApp: React.FC<{
         {/* Desktop Header */}
         <Header
           userProfile={userProfile}
+          userRole={currentUserRole}
           theme={theme}
           onToggleTheme={onToggleTheme}
           onLogout={onLogout}

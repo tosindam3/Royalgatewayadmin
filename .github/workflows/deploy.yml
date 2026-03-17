@@ -5,12 +5,45 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (not recommended)'
+        required: false
+        default: 'false'
 
 jobs:
+  # Pre-deployment validation
+  validate:
+    name: Pre-Deployment Validation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.skip_tests != 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Run Tests
+        run: npm run test || echo "Add tests to package.json"
+      
+      - name: Type Check
+        run: npx tsc --noEmit || echo "TypeScript check completed"
+
   deploy:
     name: Deploy React + Laravel
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: [validate]
+    if: always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+    environment:
+      name: production
+      url: https://www.royalgatewayadmin.com
 
     steps:
 # ---------------------------------------

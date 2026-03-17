@@ -50,8 +50,7 @@ class BrandSettingsService
 
             // Clear cache
             Cache::forget('brand_settings');
-            Cache::tags(['settings'])->flush();
-
+            
             // Clear individual setting caches
             foreach (array_keys($settings) as $key) {
                 Cache::forget("settings.{$key}");
