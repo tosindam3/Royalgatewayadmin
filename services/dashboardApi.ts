@@ -28,7 +28,17 @@ export const dashboardApi = {
     api.get('/dashboard/metrics/demographics') as any,
 
   payrollSummary: (): Promise<PayrollSummaryResponse> =>
-    api.get('/payroll/metrics') as any,
+    api.get('/payroll/metrics').then((res: any) => {
+      // Backend returns { stats: {...}, history: [...] }
+      const stats = res?.stats ?? res;
+      return {
+        monthly_payroll: stats?.monthly_payroll ?? 0,
+        total_employees: stats?.total_employees ?? 0,
+        average_pay: stats?.average_pay ?? 0,
+        active_runs: stats?.active_runs ?? 0,
+        history: res?.history ?? [],
+      };
+    }),
 
   mySummary: (): Promise<PersonalSummaryResponse> =>
     api.get('/dashboard/metrics/my-summary') as any,
