@@ -173,6 +173,7 @@ const MainApp: React.FC<{
         <Header
           userProfile={userProfile}
           userRole={currentUserRole}
+          brand={brand}
           theme={theme}
           onToggleTheme={onToggleTheme}
           onLogout={onLogout}

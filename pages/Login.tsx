@@ -139,10 +139,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
       className="flex items-center gap-3 cursor-pointer group"
     >
       <div className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
-        <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
+        <img src={brand.logo_url || '/HR360_Logo.png'} className="w-full h-full object-contain" alt={`${brand.company_name} Logo`} />
       </div>
       <div className={`text-2xl font-black tracking-tighter uppercase italic text-slate-900 dark:text-white`}>
-        HR360<span className="text-orange-500 font-normal">.</span>
+        {brand.company_name}<span className="text-orange-500 font-normal">.</span>
       </div>
     </div>
   );
@@ -187,10 +187,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
 
             <div className="flex flex-col items-center mb-10">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-xl overflow-hidden">
-                <img src="/HR360_Logo.png" className="w-full h-full object-contain" alt="HR360 Logo" />
+                <img src={brand.logo_url || '/HR360_Logo.png'} className="w-full h-full object-contain" alt={`${brand.company_name} Logo`} />
               </div>
               <h2 className="text-2xl font-black text-center text-slate-900 dark:text-white italic">
-                Welcome to HR360 Admin
+                Welcome to {brand.company_name} Admin
               </h2>
               <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1 italic">Authorized Access Only</p>
             </div>
