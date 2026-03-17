@@ -99,19 +99,6 @@ class BrandSettingsController extends Controller
         try {
             $validated = $request->validated();
 
-            // Validate logo URL accessibility (only for external URLs, skip for data URIs)
-            if (!empty($validated['logoUrl']) && !str_starts_with($validated['logoUrl'], 'data:')) {
-                if (filter_var($validated['logoUrl'], FILTER_VALIDATE_URL)) {
-                    if (!$this->brandService->validateLogoUrl($validated['logoUrl'])) {
-                        return $this->error(
-                            'Logo URL is not accessible or invalid',
-                            422,
-                            ['logoUrl' => ['The provided logo URL cannot be accessed']]
-                        );
-                    }
-                }
-            }
-
             $result = $this->brandService->updateBrandSettings($validated);
 
             // Audit log
