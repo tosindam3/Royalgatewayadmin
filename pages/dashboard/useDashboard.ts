@@ -42,7 +42,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'quick-stats', view],
         queryFn: dashboardApi.quickStats,
         enabled: isAdmin || isManager,
-        initialData: EMPTY_QUICK_STATS,
+        placeholderData: EMPTY_QUICK_STATS,
         ...Q,
       },
       // 1 — attendance pulse (admin + manager)
@@ -50,7 +50,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'attendance-pulse', view],
         queryFn: dashboardApi.attendancePulse,
         enabled: isAdmin || isManager,
-        initialData: EMPTY_ATTENDANCE_PULSE,
+        placeholderData: EMPTY_ATTENDANCE_PULSE,
         staleTime: 60 * 1000,
         gcTime: 5 * 60 * 1000,
         retry: 2,
@@ -61,7 +61,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'talent-trends', view],
         queryFn: dashboardApi.talentTrends,
         enabled: isAdmin,
-        initialData: EMPTY_TALENT_TRENDS,
+        placeholderData: EMPTY_TALENT_TRENDS,
         staleTime: 15 * 60 * 1000,
         gcTime: 20 * 60 * 1000,
         retry: 2,
@@ -72,7 +72,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'demographics', view],
         queryFn: dashboardApi.demographics,
         enabled: isAdmin,
-        initialData: EMPTY_DEMOGRAPHICS,
+        placeholderData: EMPTY_DEMOGRAPHICS,
         staleTime: 60 * 60 * 1000,
         gcTime: 70 * 60 * 1000,
         retry: 2,
@@ -83,7 +83,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'payroll-summary', view],
         queryFn: dashboardApi.payrollSummary,
         enabled: isAdmin,
-        initialData: EMPTY_PAYROLL_SUMMARY,
+        placeholderData: EMPTY_PAYROLL_SUMMARY,
         ...Q,
       },
       // 5 — pending approvals (admin + manager)
@@ -91,7 +91,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'pending-approvals', view],
         queryFn: dashboardApi.pendingApprovals,
         enabled: isAdmin || isManager,
-        initialData: [] as any[],
+        placeholderData: [] as any[],
         ...Q,
       },
       // 6 — team attendance (manager only)
@@ -99,7 +99,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'team-attendance', view],
         queryFn: dashboardApi.teamAttendance,
         enabled: isManager,
-        initialData: [] as any[],
+        placeholderData: [] as any[],
         staleTime: 60 * 1000,
         gcTime: 5 * 60 * 1000,
         retry: 2,
@@ -110,7 +110,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'top-performers', view],
         queryFn: dashboardApi.topPerformers,
         enabled: isAdmin || isManager,
-        initialData: [] as any[],
+        placeholderData: [] as any[],
         staleTime: 10 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         retry: 2,
@@ -121,7 +121,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'my-summary', view],
         queryFn: dashboardApi.mySummary,
         enabled: isEmployee,
-        initialData: EMPTY_PERSONAL_SUMMARY,
+        placeholderData: EMPTY_PERSONAL_SUMMARY,
         staleTime: 2 * 60 * 1000,
         gcTime: 5 * 60 * 1000,
         retry: 2,
@@ -132,7 +132,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'personal-performance', view],
         queryFn: dashboardApi.personalPerformance,
         enabled: isEmployee,
-        initialData: EMPTY_PERSONAL_PERFORMANCE,
+        placeholderData: EMPTY_PERSONAL_PERFORMANCE,
         staleTime: 10 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         retry: 2,
@@ -143,7 +143,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
         queryKey: ['dashboard', 'leave-balances', view],
         queryFn: dashboardApi.leaveBalances,
         enabled: isEmployee,
-        initialData: [] as any[],
+        placeholderData: [] as any[],
         ...Q,
       },
     ],
@@ -163,7 +163,7 @@ export function useDashboard(role: UserRole, permissions: UserPermissions | null
     leaveBalances,
   ] = results;
 
-  const isLoading = results.some(r => r.isFetching && !r.data);
+  const isLoading = results.some(r => r.isFetching && r.isPlaceholderData);
 
   return {
     view,
