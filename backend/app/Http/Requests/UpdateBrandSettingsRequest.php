@@ -29,8 +29,8 @@ class UpdateBrandSettingsRequest extends FormRequest
     {
         return [
             'companyName' => 'required|string|min:2|max:255',
-            'logoUrl' => 'nullable|string|max:2048',
-            'primaryColor' => ['required', 'string', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+            'logoUrl' => ['nullable', 'string', 'max:2048000'],
+            'primaryColor' => ['required', 'string', 'hex_color'],
         ];
     }
 
@@ -44,9 +44,9 @@ class UpdateBrandSettingsRequest extends FormRequest
             'companyName.min' => 'Company name must be at least 2 characters',
             'companyName.max' => 'Company name cannot exceed 255 characters',
             'logoUrl.url' => 'Logo URL must be a valid URL',
-            'logoUrl.max' => 'Logo URL cannot exceed 2048 characters',
+            'logoUrl.max' => 'Logo URL cannot exceed 2MB',
             'primaryColor.required' => 'Primary color is required',
-            'primaryColor.regex' => 'Primary color must be a valid hex color code (e.g., #8252e9)',
+            'primaryColor.hex_color' => 'Primary color must be a valid hex color code (e.g., #8252e9)',
         ];
     }
 

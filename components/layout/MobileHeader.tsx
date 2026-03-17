@@ -39,11 +39,11 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
           </svg>
         </button>
         
-        {brand.logoUrl ? (
-          <img src={brand.logoUrl} className="w-8 h-8 rounded-lg object-cover shadow-sm" alt="Logo" />
+        {brand.logo_url ? (
+          <img src={brand.logo_url} className="w-8 h-8 rounded-lg object-cover shadow-sm" alt="Logo" />
         ) : (
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/40 shrink-0">
-            <span className="font-black text-sm text-white italic">{brand.companyName.charAt(0)}</span>
+            <span className="font-black text-sm text-white italic">{(brand.company_name || 'H').charAt(0)}</span>
           </div>
         )}
       </div>

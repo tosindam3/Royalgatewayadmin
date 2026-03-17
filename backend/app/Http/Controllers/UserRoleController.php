@@ -48,23 +48,12 @@ class UserRoleController extends Controller
 
         try {
             DB::transaction(function () use ($user, $validated, $currentUser) {
-                // Singleton Superadmin Enforcement
+                // Superadmin Authorization Check
                 $superRole = Role::where('name', 'super_admin')->first();
                 if ($superRole && (in_array($superRole->id, $validated['role_ids']) || ($validated['primary_role_id'] ?? null) == $superRole->id)) {
-                    // 1. Only existing super_admin can assign super_admin role
+                    // Only existing super_admin can assign super_admin role
                     if (!$currentUser || !$currentUser->hasRole('super_admin')) {
                         throw new \Exception('Only the Super Administrator can assign the super_admin role.');
-                    }
-
-                    // 2. Check if another user already has the role (check both pivot and primary_role_id)
-                    $existingSuper = User::where(function($q) use ($superRole) {
-                        $q->whereHas('roles', function ($sub) use ($superRole) {
-                            $sub->where('roles.id', $superRole->id);
-                        })->orWhere('primary_role_id', $superRole->id);
-                    })->where('users.id', '!=', $user->id)->exists();
-
-                    if ($existingSuper) {
-                        throw new \Exception('A Super Administrator already exists. There can only be one global superadmin.');
                     }
                 }
 
@@ -169,27 +158,11 @@ class UserRoleController extends Controller
 
         try {
             DB::transaction(function () use ($validated, $role, $currentUser) {
-                // Singleton Superadmin Enforcement
+                // Superadmin Authorization Check
                 if ($role->name === 'super_admin') {
-                    // 1. Only existing super_admin can assign super_admin role
+                    // Only existing super_admin can assign super_admin role
                     if (!$currentUser || !$currentUser->hasRole('super_admin')) {
                         throw new \Exception('Only the Super Administrator can assign the super_admin role.');
-                    }
-
-                    // 2. Prevent bulk assignment if it would result in > 1 superadmin
-                    if (count($validated['user_ids']) > 1) {
-                        throw new \Exception('There can only be one global superadmin. Bulk assignment of this role is not permitted.');
-                    }
-
-                    // 3. Check if another user already has the role
-                    $existingSuper = User::where(function($q) use ($role) {
-                        $q->whereHas('roles', function ($sub) use ($role) {
-                            $sub->where('roles.id', $role->id);
-                        })->orWhere('primary_role_id', $role->id);
-                    })->where('users.id', '!=', $validated['user_ids'][0])->exists();
-
-                    if ($existingSuper) {
-                        throw new \Exception('A Super Administrator already exists. There can only be one global superadmin.');
                     }
                 }
 

@@ -201,7 +201,9 @@ const MainApp: React.FC<{
           <div className="max-w-[1400px] mx-auto animate-fade-in h-full flex flex-col">
             <Suspense fallback={<PageSkeleton />}>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={
+                  <Dashboard userRole={currentUserRole} userPermissions={userPermissions} userProfile={userProfile} />
+                } />
 
                 {/* My Attendance - Available to all users */}
                 <Route path="/me/attendance" element={<MyAttendance />} />
@@ -271,6 +273,7 @@ const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: '',
     username: '',
+    email: '',
     avatar: '',
     employee_id: undefined
   });
@@ -280,9 +283,9 @@ const App: React.FC = () => {
 
   // Convert brand settings to legacy format for compatibility
   const brand: BrandSettings = {
-    companyName: brandSettings?.company_name || 'HR360',
-    logoUrl: brandSettings?.logo_url || '',
-    primaryColor: brandSettings?.primary_color || '#8252e9'
+    company_name: brandSettings?.company_name || 'HR360',
+    logo_url: brandSettings?.logo_url || '',
+    primary_color: brandSettings?.primary_color || '#8252e9'
   };
 
   useEffect(() => {
@@ -310,6 +313,7 @@ const App: React.FC = () => {
             setUserProfile({
               name: user.display_name || user.name,
               username: user.email,
+              email: user.email,
               avatar: user.employee_profile?.avatar || '',
               employee_id: user.employee_profile?.id
             });
@@ -343,6 +347,7 @@ const App: React.FC = () => {
       setUserProfile({
         name: user.display_name || user.name,
         username: user.email,
+        email: user.email,
         avatar: user.employee_profile?.avatar || '',
         employee_id: user.employee_profile?.id
       });
@@ -389,9 +394,9 @@ const App: React.FC = () => {
         brand={brand}
         onUpdateBrand={async (newBrand: BrandSettings) => {
           await updateBrandSettings({
-            primary_color: newBrand.primaryColor,
-            company_name: newBrand.companyName,
-            logo_url: newBrand.logoUrl
+            primary_color: newBrand.primary_color,
+            company_name: newBrand.company_name,
+            logo_url: newBrand.logo_url
           });
         }}
         userProfile={userProfile}

@@ -44,21 +44,21 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
         {/* Header */}
         <div className="p-6 flex items-center justify-between border-b border-slate-200 dark:border-white/5">
           <div className="flex items-center gap-3">
-            {brand.logoUrl ? (
+            {brand.logo_url ? (
               <img 
-                src={brand.logoUrl} 
+                src={brand.logo_url} 
                 className="w-10 h-10 rounded-xl object-cover shadow-lg" 
                 alt="Logo" 
               />
             ) : (
               <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-2xl shadow-orange-500/40">
                 <span className="font-black text-xl text-white italic">
-                  {brand.companyName.charAt(0)}
+                  {(brand.company_name || 'H').charAt(0)}
                 </span>
               </div>
             )}
             <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">
-              {brand.companyName}
+              {brand.company_name || 'HR360'}
             </h1>
           </div>
           

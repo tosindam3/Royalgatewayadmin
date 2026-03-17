@@ -28,6 +28,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
             Route::get('/talent-trends', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'talentTrends']);
             Route::get('/attendance-pulse', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'attendancePulse']);
             Route::get('/demographics', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'demographics']);
+            Route::get('/my-summary', [App\Http\Controllers\Api\V1\Dashboard\MetricController::class, 'mySummary']);
         });
     });
 
