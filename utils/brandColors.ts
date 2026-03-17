@@ -9,13 +9,23 @@
  * @returns RGB values as string (e.g., "130, 82, 233")
  */
 export function hexToRgb(hex: string): string {
+  if (!hex || typeof hex !== 'string') return '130, 82, 233'; // Default fallback
+  
   // Remove # if present
   const cleanHex = hex.replace('#', '');
   
-  // Parse hex values
-  const r = parseInt(cleanHex.substring(0, 2), 16);
-  const g = parseInt(cleanHex.substring(2, 4), 16);
-  const b = parseInt(cleanHex.substring(4, 6), 16);
+  // Handle shorthand hex (e.g. #03F)
+  if (cleanHex.length === 3) {
+    const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+    const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+    const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+    return `${r}, ${g}, ${b}`;
+  }
+
+  // Parse standard hex values
+  const r = parseInt(cleanHex.substring(0, 2), 16) || 0;
+  const g = parseInt(cleanHex.substring(2, 4), 16) || 0;
+  const b = parseInt(cleanHex.substring(4, 6), 16) || 0;
   
   return `${r}, ${g}, ${b}`;
 }
@@ -25,6 +35,7 @@ export function hexToRgb(hex: string): string {
  * @param color - Hex color code (e.g., "#8252e9")
  */
 export function updateBrandColor(color: string): void {
+  if (!color) return;
   const root = document.documentElement;
   const rgb = hexToRgb(color);
   

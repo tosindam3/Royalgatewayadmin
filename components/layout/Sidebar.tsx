@@ -80,14 +80,14 @@ const Sidebar: React.FC<SidebarProps> = ({ brand, isCollapsed, onToggleCollapse,
         <aside className={`hidden md:flex flex-col border-r border-slate-200 dark:border-white/5 glass transition-all duration-500 ease-in-out ${isCollapsed ? 'w-20' : 'w-72'}`}>
             <div className="p-7 flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3 overflow-hidden">
-                    {brand.logoUrl ? (
-                        <img src={brand.logoUrl} className="w-10 h-10 rounded-xl object-cover shadow-lg" alt="Logo" />
+                    {brand.logo_url ? (
+                        <img src={brand.logo_url} className="w-10 h-10 rounded-xl object-cover shadow-lg" alt="Logo" />
                     ) : (
                         <div className="w-10 h-10 bg-orange-500 rounded-xl flex-shrink-0 flex items-center justify-center shadow-2xl shadow-orange-500/40">
-                            <span className="font-black text-xl text-white italic">{brand.companyName.charAt(0)}</span>
+                            <span className="font-black text-xl text-white italic">{(brand.company_name || 'H').charAt(0)}</span>
                         </div>
                     )}
-                    {!isCollapsed && <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic animate-in fade-in slide-in-from-left-2">{brand.companyName}</h1>}
+                    {!isCollapsed && <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic animate-in fade-in slide-in-from-left-2">{brand.company_name || 'HR360'}</h1>}
                 </div>
             </div>
             <nav className="flex-1 overflow-y-auto no-scrollbar space-y-0.5">

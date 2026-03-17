@@ -12,9 +12,9 @@ export const mapBackendRoleToUserRole = (roles?: { name: string }[]): UserRole =
   // Handle both slug and name from backend, and normalize for matching
   const roleNames = roles.map(r => (r.name || '').toLowerCase().replace(/\s+/g, '_'));
   
-  if (roleNames.includes('super_admin')) return UserRole.SUPER_ADMIN;
-  if (roleNames.includes('admin') || roleNames.includes('hr_admin')) return UserRole.ADMIN;
-  if (roleNames.includes('hr_manager') || roleNames.includes('branch_manager') || roleNames.includes('department_head') || roleNames.includes('team_lead') || roleNames.includes('manager')) return UserRole.MANAGER;
+  if (roleNames.includes('super_admin') || roleNames.includes('ceo')) return UserRole.SUPER_ADMIN;
+  if (roleNames.includes('admin') || roleNames.includes('hr_admin') || roleNames.includes('hr_manager')) return UserRole.ADMIN;
+  if (roleNames.includes('branch_manager') || roleNames.includes('department_head') || roleNames.includes('team_lead') || roleNames.includes('manager')) return UserRole.MANAGER;
 
   return UserRole.EMPLOYEE;
 };
@@ -387,9 +387,9 @@ export interface FormTemplate {
 }
 
 export interface BrandSettings {
-  companyName: string;
-  logoUrl: string;
-  primaryColor: string;
+  company_name: string;
+  logo_url: string;
+  primary_color: string;
 }
 
 export interface SecurityAlert {

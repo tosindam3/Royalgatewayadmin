@@ -160,7 +160,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
             <button
               onClick={onGetStarted}
               className="px-6 py-2.5 rounded-xl text-[10px] font-black text-white uppercase tracking-[0.2em] shadow-lg hover:scale-105 active:scale-95 transition-all shadow-purple-500/20"
-              style={{ backgroundColor: brand.primaryColor }}
+              style={{ backgroundColor: brand.primary_color }}
             >
               GET STARTED
             </button>
@@ -199,7 +199,7 @@ const Landing: React.FC<LandingProps> = ({ onGetStarted, onLogin, brand }) => {
             <button
               onClick={onGetStarted}
               className="w-full sm:w-auto px-10 py-5 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:scale-[1.02] active:scale-98 transition-all shadow-purple-500/30"
-              style={{ backgroundColor: brand.primaryColor }}
+              style={{ backgroundColor: brand.primary_color }}
             >
               Start Company Onboarding
             </button>

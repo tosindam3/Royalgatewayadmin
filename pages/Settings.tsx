@@ -27,8 +27,8 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
 
   // Update CSS variables when brand color changes
   useEffect(() => {
-    updateBrandColor(localBrand.primaryColor);
-  }, [localBrand.primaryColor]);
+    updateBrandColor(localBrand.primary_color);
+  }, [localBrand.primary_color]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -46,7 +46,7 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onloadend = () => {
-        setLocalBrand({ ...localBrand, logoUrl: reader.result as string });
+        setLocalBrand({ ...localBrand, logo_url: reader.result as string });
       };
       reader.readAsDataURL(file);
     }
@@ -69,7 +69,7 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
           }`}
         >
           My Profile
-          {activeTab === 'profile' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primaryColor }} />}
+          {activeTab === 'profile' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primary_color }} />}
         </button>
         <button 
           onClick={() => setActiveTab('brand')}
@@ -80,7 +80,7 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
           }`}
         >
           Company Branding
-          {activeTab === 'brand' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primaryColor }} />}
+          {activeTab === 'brand' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primary_color }} />}
         </button>
         <button 
           onClick={() => setActiveTab('currency')}
@@ -91,7 +91,7 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
           }`}
         >
           Currency Settings
-          {activeTab === 'currency' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primaryColor }} />}
+          {activeTab === 'currency' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primary_color }} />}
         </button>
       </div>
 
@@ -112,9 +112,9 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                         className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                       />
                       <div className="w-32 h-32 rounded-[40px] border-2 border-dashed border-slate-300 dark:border-white/10 transition-all flex items-center justify-center overflow-hidden bg-slate-100 dark:bg-white/5 relative shadow-xl group-hover:border-opacity-100"
-                        style={{ borderColor: `${localBrand.primaryColor}50` }}
-                        onMouseEnter={(e) => e.currentTarget.style.borderColor = `${localBrand.primaryColor}80`}
-                        onMouseLeave={(e) => e.currentTarget.style.borderColor = `${localBrand.primaryColor}50`}
+                        style={{ borderColor: `${localBrand.primary_color}50` }}
+                        onMouseEnter={(e) => e.currentTarget.style.borderColor = `${localBrand.primary_color}80`}
+                        onMouseLeave={(e) => e.currentTarget.style.borderColor = `${localBrand.primary_color}50`}
                       >
                         {localProfile.avatar ? (
                           <img src={localProfile.avatar} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Avatar Preview" />
@@ -162,8 +162,8 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                     onClick={handleSaveProfile}
                     className="px-10 py-4 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
                     style={{ 
-                      backgroundColor: localBrand.primaryColor,
-                      boxShadow: `0 20px 25px -5px ${localBrand.primaryColor}20, 0 8px 10px -6px ${localBrand.primaryColor}20`
+                      backgroundColor: localBrand.primary_color,
+                      boxShadow: `0 20px 25px -5px ${localBrand.primary_color}20, 0 8px 10px -6px ${localBrand.primary_color}20`
                     }}
                    >
                      Update Profile Identity
@@ -184,12 +184,12 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                       <label className="text-[10px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest block mb-2">Company Trading Name</label>
                       <input 
                         type="text" 
-                        value={localBrand.companyName}
-                        onChange={(e) => setLocalBrand({...localBrand, companyName: e.target.value})}
+                        value={localBrand.company_name}
+                        onChange={(e) => setLocalBrand({...localBrand, company_name: e.target.value})}
                         placeholder="e.g. Acme Corp" 
                         className="w-full bg-slate-50 dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-2xl px-6 py-3.5 text-sm text-slate-900 dark:text-white outline-none transition-all placeholder:text-slate-400 focus:border-opacity-100"
                         style={{ borderColor: 'inherit' }}
-                        onFocus={(e) => e.currentTarget.style.borderColor = localBrand.primaryColor}
+                        onFocus={(e) => e.currentTarget.style.borderColor = localBrand.primary_color}
                         onBlur={(e) => e.currentTarget.style.borderColor = ''}
                       />
                     </div>
@@ -203,13 +203,13 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                           className="absolute inset-0 opacity-0 cursor-pointer z-10" 
                         />
                         <div className="w-full bg-slate-50 dark:bg-white/5 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl px-6 py-8 flex flex-col items-center justify-center transition-all group-hover:border-opacity-100"
-                          style={{ borderColor: `${localBrand.primaryColor}50` }}
-                          onMouseEnter={(e) => e.currentTarget.style.borderColor = `${localBrand.primaryColor}80`}
-                          onMouseLeave={(e) => e.currentTarget.style.borderColor = `${localBrand.primaryColor}50`}
+                          style={{ borderColor: `${localBrand.primary_color}50` }}
+                          onMouseEnter={(e) => e.currentTarget.style.borderColor = `${localBrand.primary_color}80`}
+                          onMouseLeave={(e) => e.currentTarget.style.borderColor = `${localBrand.primary_color}50`}
                         >
-                          {localBrand.logoUrl ? (
+                          {localBrand.logo_url ? (
                             <div className="flex flex-col items-center gap-3">
-                              <img src={localBrand.logoUrl} className="w-16 h-16 object-contain rounded-lg" alt="Logo Preview" />
+                              <img src={localBrand.logo_url} className="w-16 h-16 object-contain rounded-lg" alt="Logo Preview" />
                               <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Click to change logo</span>
                             </div>
                           ) : (
@@ -230,12 +230,12 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                      <div className="text-[10px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest mb-2">Live Logo Preview</div>
                      <div 
                       className="w-24 h-24 rounded-3xl flex items-center justify-center shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative overflow-hidden"
-                      style={{ backgroundColor: localBrand.primaryColor }}
+                      style={{ backgroundColor: localBrand.primary_color }}
                      >
-                       {localBrand.logoUrl ? (
-                         <img src={localBrand.logoUrl} className="w-full h-full object-cover" alt="Preview" />
+                       {localBrand.logo_url ? (
+                         <img src={localBrand.logo_url} className="w-full h-full object-cover" alt="Preview" />
                        ) : (
-                         <span className="text-white text-4xl font-black italic">{localBrand.companyName.charAt(0)}</span>
+                         <span className="text-white text-4xl font-black italic">{localBrand.company_name.charAt(0)}</span>
                        )}
                      </div>
                   </div>
@@ -246,12 +246,12 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                   <div className="flex items-center gap-6">
                     <input 
                       type="color" 
-                      value={localBrand.primaryColor}
-                      onChange={(e) => setLocalBrand({...localBrand, primaryColor: e.target.value})}
+                      value={localBrand.primary_color}
+                      onChange={(e) => setLocalBrand({...localBrand, primary_color: e.target.value})}
                       className="w-16 h-16 rounded-2xl bg-transparent border-0 p-0 cursor-pointer"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-900 dark:text-white mb-1 uppercase tracking-tight">{localBrand.primaryColor}</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white mb-1 uppercase tracking-tight">{localBrand.primary_color}</p>
                       <p className="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-relaxed">This color will be applied to buttons, active navigation states, and systemic highlights across the entire workspace.</p>
                     </div>
                   </div>
@@ -262,8 +262,8 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
                     onClick={handleSaveBrand}
                     className="px-10 py-4 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
                     style={{ 
-                      backgroundColor: localBrand.primaryColor,
-                      boxShadow: `0 20px 25px -5px ${localBrand.primaryColor}20, 0 8px 10px -6px ${localBrand.primaryColor}20`
+                      backgroundColor: localBrand.primary_color,
+                      boxShadow: `0 20px 25px -5px ${localBrand.primary_color}20, 0 8px 10px -6px ${localBrand.primary_color}20`
                     }}
                    >
                      Apply Corporate Branding
@@ -293,13 +293,13 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
 
                <div className="space-y-3 opacity-40 pointer-events-none grayscale">
                   <div className="flex gap-2">
-                    <div className="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase text-white" style={{ backgroundColor: localBrand.primaryColor }}>Active Tab</div>
+                    <div className="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase text-white" style={{ backgroundColor: localBrand.primary_color }}>Active Tab</div>
                     <div className="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-white/5">Normal Tab</div>
                   </div>
                   <div className="h-1 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full" style={{ width: '65%', backgroundColor: localBrand.primaryColor }} />
+                      <div className="h-full" style={{ width: '65%', backgroundColor: localBrand.primary_color }} />
                   </div>
-                  <button className="w-full py-3 rounded-xl text-white font-black text-[9px] uppercase tracking-widest shadow-lg" style={{ backgroundColor: localBrand.primaryColor }}>
+                  <button className="w-full py-3 rounded-xl text-white font-black text-[9px] uppercase tracking-widest shadow-lg" style={{ backgroundColor: localBrand.primary_color }}>
                     Branded Action Button
                   </button>
                </div>

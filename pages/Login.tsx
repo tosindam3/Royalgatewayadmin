@@ -43,7 +43,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
     weekStartDay: 'Monday',
     logo: null as File | null,
     logoPreview: '',
-    primaryColor: brand.primaryColor,
+    primaryColor: brand.primary_color,
     subdomain: '',
     emailSender: ''
   });
@@ -204,7 +204,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
                   className={`w-full bg-slate-50 dark:bg-[#1c1633] border border-slate-100 dark:border-white/5 rounded-full py-4 pl-14 pr-6 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 focus:outline-none focus:ring-2 transition-all shadow-inner`}
-                  style={{ '--tw-ring-color': `${brand.primaryColor}33` } as any}
+                  style={{ '--tw-ring-color': `${brand.primary_color}33` } as any}
                   required
                 />
               </div>
@@ -217,7 +217,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   className={`w-full bg-slate-50 dark:bg-[#1c1633] border border-slate-100 dark:border-white/5 rounded-full py-4 pl-14 pr-14 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/20 focus:outline-none focus:ring-2 transition-all shadow-inner`}
-                  style={{ '--tw-ring-color': `${brand.primaryColor}33` } as any}
+                  style={{ '--tw-ring-color': `${brand.primary_color}33` } as any}
                   required
                 />
                 <button
@@ -235,7 +235,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToLanding, initialMode = '
                 isLoading={isAuthenticating}
                 loadingText="Authenticating..."
                 className="w-full mt-10 py-5 rounded-full"
-                style={{ backgroundColor: brand.primaryColor, boxShadow: `0 12px 32px -8px ${brand.primaryColor}80` }}
+                style={{ backgroundColor: brand.primary_color, boxShadow: `0 12px 32px -8px ${brand.primary_color}80` }}
               >
                 AUTHORIZE ACCESS
               </Button>
