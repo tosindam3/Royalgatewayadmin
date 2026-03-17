@@ -36,13 +36,11 @@ class OrganizationSetting extends Model
         static::saved(function ($setting) {
             Cache::forget("settings.{$setting->key}");
             Cache::forget('brand_settings');
-            Cache::tags(['settings'])->flush();
         });
 
         static::deleted(function ($setting) {
             Cache::forget("settings.{$setting->key}");
             Cache::forget('brand_settings');
-            Cache::tags(['settings'])->flush();
         });
     }
 }

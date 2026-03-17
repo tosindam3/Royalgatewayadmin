@@ -13,12 +13,19 @@ class UpdateBrandSettingsRequest extends FormRequest
     {
         $user = $this->user();
         if (!$user) return false;
-        
-        // Check via Spatie roles
-        if (method_exists($user, 'hasAnyRole')) {
-            return $user->hasAnyRole(['super_admin', 'admin', 'hr_manager', 'ceo']);
+
+        $allowedRoles = ['super_admin', 'admin', 'hr_manager', 'ceo'];
+
+        // Check the role column directly (fastest, no relation load needed)
+        if (in_array($user->role, $allowedRoles)) {
+            return true;
         }
-        
+
+        // Check via custom hasAnyRole (loads primaryRole + roles relations)
+        if (method_exists($user, 'hasAnyRole')) {
+            return $user->hasAnyRole($allowedRoles);
+        }
+
         return false;
     }
 
