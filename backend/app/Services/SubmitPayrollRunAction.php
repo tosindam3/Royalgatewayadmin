@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Log;
 class SubmitPayrollRunAction
 {
     public function __construct(
-        private PayrollRunGuard $guard
+        private PayrollRunGuard $guard,
+        private PayrollWorkflowResolver $workflowResolver,
+        private PayrollNotificationService $notificationService
     ) {}
 
     /**
@@ -35,94 +37,85 @@ class SubmitPayrollRunAction
         $this->guard->assertSubmittable($run);
 
         return DB::transaction(function () use ($run, $submitter, $message) {
+            // Resolve workflow automatically based on run characteristics
+            $workflow = $this->workflowResolver->resolveWorkflow($run);
+            
+            // Get first approver from workflow
+            $firstApproverId = $this->workflowResolver->getFirstApprover($workflow, $run);
+            
+            if (!$firstApproverId) {
+                throw new \Exception('Unable to determine approver for this payroll run. Please check workflow configuration.');
+            }
+
             // Create approval request
             $approvalRequest = ApprovalRequest::create([
                 'request_number' => $this->generateRequestNumber(),
-                'workflow_id' => $this->getPayrollWorkflowId(),
+                'workflow_id' => $workflow->id,
                 'requestable_type' => PayrollRun::class,
                 'requestable_id' => $run->id,
                 'requester_id' => $submitter->id,
                 'status' => 'pending',
                 'current_step' => 1,
-                'current_approver_id' => $run->approver_user_id,
+                'current_approver_id' => $firstApproverId,
                 'requester_comment' => $message,
                 'submitted_at' => now(),
+                'metadata' => [
+                    'total_net' => $run->total_net,
+                    'employee_count' => $run->employees()->count(),
+                    'scope_type' => $run->scope_type,
+                    'scope_ref_id' => $run->scope_ref_id,
+                ],
             ]);
 
-            // Update payroll run
+            // Update payroll run with auto-resolved approver
             $run->update([
                 'status' => 'submitted',
                 'submitted_at' => now(),
                 'approval_request_id' => $approvalRequest->id,
+                'approver_user_id' => $firstApproverId, // Set for backward compatibility
             ]);
+
+            // Get first step for action logging
+            $firstStep = $workflow->steps()->where('step_order', 1)->first();
 
             // Insert approval action (submitted)
             ApprovalAction::create([
                 'request_id' => $approvalRequest->id,
-                'step_id' => 1, // v1: single step
+                'step_id' => $firstStep?->id ?? 1,
                 'approver_id' => $submitter->id,
                 'action' => 'approved', // Submitter "approves" to move to next step
                 'comment' => $message,
                 'acted_at' => now(),
             ]);
 
-            // Queue notification (MUST NOT fail the submission)
-            $this->queueNotification($run, $approvalRequest, $message);
+            // Send notification to approver (MUST NOT fail the submission)
+            try {
+                $approver = User::find($firstApproverId);
+                if ($approver) {
+                    $this->notificationService->notifyApprovalPending($run, $approvalRequest, $approver);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to send approval notification', [
+                    'run_id' => $run->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             Log::info("Payroll run submitted for approval", [
                 'run_id' => $run->id,
                 'approval_request_id' => $approvalRequest->id,
-                'approver_id' => $run->approver_user_id,
+                'workflow_id' => $workflow->id,
+                'workflow_name' => $workflow->name,
+                'approver_id' => $firstApproverId,
             ]);
 
             return [
                 'approval_request_id' => $approvalRequest->id,
                 'run_status' => 'submitted',
+                'workflow_name' => $workflow->name,
+                'approver_name' => $approver->name ?? 'Unknown',
             ];
         });
-    }
-
-    /**
-     * Queue notification for approver
-     * 
-     * @param PayrollRun $run
-     * @param ApprovalRequest $approvalRequest
-     * @param string|null $message
-     * @return void
-     */
-    private function queueNotification(PayrollRun $run, ApprovalRequest $approvalRequest, ?string $message): void
-    {
-        try {
-            NotificationOutbox::create([
-                'channel' => 'memo',
-                'event_key' => 'payroll_submitted',
-                'recipient_user_id' => $run->approver_user_id,
-                'payload_json' => [
-                    'run_id' => $run->id,
-                    'approval_request_id' => $approvalRequest->id,
-                    'period_name' => $run->period->name,
-                    'total_gross' => $run->total_gross,
-                    'total_net' => $run->total_net,
-                    'employee_count' => $run->employees()->count(),
-                    'message' => $message,
-                    'submitted_by' => $run->preparedBy->name,
-                    'submitted_at' => $run->submitted_at->toIso8601String(),
-                ],
-                'status' => 'pending',
-                'attempts' => 0,
-            ]);
-
-            Log::info("Notification queued for payroll submission", [
-                'run_id' => $run->id,
-                'recipient_id' => $run->approver_user_id,
-            ]);
-        } catch (\Exception $e) {
-            // CRITICAL: Never fail submission if notification fails
-            Log::error("Failed to queue notification for payroll submission", [
-                'run_id' => $run->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**
@@ -144,21 +137,5 @@ class SubmitPayrollRunAction
         }
 
         return "PR-{$year}-" . str_pad($number, 5, '0', STR_PAD_LEFT);
-    }
-
-    /**
-     * Get payroll workflow ID (or create if not exists)
-     * 
-     * @return int
-     */
-    private function getPayrollWorkflowId(): int
-    {
-        $workflow = \App\Models\ApprovalWorkflow::where('code', 'payroll_run_approval')->first();
-        
-        if (!$workflow) {
-            throw new \Exception('Payroll approval workflow not found. Please run PayrollWorkflowSeeder.');
-        }
-        
-        return $workflow->id;
     }
 }

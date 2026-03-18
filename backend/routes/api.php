@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Route;
 // Health Check Routes (no authentication required)
 require __DIR__.'/health.php';
 
+// Diagnostic Routes (for testing)
+require __DIR__.'/diagnostic-dashboard.php';
+
 // API v1 Routes
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
     // Authentication Routes (stricter rate limit)
@@ -252,6 +255,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::get('/runs/{id}/employees', [App\Http\Controllers\PayrollRunController::class, 'employees']);
         Route::get('/runs/{runId}/employees/{employeeId}/breakdown', [App\Http\Controllers\PayrollRunController::class, 'employeeBreakdown']);
         Route::post('/runs/{id}/recalculate', [App\Http\Controllers\PayrollRunController::class, 'recalculate']);
+        Route::post('/runs/{id}/adjust-item', [App\Http\Controllers\PayrollRunController::class, 'adjustItem']);
         Route::post('/runs/{id}/submit', [App\Http\Controllers\PayrollRunController::class, 'submit']);
 
         // Payroll Items
@@ -275,8 +279,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
         // Organization Settings
         Route::get('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'index']);
+        Route::get('/settings/pending', [App\Http\Controllers\OrganizationSettingController::class, 'pending']);
         Route::get('/settings/{key}', [App\Http\Controllers\OrganizationSettingController::class, 'show']);
         Route::post('/settings', [App\Http\Controllers\OrganizationSettingController::class, 'update']);
+        Route::post('/settings/{key}/approve', [App\Http\Controllers\OrganizationSettingController::class, 'approve']);
+        Route::post('/settings/{key}/reject', [App\Http\Controllers\OrganizationSettingController::class, 'reject']);
         
         // Currency Settings
         Route::get('/currency/settings', [App\Http\Controllers\OrganizationSettingController::class, 'getCurrencySettings']);

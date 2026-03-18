@@ -28,15 +28,10 @@ class PayrollCalculator
      *   'late_minutes' => int,
      *   'overtime_hours' => float,
      *   'performance_score' => int,
-     *   'working_days' => int
+     *   'working_days' => int,
+     *   'policy' => array // Global payroll policy from OrganizationSetting
      * ]
-     * @return array [
-     *   'gross' => float,
-     *   'total_deductions' => float,
-     *   'net' => float,
-     *   'earnings' => array,
-     *   'deductions' => array
-     * ]
+     * @return array
      */
     public function calculate(array $input): array
     {
@@ -46,79 +41,108 @@ class PayrollCalculator
         $overtimeHours = (float) ($input['overtime_hours'] ?? 0);
         $performanceScore = (int) ($input['performance_score'] ?? 0);
         $workingDays = (int) ($input['working_days'] ?? 22);
+        
+        // Policy inputs
+        $policy = $input['policy'] ?? [];
+        $attPolicy = $policy['attendance'] ?? [];
+        $perfPolicy = $policy['performance'] ?? [];
+        $otPolicy = $policy['overtime'] ?? [];
 
         // Calculate rates
         $dailyRate = $workingDays > 0 ? $baseSalary / $workingDays : 0;
-        $hourlyRate = $dailyRate / self::WORKING_HOURS_PER_DAY;
+        $hourlyRate = $dailyRate / ($attPolicy['working_hours_per_day'] ?? 8);
 
-        // Calculate earnings
+        // Earnings
         $earnings = [];
         $earnings[] = [
             'code' => 'BASE_SALARY',
             'label' => 'Base Salary',
+            'system_calculated' => round($baseSalary, 2),
             'amount' => round($baseSalary, 2),
         ];
 
-        // Overtime pay
+        // Overtime Pay
         $overtimePay = 0;
-        if ($overtimeHours > 0) {
-            $overtimePay = $overtimeHours * $hourlyRate * self::OVERTIME_MULTIPLIER;
+        if ($overtimeHours > 0 && ($otPolicy['enabled'] ?? true)) {
+            $multiplier = $otPolicy['multiplier'] ?? 1.5;
+            $overtimePay = $overtimeHours * $hourlyRate * $multiplier;
             $earnings[] = [
                 'code' => 'OVERTIME',
                 'label' => 'Overtime Pay',
+                'system_calculated' => round($overtimePay, 2),
                 'amount' => round($overtimePay, 2),
             ];
         }
 
-        // Performance bonus (score >= 80)
+        // Performance Bonus
         $performanceBonus = 0;
-        if ($performanceScore >= self::PERFORMANCE_BONUS_THRESHOLD) {
-            $performanceBonus = $baseSalary * self::PERFORMANCE_BONUS_PERCENT;
+        if (($perfPolicy['bonus_enabled'] ?? true) && $performanceScore >= ($perfPolicy['bonus_threshold'] ?? 80)) {
+            $percent = ($perfPolicy['bonus_percentage'] ?? 5) / 100;
+            $performanceBonus = $baseSalary * $percent;
             $earnings[] = [
                 'code' => 'PERFORMANCE_BONUS',
                 'label' => 'Performance Bonus',
+                'system_calculated' => round($performanceBonus, 2),
                 'amount' => round($performanceBonus, 2),
             ];
         }
 
-        // Calculate deductions
+        // Deductions
         $deductions = [];
 
-        // Absent days deduction
+        // Absent Days Deduction
         $absentDeduction = 0;
         if ($absentDays > 0) {
-            $absentDeduction = $absentDays * $dailyRate;
+            $deductionType = $attPolicy['absent_penalty_type'] ?? 'daily_pay';
+            if ($deductionType === 'daily_pay') {
+                $multiplier = $attPolicy['absent_penalty_multiplier'] ?? 1;
+                $absentDeduction = $absentDays * $dailyRate * $multiplier;
+            } else {
+                $absentDeduction = $absentDays * ($attPolicy['absent_penalty_flat_amount'] ?? 0);
+            }
+
             $deductions[] = [
                 'code' => 'ABSENT_DEDUCTION',
                 'label' => 'Absent Days Deduction',
+                'system_calculated' => round($absentDeduction, 2),
                 'amount' => round($absentDeduction, 2),
             ];
         }
 
-        // Late penalty
+        // Late Penalty
         $latePenalty = 0;
-        if ($lateMinutes > 0) {
-            $lateHours = $lateMinutes / 60;
-            $latePenalty = $lateHours * $hourlyRate * self::LATE_PENALTY_MULTIPLIER;
+        $gracePeriod = $attPolicy['grace_period_minutes'] ?? 15;
+        if ($lateMinutes > $gracePeriod && ($attPolicy['late_penalty_enabled'] ?? true)) {
+            $penaltyType = $attPolicy['late_penalty_type'] ?? 'hourly_rate';
+            if ($penaltyType === 'hourly_rate') {
+                $penaltyValue = $attPolicy['late_penalty_value'] ?? 1; // e.g. 1 hour
+                $latePenalty = $penaltyValue * $hourlyRate;
+            } else {
+                $latePenalty = $attPolicy['late_penalty_flat_amount'] ?? 0;
+            }
+
             $deductions[] = [
                 'code' => 'LATE_PENALTY',
                 'label' => 'Late Penalty',
+                'system_calculated' => round($latePenalty, 2),
                 'amount' => round($latePenalty, 2),
             ];
         }
 
-        // Performance penalty (score < 60)
+        // Performance Deduction
         $performancePenalty = 0;
-        if ($performanceScore > 0 && $performanceScore < self::PERFORMANCE_PENALTY_THRESHOLD) {
-            $performancePenalty = $baseSalary * self::PERFORMANCE_PENALTY_PERCENT;
+        if (($perfPolicy['penalty_enabled'] ?? true) && $performanceScore > 0 && $performanceScore < ($perfPolicy['penalty_threshold'] ?? 40)) {
+            $percent = ($perfPolicy['penalty_percentage'] ?? 5) / 100;
+            $performancePenalty = $baseSalary * $percent;
             $deductions[] = [
                 'code' => 'PERFORMANCE_PENALTY',
                 'label' => 'Performance Penalty',
+                'system_calculated' => round($performancePenalty, 2),
                 'amount' => round($performancePenalty, 2),
             ];
         }
 
-        // Calculate totals
+        // Totals
         $grossPay = $baseSalary + $overtimePay + $performanceBonus;
         $totalDeductions = $absentDeduction + $latePenalty + $performancePenalty;
         $netPay = $grossPay - $totalDeductions;
@@ -129,6 +153,7 @@ class PayrollCalculator
             'net' => round($netPay, 2),
             'earnings' => $earnings,
             'deductions' => $deductions,
+            'policy_version' => $policy['version'] ?? 'default'
         ];
     }
 

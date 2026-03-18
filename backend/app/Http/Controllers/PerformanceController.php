@@ -60,12 +60,9 @@ class PerformanceController extends Controller
             ->orderBy('year', 'desc')
             ->pluck('year');
             
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'periods' => $periods,
-                'years' => $years
-            ]
+        return $this->success([
+            'periods' => $periods,
+            'years' => $years
         ]);
     }
 
@@ -88,10 +85,7 @@ class PerformanceController extends Controller
         $submissions = $query->orderBy('created_at', 'desc')
             ->paginate($request->per_page ?? 20);
 
-        return response()->json([
-            'success' => true,
-            'data' => $submissions
-        ]);
+        return $this->success($submissions);
     }
 
     // Create new submission
@@ -136,11 +130,7 @@ class PerformanceController extends Controller
 
         Cache::tags(['performance'])->flush();
 
-        return response()->json([
-            'success' => true,
-            'data'    => $submission,
-            'message' => 'Submission created successfully',
-        ], 201);
+        return $this->success($submission, 'Submission created successfully', 201);
     }
 
     // Save draft
@@ -166,11 +156,7 @@ class PerformanceController extends Controller
             ]
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => $draft,
-            'message' => 'Draft saved successfully'
-        ]);
+        return $this->success($draft, 'Draft saved successfully');
     }
 
     // Get draft
@@ -186,10 +172,7 @@ class PerformanceController extends Controller
             ->where('status', 'draft')
             ->first();
 
-        return response()->json([
-            'success' => true,
-            'data' => $draft
-        ]);
+        return $this->success($draft);
     }
 
     // Get leaderboard
@@ -232,10 +215,7 @@ class PerformanceController extends Controller
                 });
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $leaderboard
-        ]);
+        return $this->success($leaderboard);
     }
 
     // Get department summaries
@@ -283,10 +263,7 @@ class PerformanceController extends Controller
                 });
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $summaries
-        ]);
+        return $this->success($summaries);
     }
 
     // Individual Employee Personal Analytics
@@ -298,13 +275,18 @@ class PerformanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        if (!$user->employee_id) {
-            return response()->json(['success' => false, 'message' => 'Not an employee'], 403);
-        }
-
-        $employee = Employee::find($user->employee_id);
+        $employee = $user->employeeProfile;
         if (!$employee) {
-            return response()->json(['success' => false, 'message' => 'Employee record not found'], 404);
+            // Return empty state instead of error for employees without submissions
+            return $this->success([
+                'current_score' => 0,
+                'rating' => null,
+                'department_average' => 0,
+                'organization_average' => 0,
+                'history' => [],
+                'latest_breakdown' => [],
+                'has_submission' => false,
+            ]);
         }
 
         // Fetch user's historical submissions
@@ -315,7 +297,25 @@ class PerformanceController extends Controller
             ->get();
 
         if ($submissions->isEmpty()) {
-            return response()->json(['success' => true, 'data' => null]);
+            // Return empty state with department/org averages
+            $deptAvg = PerformanceSubmission::where('department_id', $employee->department_id)
+                ->where('status', 'submitted')
+                ->whereNotNull('score')
+                ->avg('score');
+
+            $orgAvg = PerformanceSubmission::where('status', 'submitted')
+                ->whereNotNull('score')
+                ->avg('score');
+
+            return $this->success([
+                'current_score' => 0,
+                'rating' => null,
+                'department_average' => round($deptAvg ?? 0, 2),
+                'organization_average' => round($orgAvg ?? 0, 2),
+                'history' => [],
+                'latest_breakdown' => [],
+                'has_submission' => false,
+            ]);
         }
 
         $latestSubmission = $submissions->last();
@@ -340,16 +340,14 @@ class PerformanceController extends Controller
             ];
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'current_score' => round($latestSubmission->score, 2),
-                'rating' => $latestSubmission->rating,
-                'department_average' => round($deptAvg ?? 0, 2),
-                'organization_average' => round($orgAvg ?? 0, 2),
-                'history' => $history,
-                'latest_breakdown' => $latestSubmission->breakdown,
-            ]
+        return $this->success([
+            'current_score' => round($latestSubmission->score, 2),
+            'rating' => $latestSubmission->rating,
+            'department_average' => round($deptAvg ?? 0, 2),
+            'organization_average' => round($orgAvg ?? 0, 2),
+            'history' => $history,
+            'latest_breakdown' => $latestSubmission->breakdown ?? [],
+            'has_submission' => true,
         ]);
     }
 
@@ -412,15 +410,12 @@ class PerformanceController extends Controller
             ];
         })->values();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'branch_average' => round($branchAvg, 2),
-                'organization_average' => round($orgAvg ?? 0, 2),
-                'department_comparisons' => $departmentAverages,
-                'top_performers' => $topPerformers,
-                'total_submissions' => $branchSubmissions->count(),
-            ]
+        return $this->success([
+            'branch_average' => round($branchAvg, 2),
+            'organization_average' => round($orgAvg ?? 0, 2),
+            'department_comparisons' => $departmentAverages,
+            'top_performers' => $topPerformers,
+            'total_submissions' => $branchSubmissions->count(),
         ]);
     }
 
@@ -450,7 +445,7 @@ class PerformanceController extends Controller
 
         $configs = $query->orderBy('created_at', 'desc')->get();
 
-        return response()->json(['success' => true, 'data' => $configs]);
+        return $this->success($configs);
     }
 
     // Get single config
@@ -459,10 +454,7 @@ class PerformanceController extends Controller
         $config = PerformanceConfig::with(['department:id,name', 'departments:id,name', 'creator:id,name'])
             ->findOrFail($id);
 
-        return response()->json([
-            'success' => true,
-            'data' => $config
-        ]);
+        return $this->success($config);
     }
 
     // Get config by department
@@ -483,10 +475,7 @@ class PerformanceController extends Controller
             ], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $config
-        ]);
+        return $this->success($config);
     }
 
     // Create a new config (Admin only)
@@ -533,11 +522,7 @@ class PerformanceController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->load(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']),
-            'message' => 'Configuration created successfully',
-        ], 201);
+        return $this->success($config->load(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']), 'Configuration created successfully', 201);
     }
 
     // Update an existing config (Admin only) — auto-reverts published → draft
@@ -583,11 +568,7 @@ class PerformanceController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->fresh(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']),
-            'message' => 'Configuration updated. Status reverted to draft — re-publish to update the employee portal.',
-        ]);
+        return $this->success($config->fresh(['department:id,name', 'departments:id,name', 'branch:id,name', 'creator:id,name']), 'Configuration updated. Status reverted to draft — re-publish to update the employee portal.');
     }
 
     // Delete a config — only if it's a draft
@@ -608,7 +589,7 @@ class PerformanceController extends Controller
 
         $config->delete();
 
-        return response()->json(['success' => true, 'message' => 'Template deleted successfully']);
+        return $this->success(null, 'Template deleted successfully');
     }
 
     // Analytics summary endpoint
@@ -723,17 +704,14 @@ class PerformanceController extends Controller
                 ];
             }
 
-            return response()->json([
-                'success' => true,
-                'data'    => [
-                    'total_submissions' => $total,
-                    'average_score'     => round($avgScore, 2),
-                    'top_score'         => $topScore,
-                    'by_department'     => $byDept,
-                    'trajectory'        => $trajectory,
-                    'distribution'      => $distribution,
-                    'competency_matrix' => $competencyMatrix,
-                ],
+            return $this->success([
+                'total_submissions' => $total,
+                'average_score'     => round($avgScore, 2),
+                'top_score'         => $topScore,
+                'by_department'     => $byDept,
+                'trajectory'        => $trajectory,
+                'distribution'      => $distribution,
+                'competency_matrix' => $competencyMatrix,
             ]);
         });
     }
@@ -749,11 +727,7 @@ class PerformanceController extends Controller
             'published_at' => now(),
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->fresh(['department:id,name', 'branch:id,name']),
-            'message' => 'Template published. Employees can now see and submit this form.',
-        ]);
+        return $this->success($config->fresh(['department:id,name', 'branch:id,name']), 'Template published. Employees can now see and submit this form.');
     }
 
     /** Revert a published/archived template back to draft */
@@ -762,11 +736,7 @@ class PerformanceController extends Controller
         $config = PerformanceConfig::findOrFail($id);
         $config->update(['status' => 'draft', 'published_at' => null]);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->fresh(),
-            'message' => 'Template reverted to draft.',
-        ]);
+        return $this->success($config->fresh(), 'Template reverted to draft.');
     }
 
     /** Archive a published template (hides from employees without deleting) */
@@ -775,11 +745,7 @@ class PerformanceController extends Controller
         $config = PerformanceConfig::findOrFail($id);
         $config->update(['status' => 'archived']);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->fresh(),
-            'message' => 'Template archived.',
-        ]);
+        return $this->success($config->fresh(), 'Template archived.');
     }
 
     /** Clone a template — creates a draft copy */
@@ -800,11 +766,7 @@ class PerformanceController extends Controller
             'created_by'     => request()->user()->id,
         ]);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $clone->load(['department:id,name', 'branch:id,name', 'creator:id,name']),
-            'message' => 'Template cloned as draft.',
-        ], 201);
+        return $this->success($clone->load(['department:id,name', 'branch:id,name', 'creator:id,name']), 'Template cloned as draft.', 201);
     }
 
     /**
@@ -833,10 +795,7 @@ class PerformanceController extends Controller
             ], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $config->load(['department:id,name', 'branch:id,name']),
-        ]);
+        return $this->success($config->load(['department:id,name', 'branch:id,name']));
     }
 }
 

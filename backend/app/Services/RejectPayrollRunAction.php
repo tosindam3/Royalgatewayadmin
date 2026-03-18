@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\Log;
 class RejectPayrollRunAction
 {
     public function __construct(
-        private PayrollRunGuard $guard
+        private PayrollRunGuard $guard,
+        private PayrollNotificationService $notificationService
     ) {}
 
     /**
@@ -44,6 +45,7 @@ class RejectPayrollRunAction
         return DB::transaction(function () use ($run, $approver, $comment) {
             // Lock approval request row FOR UPDATE
             $approvalRequest = ApprovalRequest::lockForUpdate()
+                ->with('workflow.steps')
                 ->findOrFail($run->approval_request_id);
 
             // Lock payroll run row FOR UPDATE
@@ -61,6 +63,11 @@ class RejectPayrollRunAction
                     "Payroll run is not in submitted status. Current status: {$run->status}"
                 );
             }
+
+            // Get current step
+            $currentStep = $approvalRequest->workflow->steps()
+                ->where('step_order', $approvalRequest->current_step)
+                ->first();
 
             // Update approval request
             $approvalRequest->update([
@@ -81,12 +88,22 @@ class RejectPayrollRunAction
             // Insert approval action
             ApprovalAction::create([
                 'request_id' => $approvalRequest->id,
-                'step_id' => 1, // v1: single step
+                'step_id' => $currentStep?->id ?? 1,
                 'approver_id' => $approver->id,
                 'action' => 'rejected',
                 'comment' => $comment,
                 'acted_at' => now(),
             ]);
+
+            // Notify preparer of rejection
+            try {
+                $this->notificationService->notifyApprovalRejected($run, $approver, $comment);
+            } catch (\Exception $e) {
+                Log::error('Failed to notify preparer of rejection', [
+                    'run_id' => $run->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             Log::info("Payroll run rejected", [
                 'run_id' => $run->id,

@@ -73,3 +73,31 @@ Route::get('/diagnostic/dashboard-data', function () {
 
     return response()->json($data);
 });
+
+
+// Payroll periods diagnostic
+Route::get('/diagnostic/payroll-periods', function () {
+    if (config('app.env') !== 'production' || !request()->hasHeader('X-Diagnostic-Key')) {
+        abort(404);
+    }
+    
+    if (request()->header('X-Diagnostic-Key') !== 'temp-diagnostic-2026') {
+        abort(403);
+    }
+
+    $periods = \App\Models\PayrollPeriod::orderBy('year', 'desc')->orderBy('month', 'desc')->get();
+
+    return response()->json([
+        'total' => $periods->count(),
+        'periods' => $periods->map(fn($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'year' => $p->year,
+            'month' => $p->month,
+            'start_date' => $p->start_date->toDateString(),
+            'end_date' => $p->end_date->toDateString(),
+            'working_days' => $p->working_days,
+            'status' => $p->status,
+        ])
+    ]);
+});

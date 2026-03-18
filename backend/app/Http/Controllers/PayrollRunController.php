@@ -116,7 +116,6 @@ class PayrollRunController extends Controller
             'period_id' => 'required|exists:payroll_periods,id',
             'scope_type' => 'required|in:all,department,branch,custom',
             'scope_ref_id' => 'nullable|integer',
-            'approver_user_id' => 'required|exists:users,id',
             'note' => 'nullable|string|max:1000',
         ]);
 
@@ -283,6 +282,114 @@ class PayrollRunController extends Controller
 
         return response()->json([
             'data' => $this->formatRun($run),
+        ]);
+    }
+
+    /**
+     * Adjust a payroll item for an employee
+     * POST /api/v1/payroll/runs/{id}/adjust-item
+     */
+    public function adjustItem(Request $request, int $id)
+    {
+        $user = Auth::user();
+        $isSuperOrCeo = in_array($user->role, ['super_admin', 'ceo']);
+        $isHr = $user->role === 'hr_manager';
+
+        if (!$isSuperOrCeo && !$isHr) {
+            return response()->json(['message' => 'Unauthorized to make adjustments'], 403);
+        }
+
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'item_code' => 'required|string',
+            'amount' => 'required|numeric',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $run = PayrollRun::findOrFail($id);
+        
+        // Only allow adjustments on draft or review_required runs
+        if (!in_array($run->status, ['draft', 'review_required', 'rejected'])) {
+            return response()->json(['message' => 'Cannot adjust items for a run in ' . $run->status . ' state'], 400);
+        }
+
+        $payrollEmployee = PayrollRunEmployee::where('payroll_run_id', $id)
+            ->where('employee_id', $validated['employee_id'])
+            ->firstOrFail();
+
+        $found = false;
+        $earnings = $payrollEmployee->earnings_json ?? [];
+        $deductions = $payrollEmployee->deductions_json ?? [];
+
+        // Check earnings
+        foreach ($earnings as &$item) {
+            if ($item['code'] === $validated['item_code']) {
+                $item['system_calculated'] = $item['system_calculated'] ?? $item['amount'];
+                $item['adjustment'] = $validated['amount'] - $item['system_calculated'];
+                $item['amount'] = $validated['amount'];
+                $item['is_manual'] = true;
+                $item['note'] = $validated['note'];
+                $item['adjusted_by'] = $user->name;
+                $found = true;
+                break;
+            }
+        }
+
+        if (!$found) {
+            // Check deductions
+            foreach ($deductions as &$item) {
+                if ($item['code'] === $validated['item_code']) {
+                    $item['system_calculated'] = $item['system_calculated'] ?? $item['amount'];
+                    $item['adjustment'] = $validated['amount'] - $item['system_calculated'];
+                    $item['amount'] = $validated['amount'];
+                    $item['is_manual'] = true;
+                    $item['note'] = $validated['note'];
+                    $item['adjusted_by'] = $user->name;
+                    $found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$found) {
+            return response()->json(['message' => 'Item code not found for this employee'], 404);
+        }
+
+        // Save updated JSONs
+        $payrollEmployee->earnings_json = $earnings;
+        $payrollEmployee->deductions_json = $deductions;
+
+        // Recalculate totals for this employee
+        $payrollEmployee->gross_pay = collect($earnings)->sum('amount');
+        $payrollEmployee->total_deductions = collect($deductions)->sum('amount');
+        $payrollEmployee->net_pay = $payrollEmployee->gross_pay - $payrollEmployee->total_deductions;
+        $payrollEmployee->save();
+
+        // If HR Manager, mark run as review_required
+        if (!$isSuperOrCeo && $run->status !== 'review_required') {
+            $run->status = 'review_required';
+            $run->save();
+        }
+
+        // Update overall run totals
+        $allEmployees = $run->employees();
+        $run->total_gross = $allEmployees->sum('gross_pay');
+        $run->total_deductions = $allEmployees->sum('total_deductions');
+        $run->total_net = $allEmployees->sum('net_pay');
+        $run->save();
+
+        return response()->json([
+            'message' => $isSuperOrCeo ? 'Item adjusted and recalculated.' : 'Adjustment submitted for review.',
+            'data' => [
+                'gross_pay' => (float)$payrollEmployee->gross_pay,
+                'total_deductions' => (float)$payrollEmployee->total_deductions,
+                'net_pay' => (float)$payrollEmployee->net_pay,
+                'run_totals' => [
+                    'gross' => (float)$run->total_gross,
+                    'deductions' => (float)$run->total_deductions,
+                    'net' => (float)$run->total_net,
+                ]
+            ]
         ]);
     }
 

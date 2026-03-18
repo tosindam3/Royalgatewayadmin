@@ -177,10 +177,45 @@ class AttendanceController extends Controller
             return $this->error('Employee profile not found.', 404);
         }
         
-        return $this->success(
-            $this->attendance->todayStatus($user->employeeProfile->id),
-            'Today\'s attendance status.'
-        );
+        $employeeId = $user->employeeProfile->id;
+        $status = $this->attendance->todayStatus($employeeId);
+        
+        // Get today's attendance record for work hours calculation
+        $todayRecord = \App\Models\AttendanceRecord::where('employee_id', $employeeId)
+            ->whereDate('attendance_date', now()->toDateString())
+            ->first();
+        
+        // Get organization work hours setting
+        $workHoursPerDay = \App\Models\OrganizationSetting::where('key', 'attendance.work_hours_per_day')
+            ->value('value');
+        $requiredMinutes = $workHoursPerDay ? (int)json_decode($workHoursPerDay) * 60 : 480; // Default 8 hours
+        
+        // Calculate worked hours and completion status
+        $workedMinutes = $todayRecord ? abs($todayRecord->work_minutes) : 0;
+        $workedHours = round($workedMinutes / 60, 2);
+        $completionStatus = 'incomplete'; // not checked in
+        
+        if ($status['checked_in']) {
+            if ($status['checked_out']) {
+                // Both check-in and check-out exist
+                if ($workedMinutes >= $requiredMinutes) {
+                    $completionStatus = 'complete'; // Green - fulfilled working hours
+                } else {
+                    $completionStatus = 'partial'; // Yellow - checked out but didn't fulfill hours
+                }
+            } else {
+                // Only checked in, still working
+                $completionStatus = 'working'; // Blue - currently working
+            }
+        }
+        
+        $status['worked_hours'] = $workedHours;
+        $status['worked_minutes'] = $workedMinutes;
+        $status['required_minutes'] = $requiredMinutes;
+        $status['completion_status'] = $completionStatus;
+        $status['late_minutes'] = $todayRecord?->late_minutes ?? 0;
+        
+        return $this->success($status, 'Today\'s attendance status.');
     }
 
     /**
@@ -209,10 +244,31 @@ class AttendanceController extends Controller
             return $this->error('Employee profile not found.', 404);
         }
 
-        $logs = isset($data['start_date']) && isset($data['end_date'])
-            ? $this->attendance->getDateRangeLogs($employeeId, $data['start_date'], $data['end_date'])
-            : $this->attendance->getRecentLogs($employeeId, $data['limit'] ?? 30);
+        // Return attendance records instead of logs for better data
+        if (isset($data['start_date']) && isset($data['end_date'])) {
+            $records = \App\Models\AttendanceRecord::where('employee_id', $employeeId)
+                ->whereBetween('attendance_date', [$data['start_date'], $data['end_date']])
+                ->orderBy('attendance_date', 'desc')
+                ->get()
+                ->map(function($record) {
+                    return [
+                        'id' => $record->id,
+                        'date' => $record->attendance_date->format('Y-m-d'),
+                        'check_in_time' => $record->check_in_time?->toIso8601String(),
+                        'check_out_time' => $record->check_out_time?->toIso8601String(),
+                        'worked_minutes' => abs($record->work_minutes),
+                        'worked_hours' => round(abs($record->work_minutes) / 60, 2),
+                        'late_minutes' => $record->late_minutes,
+                        'status' => $record->status,
+                        'source' => $record->source,
+                    ];
+                });
+            
+            return $this->success($records, 'Attendance history retrieved.');
+        }
 
+        // Fallback to logs for recent history
+        $logs = $this->attendance->getRecentLogs($employeeId, $data['limit'] ?? 30);
         return $this->success($logs, 'Attendance history retrieved.');
     }
 
@@ -264,26 +320,36 @@ class AttendanceController extends Controller
         $totalEmployees = $accessibleEmployees->count();
         $employeeIds = $accessibleEmployees->pluck('id');
 
-        $query = \App\Models\AttendanceLog::whereDate('timestamp', $today);
-        $query = $this->scopeService->applyScopeToQuery($query, $user);
-        $todayLogs = $query->get();
+        // Use AttendanceRecord for accurate data instead of logs
+        $todayRecords = \App\Models\AttendanceRecord::with('employee')
+            ->whereDate('attendance_date', $today)
+            ->whereIn('employee_id', $employeeIds)
+            ->get();
         
-        $presentIds = $todayLogs->where('check_type', 'check_in')->pluck('employee_id')->unique();
-        $lateIds    = $todayLogs->where('check_type', 'check_in')->where('status', 'late')->pluck('employee_id')->unique();
+        $present = $todayRecords->whereIn('status', ['present', 'partial'])->count();
+        $late = $todayRecords->where('late_minutes', '>', 0)->count();
+        $absent = max(0, $totalEmployees - $present);
+        $onLeave = 0; // extend when leave module is wired
 
-        $present  = $presentIds->count();
-        $late     = $lateIds->count();
-        $absent   = max(0, $totalEmployees - $present);
-        $onLeave  = 0; // extend when leave module is wired
-
-        // 7-day trend
-        $weeklyTrend = collect(range(6, 0))->map(function ($daysAgo) {
+        // 7-day trend using attendance records
+        $weeklyTrend = collect(range(6, 0))->map(function ($daysAgo) use ($employeeIds) {
             $date = now()->subDays($daysAgo)->toDateString();
-            $checkIns = \App\Models\AttendanceLog::whereDate('timestamp', $date)
-                ->where('check_type', 'check_in')
+            $presentCount = \App\Models\AttendanceRecord::whereDate('attendance_date', $date)
+                ->whereIn('employee_id', $employeeIds)
+                ->whereIn('status', ['present', 'partial'])
                 ->count();
-            return ['date' => $date, 'present' => $checkIns];
+            return ['date' => $date, 'present' => $presentCount];
         });
+        
+        // Late arrivals details for the card
+        $lateArrivals = $todayRecords->where('late_minutes', '>', 0)->map(function($record) {
+            return [
+                'employee_id' => $record->employee_id,
+                'employee_name' => $record->employee->full_name ?? 'Unknown',
+                'late_minutes' => $record->late_minutes,
+                'check_in_time' => $record->check_in_time?->format('H:i:s'),
+            ];
+        })->values();
 
         return $this->success([
             'todayPresent'  => $present,
@@ -292,6 +358,7 @@ class AttendanceController extends Controller
             'todayOnLeave'  => $onLeave,
             'totalEmployees' => $totalEmployees,
             'weeklyTrend'   => $weeklyTrend,
+            'lateArrivals'  => $lateArrivals,
         ], 'Attendance overview retrieved.');
     }
 
@@ -302,58 +369,43 @@ class AttendanceController extends Controller
         
         $accessibleEmployees = $this->scopeService->getAccessibleEmployees($user);
         $totalEmployees = $accessibleEmployees->count();
+        $employeeIds = $accessibleEmployees->pluck('id');
 
-        $query = \App\Models\AttendanceLog::with(['employee' => function ($q) {
+        // Use AttendanceRecord for accurate aggregated data
+        $attendanceRecords = \App\Models\AttendanceRecord::with(['employee' => function ($q) {
             $q->with(['user:id,name', 'department:id,name']);
         }])
-            ->whereDate('timestamp', $date);
+            ->whereDate('attendance_date', $date)
+            ->whereIn('employee_id', $employeeIds)
+            ->get();
+
+        $records = $attendanceRecords->map(function ($record) {
+            $workedMinutes = abs($record->work_minutes);
             
-        $query = $this->scopeService->applyScopeToQuery($query, $user);
-
-        $logs = $query->get()
-            ->groupBy('employee_id');
-
-        $records = $logs->map(function ($entries) {
-            $checkIn  = $entries->firstWhere('check_type', 'check_in');
-            $checkOut = $entries->firstWhere('check_type', 'check_out');
-            $emp = $checkIn?->employee ?? $checkOut?->employee;
-
-            $durationMinutes = ($checkIn && $checkOut)
-                ? $checkOut->timestamp->diffInMinutes($checkIn->timestamp)
-                : null;
-
-            // Determine status based on check-in/out
-            $status = 'absent';
-            if ($checkIn && $checkOut) {
-                $status = 'present';
-            } elseif ($checkIn) {
-                $status = 'partial'; // Checked in but not out
-            }
-
             return [
-                'id'            => $checkIn?->id ?? $checkOut?->id,
-                'employee_id'   => $emp?->id,
-                'employee_name' => $emp?->full_name ?? 'Unknown',
-                'department'    => $emp?->department?->name ?? '—',
-                'check_in'      => $checkIn?->timestamp?->format('H:i:s'),
-                'check_out'     => $checkOut?->timestamp?->format('H:i:s'),
-                'hours'         => $durationMinutes !== null
-                    ? round($durationMinutes / 60, 1) . 'h'
-                    : null,
-                'status'        => $status,
-                'source'        => $checkIn?->source ?? $checkOut?->source,
+                'id'            => $record->id,
+                'employee_id'   => $record->employee_id,
+                'employee_name' => $record->employee->full_name ?? 'Unknown',
+                'department'    => $record->employee->department?->name ?? '—',
+                'check_in'      => $record->check_in_time?->format('H:i:s'),
+                'check_out'     => $record->check_out_time?->format('H:i:s'),
+                'hours'         => $workedMinutes > 0 ? round($workedMinutes / 60, 1) . 'h' : '0h',
+                'worked_minutes' => $workedMinutes,
+                'late_minutes'  => $record->late_minutes,
+                'status'        => $record->status,
+                'source'        => $record->source,
             ];
         })->values();
 
-        // Count present (includes partial - checked in but not out)
-        $present = $records->whereIn('status', ['present', 'partial'])->count();
-        $late = 0; // Late calculation would need time comparison
+        $present = $attendanceRecords->whereIn('status', ['present', 'partial'])->count();
+        $late = $attendanceRecords->where('late_minutes', '>', 0)->count();
+        $absent = max(0, $totalEmployees - $present);
 
         return $this->success([
             'date'           => $date,
             'totalEmployees' => $totalEmployees,
             'present'        => $present,
-            'absent'         => max(0, $totalEmployees - $present),
+            'absent'         => $absent,
             'late'           => $late,
             'onLeave'        => 0,
             'records'        => $records,
@@ -410,25 +462,48 @@ class AttendanceController extends Controller
         $user = request()->user();
         $scopeService = app(\App\Services\AttendanceScopeService::class);
         
-        // Check if user can manage settings
-        if (!$scopeService->canManageSettings($user)) {
-            // Return empty settings for employees instead of 403
-            return $this->success([
-                'geofencing_enabled' => false,
-                'ip_restriction_enabled' => false,
-                'biometric_sync_enabled' => false,
-                'late_grace_period' => 15,
-                'can_manage' => false,
-            ], 'Settings retrieved (read-only).');
-        }
+        $canManage = $scopeService->canManageSettings($user);
+
+        // Fetch all attendance relevant settings
+        $settings = \App\Models\OrganizationSetting::where('key', 'like', 'attendance.%')->get();
         
-        return $this->success([
-            'geofencing_enabled' => true,
-            'ip_restriction_enabled' => true,
-            'biometric_sync_enabled' => true,
-            'late_grace_period' => 15,
-            'can_manage' => true,
-        ], 'Attendance settings retrieved.');
+        $data = [
+            'can_manage' => $canManage,
+            'settings' => $settings->mapWithKeys(function($item) {
+                return [$item->key => json_decode($item->value)];
+            }),
+            // Keep legacy keys for frontend compatibility if needed
+            'late_grace_period' => (int) json_decode($settings->firstWhere('key', 'attendance.grace_period_minutes')?->value ?? '15'),
+        ];
+        
+        return $this->success($data, 'Attendance settings retrieved.');
+    }
+
+    public function updateSettings(Request $request)
+    {
+        $user = $request->user();
+        $scopeService = app(\App\Services\AttendanceScopeService::class);
+        
+        if (!$scopeService->canManageSettings($user)) {
+            return $this->error('Unauthorized to manage settings.', 403);
+        }
+
+        $validated = $request->validate([
+            'settings' => 'required|array',
+            'settings.*' => 'nullable' // Values can be mixed types
+        ]);
+
+        foreach ($validated['settings'] as $key => $value) {
+            // Only allow updating attendance keys for security
+            if (!str_starts_with($key, 'attendance.')) continue;
+
+            \App\Models\OrganizationSetting::updateOrCreate(
+                ['key' => $key],
+                ['value' => json_encode($value)]
+            );
+        }
+
+        return $this->success(null, 'Attendance settings updated successfully.');
     }
 
     public function getGeofences(Request $request)

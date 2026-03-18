@@ -13,12 +13,17 @@ export const attendanceService = {
     // Mobile/Self-Service Endpoints
     getTodayStatus: async () => apiClient.get('/hr-core/attendance/today'),
     
+    async getOrgSettings(prefix?: string) {
+        const response = await apiClient.get('/payroll/settings', { params: { prefix: prefix ?? undefined } });
+        return response.data;
+    },
+
     checkIn: async (payload: FormData) => {
         try {
             return await apiClient.post('/hr-core/attendance/check-in', payload);
         } catch (error: any) {
             if (!navigator.onLine) {
-                this.saveOfflineLog('check_in', payload);
+                attendanceService.saveOfflineLog('check_in', payload);
                 throw new Error('Offline: Check-in saved and will sync when online.');
             }
             throw error;

@@ -42,12 +42,6 @@ class PayrollRunGuard
             );
         }
 
-        if (!$run->approver_user_id) {
-            throw new ConflictHttpException(
-                "Cannot submit payroll run without an assigned approver."
-            );
-        }
-
         if ($run->employees()->count() === 0) {
             throw new ConflictHttpException(
                 "Cannot submit payroll run with no employees."

@@ -24,9 +24,17 @@ class OrganizationSettingController extends Controller
             $query->where('key', 'like', "{$prefix}%");
         }
 
-        $settings = $query->get()->pluck('value', 'key');
+        $settings = $query->get();
+        
+        $result = $settings->mapWithKeys(function($item) {
+            return [$item->key => [
+                'value' => $item->value,
+                'proposed_value' => $item->proposed_value,
+                'is_pending' => $item->is_pending_approval,
+            ]];
+        });
 
-        return $this->success($settings, 'Settings retrieved successfully.');
+        return $this->success($result, 'Settings retrieved successfully.');
     }
 
     /**
@@ -43,19 +51,95 @@ class OrganizationSettingController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $isSuperOrCeo = in_array($user->role, ['super_admin', 'ceo']);
+
         $validated = $request->validate([
             'settings' => 'required|array',
             'settings.*' => 'nullable',
         ]);
 
         foreach ($validated['settings'] as $key => $value) {
-            OrganizationSetting::updateOrCreate(
-                ['key' => $key],
-                ['value' => $value, 'type' => gettype($value)]
-            );
+            $setting = OrganizationSetting::firstOrNew(['key' => $key]);
+            
+            if ($isSuperOrCeo) {
+                $setting->value = $value;
+                $setting->type = gettype($value);
+                $setting->is_pending_approval = false;
+                $setting->proposed_value = null;
+                $setting->proposed_by_id = null;
+            } else {
+                $setting->proposed_value = $value;
+                $setting->is_pending_approval = true;
+                $setting->proposed_by_id = $user->id;
+                // If it's a new setting, we need a placeholder type
+                if (!$setting->exists) {
+                    $setting->type = gettype($value);
+                }
+            }
+            
+            $setting->save();
         }
 
-        return $this->success(null, 'Settings updated successfully.');
+        $message = $isSuperOrCeo ? 'Settings updated successfully.' : 'Changes submitted for CEO approval.';
+        return $this->success(null, $message);
+    }
+
+    /**
+     * Get pending settings changes
+     */
+    public function pending(Request $request): JsonResponse
+    {
+        $pending = OrganizationSetting::where('is_pending_approval', true)
+            ->with('proposed_by_id:id,name')
+            ->get();
+            
+        return $this->success($pending, 'Pending changes retrieved.');
+    }
+
+    /**
+     * Approve a setting change
+     */
+    public function approve(Request $request, string $key): JsonResponse
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['super_admin', 'ceo'])) {
+            return $this->error('Only CEO or Superadmin can approve settings.', 403);
+        }
+
+        $setting = OrganizationSetting::where('key', $key)->firstOrFail();
+        
+        if (!$setting->is_pending_approval) {
+            return $this->error('No pending changes for this setting.', 400);
+        }
+
+        $setting->value = $setting->proposed_value;
+        $setting->type = gettype($setting->proposed_value);
+        $setting->is_pending_approval = false;
+        $setting->proposed_value = null;
+        $setting->proposed_by_id = null;
+        $setting->save();
+
+        return $this->success(null, 'Setting change approved.');
+    }
+
+    /**
+     * Reject a setting change
+     */
+    public function reject(Request $request, string $key): JsonResponse
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['super_admin', 'ceo'])) {
+            return $this->error('Only CEO or Superadmin can reject settings.', 403);
+        }
+
+        $setting = OrganizationSetting::where('key', $key)->firstOrFail();
+        $setting->is_pending_approval = false;
+        $setting->proposed_value = null;
+        $setting->proposed_by_id = null;
+        $setting->save();
+
+        return $this->success(null, 'Setting change rejected.');
     }
 
     /**

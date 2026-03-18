@@ -178,6 +178,48 @@ const OverviewTab: React.FC = () => {
                 </div>
             </GlassCard>
 
+            {/* Late Arrivals Details */}
+            {data?.lateArrivals && data.lateArrivals.length > 0 && (
+                <GlassCard>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Late Arrivals Today</h3>
+                            <span className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-full">
+                                {data.lateArrivals.length} employee{data.lateArrivals.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <div className="space-y-2">
+                            {data.lateArrivals.map((arrival: any, index: number) => (
+                                <div 
+                                    key={index}
+                                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-white/5 rounded-lg"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                                            <Clock className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                                                {arrival.employee_name}
+                                            </p>
+                                            <p className="text-xs text-slate-500 dark:text-gray-400">
+                                                Checked in at {arrival.check_in_time}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                                            +{arrival.late_minutes}m
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-gray-400">late</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </GlassCard>
+            )}
+
             {/* Empty State */}
             {data?.todayPresent === 0 && data?.todayAbsent === 0 && (
                 <GlassCard>

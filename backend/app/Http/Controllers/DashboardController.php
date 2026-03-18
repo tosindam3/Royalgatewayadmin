@@ -23,40 +23,16 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $isManagement = $user->hasPermission('dashboard.management');
+        
+        // Determine effective role for frontend
+        $effectiveRole = 'employee';
+        if ($user->hasPermission('dashboard.management')) {
+            $effectiveRole = 'management';
+        }
 
         $manifest = [
             'layout' => 'standard',
             'widgets' => [
-                [
-                    'key' => 'quick-stats',
-                    'endpoint' => '/dashboard/metrics/quick-stats',
-                    'type' => 'metric_group',
-                    'authorized' => $isManagement
-                ],
-                [
-                    'key' => 'talent-trends',
-                    'endpoint' => '/dashboard/metrics/talent-trends',
-                    'type' => 'chart_area',
-                    'authorized' => $isManagement
-                ],
-                [
-                    'key' => 'attendance-pulse',
-                    'endpoint' => '/dashboard/metrics/attendance-pulse',
-                    'type' => 'chart_pie',
-                    'authorized' => $isManagement
-                ],
-                [
-                    'key' => 'demographics',
-                    'endpoint' => '/dashboard/metrics/demographics',
-                    'type' => 'demographics',
-                    'authorized' => $isManagement
-                ],
-                [
-                    'key' => 'milestones',
-                    'endpoint' => null, // Static or embedded for speed
-                    'type' => 'list_milestones',
-                    'authorized' => true,
-                    'data' => (new \App\Services
                 [
                     'key' => 'quick-stats',
                     'endpoint' => '/dashboard/metrics/quick-stats',
@@ -107,13 +83,58 @@ class DashboardController extends Controller
 
     public function employeeSummary(Request $request)
     {
-        $employee = $request->user()->employee;
+        $employee = $request->user()->employeeProfile;
         if (!$employee) {
             return $this->error('Employee profile not found', 404);
         }
 
         $service = new \App\Services\DashboardService();
-        $period = $request->query('period');
-        return $this->success($service->getEmployeeSummary($employee->id, $period));
+        $summary = $service->getPersonalSummary($employee->id);
+        
+        // Get leave balance
+        $leaveBalance = $service->getLeaveBalance($employee->id);
+        
+        // Merge the data
+        $data = array_merge($summary, $leaveBalance);
+        
+        // Add clock status from today's attendance
+        $todayRecord = \App\Models\AttendanceRecord::where('employee_id', $employee->id)
+            ->whereDate('attendance_date', now()->toDateString())
+            ->first();
+        
+        $clockStatus = 'not_started';
+        $clockInTime = null;
+        
+        if ($todayRecord && $todayRecord->check_in_time) {
+            $clockStatus = $todayRecord->check_out_time ? 'clocked_out' : 'clocked_in';
+            $clockInTime = $todayRecord->check_in_time->format('H:i:s');
+        }
+        
+        $data['clock_status'] = $clockStatus;
+        $data['clock_in_time'] = $clockInTime;
+        
+        // Add weekly attendance breakdown
+        $weeks = [];
+        for ($i = 3; $i >= 0; $i--) {
+            $weekStart = \Carbon\Carbon::now()->subWeeks($i)->startOfWeek();
+            $weekEnd   = \Carbon\Carbon::now()->subWeeks($i)->endOfWeek();
+            $weekRecs  = \App\Models\AttendanceRecord::where('employee_id', $employee->id)
+                ->whereBetween('attendance_date', [$weekStart, $weekEnd])
+                ->get();
+            $weeks[] = [
+                'week'    => 'Week ' . (4 - $i),
+                'present' => $weekRecs->whereIn('status', ['present', 'partial'])->count(),
+                'late'    => $weekRecs->where('late_minutes', '>', 0)->count(),
+                'absent'  => $weekRecs->where('status', 'absent')->count(),
+            ];
+        }
+        
+        $data['attendance_by_week'] = $weeks;
+        
+        // Rename keys to match frontend expectations
+        $data['days_present'] = $data['present_days'];
+        $data['days_absent'] = $data['absent_days'];
+        
+        return $this->success($data);
     }
 }

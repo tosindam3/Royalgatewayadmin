@@ -17,6 +17,8 @@ class PayrollItem extends Model
         'default_value',
         'active',
         'description',
+        'is_taxable',
+        'is_statutory',
     ];
 
     protected $casts = [

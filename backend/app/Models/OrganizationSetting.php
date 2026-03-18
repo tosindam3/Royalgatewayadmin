@@ -11,10 +11,15 @@ class OrganizationSetting extends Model
         'key',
         'value',
         'type',
+        'proposed_value',
+        'is_pending_approval',
+        'proposed_by_id',
     ];
 
     protected $casts = [
         'value' => 'json',
+        'proposed_value' => 'json',
+        'is_pending_approval' => 'boolean',
     ];
 
     /**

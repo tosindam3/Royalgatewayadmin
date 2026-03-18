@@ -140,9 +140,53 @@ class MetricController extends Controller
         }
 
         $key  = $this->cache->key('my_summary', $user->id);
-        $data = $this->cache->remember($key, DashboardCacheService::TTL_MY_SUMMARY, fn() =>
-            $this->dashboardService->getPersonalSummary($employeeId)
-        );
+        $data = $this->cache->remember($key, DashboardCacheService::TTL_MY_SUMMARY, function() use ($employeeId) {
+            $summary = $this->dashboardService->getPersonalSummary($employeeId);
+            $leaveBalance = $this->dashboardService->getLeaveBalance($employeeId);
+            
+            // Merge the data
+            $data = array_merge($summary, $leaveBalance);
+            
+            // Add clock status from today's attendance
+            $todayRecord = \App\Models\AttendanceRecord::where('employee_id', $employeeId)
+                ->whereDate('attendance_date', now()->toDateString())
+                ->first();
+            
+            $clockStatus = 'not_started';
+            $clockInTime = null;
+            
+            if ($todayRecord && $todayRecord->check_in_time) {
+                $clockStatus = $todayRecord->check_out_time ? 'clocked_out' : 'clocked_in';
+                $clockInTime = $todayRecord->check_in_time->format('H:i:s');
+            }
+            
+            $data['clock_status'] = $clockStatus;
+            $data['clock_in_time'] = $clockInTime;
+            
+            // Add weekly attendance breakdown
+            $weeks = [];
+            for ($i = 3; $i >= 0; $i--) {
+                $weekStart = \Carbon\Carbon::now()->subWeeks($i)->startOfWeek();
+                $weekEnd   = \Carbon\Carbon::now()->subWeeks($i)->endOfWeek();
+                $weekRecs  = \App\Models\AttendanceRecord::where('employee_id', $employeeId)
+                    ->whereBetween('attendance_date', [$weekStart, $weekEnd])
+                    ->get();
+                $weeks[] = [
+                    'week'    => 'Week ' . (4 - $i),
+                    'present' => $weekRecs->whereIn('status', ['present', 'partial'])->count(),
+                    'late'    => $weekRecs->where('late_minutes', '>', 0)->count(),
+                    'absent'  => $weekRecs->where('status', 'absent')->count(),
+                ];
+            }
+            
+            $data['attendance_by_week'] = $weeks;
+            
+            // Rename keys to match frontend expectations
+            $data['days_present'] = $data['present_days'];
+            $data['days_absent'] = $data['absent_days'];
+            
+            return $data;
+        });
 
         return $this->success($data);
     }

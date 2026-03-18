@@ -35,7 +35,6 @@ class PayrollRunBuilder
      *   'period_id' => int,
      *   'scope_type' => string,
      *   'scope_ref_id' => int|null,
-     *   'approver_user_id' => int,
      *   'note' => string|null
      * ]
      * @param User $preparer
@@ -44,14 +43,14 @@ class PayrollRunBuilder
     public function create(array $data, User $preparer): PayrollRun
     {
         return DB::transaction(function () use ($data, $preparer) {
-            // Create the payroll run
+            // Create the payroll run (approver will be set during submission)
             $run = PayrollRun::create([
                 'period_id' => $data['period_id'],
                 'scope_type' => $data['scope_type'] ?? 'all',
                 'scope_ref_id' => $data['scope_ref_id'] ?? null,
                 'status' => 'draft',
                 'prepared_by_user_id' => $preparer->id,
-                'approver_user_id' => $data['approver_user_id'],
+                'approver_user_id' => null, // Will be set during submission
                 'note' => $data['note'] ?? null,
                 'total_gross' => 0,
                 'total_deductions' => 0,
@@ -108,11 +107,33 @@ class PayrollRunBuilder
 
         $employeeIds = $employees->pluck('id')->toArray();
 
+        // Fetch global payroll settings
+        $payrollPolicy = \App\Models\OrganizationSetting::get('payroll_policy') ?? [];
+        
+        // Fetch specific individual settings to ensure they override/supplement the policy JSON
+        $individualSettings = [
+            'attendance' => [
+                'grace_period_minutes' => (int) \App\Models\OrganizationSetting::get('attendance.grace_period_minutes', 15),
+                'working_hours_per_day' => (int) \App\Models\OrganizationSetting::get('attendance.work_hours_per_day', 8),
+                'absent_penalty_multiplier' => (float) \App\Models\OrganizationSetting::get('attendance.absent_penalty_multiplier', 1),
+            ],
+            'performance' => [
+                'bonus_enabled' => (bool) \App\Models\OrganizationSetting::get('performance.bonus_enabled', true),
+                'bonus_threshold' => (int) \App\Models\OrganizationSetting::get('performance.bonus_threshold', 80),
+                'bonus_percentage' => (int) \App\Models\OrganizationSetting::get('performance.bonus_percentage', 5),
+                'penalty_enabled' => (bool) \App\Models\OrganizationSetting::get('performance.penalty_enabled', true),
+                'penalty_threshold' => (int) \App\Models\OrganizationSetting::get('performance.penalty_threshold', 40),
+                'penalty_percentage' => (int) \App\Models\OrganizationSetting::get('performance.penalty_percentage', 5),
+            ],
+        ];
+
+        $policy = array_replace_recursive($payrollPolicy, $individualSettings);
+
         // Fetch attendance summaries for the period
         $attendanceSummaries = $this->getAttendanceSummaries($period, $employeeIds);
 
         // Fetch performance scores for the period
-        $performanceScores = $this->getPerformanceScores($period->id, $employeeIds);
+        $performanceScores = $this->getPerformanceScores($period, $employeeIds);
 
         // Calculate payroll for each employee
         $employeeRows = [];
@@ -139,6 +160,7 @@ class PayrollRunBuilder
                 'overtime_hours' => $attendance['overtime_hours'],
                 'performance_score' => $performanceScore,
                 'working_days' => $period->working_days,
+                'policy' => $policy,
             ]);
 
             $employeeRows[] = [
@@ -256,11 +278,12 @@ class PayrollRunBuilder
      * @param array $employeeIds
      * @return array [employee_id => score]
      */
-    private function getPerformanceScores(int $periodId, array $employeeIds): array
+    private function getPerformanceScores(PayrollPeriod $period, array $employeeIds): array
     {
-        // PerformanceMonthlyScore model does not exist in this version.
-        // Returning empty array so payroll processes with score = 0 (no bonus / no penalty).
-        // Future: query performance submissions when the performance module integrates with payroll.
-        return [];
+        $periodName = $period->name; 
+        return \App\Models\PerformanceSubmission::whereIn('employee_id', $employeeIds)
+            ->where('period', $periodName)
+            ->pluck('score', 'employee_id')
+            ->toArray();
     }
 }

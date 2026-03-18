@@ -12,13 +12,16 @@ const MyAttendanceSummary: React.FC<Props> = ({ data }) => {
   const { tooltip, axis, grid } = useChartTheme();
   const month = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+  // Safety check for attendance_by_week
+  const weeklyData = data?.attendance_by_week || [];
+
   return (
     <CardShell title="My Attendance" action={month}>
-      {data.attendance_by_week.length === 0 ? (
+      {weeklyData.length === 0 ? (
         <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">No attendance data this month</p>
       ) : (
         <ResponsiveContainer width="100%" height={170}>
-          <BarChart data={data.attendance_by_week} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={10}>
+          <BarChart data={weeklyData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={10}>
             <CartesianGrid {...grid} vertical={false} />
             <XAxis dataKey="week" tick={axis} axisLine={false} tickLine={false} />
             <YAxis tick={axis} axisLine={false} tickLine={false} />

@@ -9,6 +9,7 @@ export interface Role {
     is_system: boolean;
     is_active: boolean;
     permissions?: Permission[];
+    permissions_count?: number;
     users_count?: number;
 }
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import GlassCard from '../components/GlassCard';
 import { payrollApi } from '../services/payrollService';
 import Button from '../components/ui/Button';
@@ -33,7 +34,6 @@ const Payroll: React.FC = () => {
     period_id: 0,
     scope_type: 'all' as 'all' | 'department' | 'branch',
     scope_ref_id: undefined as number | undefined,
-    approver_user_id: 0,
     note: ''
   });
 
@@ -153,21 +153,24 @@ const Payroll: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-periods'] });
       setIsCreatePeriodModalOpen(false);
+      toast.success('Payroll period created successfully');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Failed to create payroll period');
+      const message = err.response?.data?.message || 'Failed to create payroll period';
+      toast.error(message);
     }
   });
 
   const createRunMutation = useMutation({
     mutationFn: (data: any) => payrollApi.createRun(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
       setIsCreateRunModalOpen(false);
-      alert('Payroll run initiated successfully!');
+      toast.success('Payroll run created successfully! You can now review and submit it for approval.');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Failed to create payroll run');
+      const message = err.response?.data?.message || 'Failed to create payroll run';
+      toast.error(message);
     }
   });
 
@@ -183,23 +186,49 @@ const Payroll: React.FC = () => {
     mutationFn: (runId: number) => payrollApi.recalculate(runId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll-runs', 'payroll-run', 'payroll-employees'] });
+      toast.success('Payroll recalculated successfully with latest data!');
+    },
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Failed to recalculate payroll';
+      toast.error(message);
     }
   });
 
   const submitMutation = useMutation({
     mutationFn: ({ runId, message }: { runId: number; message?: string }) =>
       payrollApi.submit(runId, message),
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['payroll-runs', 'payroll-run'] });
       setShowSubmitModal(false);
+      const workflowName = response.data?.workflow_name || 'approval workflow';
+      const approverName = response.data?.approver_name || 'the approver';
+      toast.success(`Payroll submitted successfully! Routed to ${approverName} via ${workflowName}.`);
+    },
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Failed to submit payroll run';
+      toast.error(message);
     }
   });
 
   const approveMutation = useMutation({
     mutationFn: ({ approvalId, comment }: { approvalId: number; comment?: string }) =>
       payrollApi.approve(approvalId, comment),
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['approval-inbox', 'payroll-runs', 'payroll-run'] });
+      const status = response.data?.approval_status;
+      const nextApprover = response.data?.next_approver;
+      
+      if (status === 'approved') {
+        toast.success('✅ Payroll fully approved! The run is now finalized.');
+      } else if (nextApprover) {
+        toast.success(`✓ Approved! Forwarded to ${nextApprover} for next level approval.`);
+      } else {
+        toast.success('Payroll approved successfully!');
+      }
+    },
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Failed to approve payroll';
+      toast.error(message);
     }
   });
 
@@ -211,6 +240,11 @@ const Payroll: React.FC = () => {
       setShowRejectModal(false);
       setRejectionReason('');
       setApprovalToReject(null);
+      toast.success('Payroll rejected. The preparer has been notified to make corrections.');
+    },
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Failed to reject payroll';
+      toast.error(message);
     }
   });
 
@@ -376,7 +410,6 @@ const Payroll: React.FC = () => {
                         period_id: selectedPeriodId || 0,
                         scope_type: 'all',
                         scope_ref_id: undefined,
-                        approver_user_id: 0,
                         note: ''
                       });
                       setIsCreateRunModalOpen(true);
@@ -777,18 +810,14 @@ const Payroll: React.FC = () => {
                   </div>
                 )}
 
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2">Select Approver</label>
-                  <select
-                    value={createRunForm.approver_user_id}
-                    onChange={(e) => setCreateRunForm({ ...createRunForm, approver_user_id: Number(e.target.value) })}
-                    className="w-full p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-sm font-bold"
-                  >
-                    <option value="0">Select Approver</option>
-                    {employeesResponse?.data?.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
-                    ))}
-                  </select>
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl">
+                  <p className="text-[10px] font-black text-blue-900 dark:text-blue-300 uppercase tracking-widest mb-2">
+                    ℹ️ Automatic Approval Routing
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    The system will automatically determine the approval workflow based on the scope and amount. 
+                    No need to manually select approvers.
+                  </p>
                 </div>
 
                 <div>
@@ -810,7 +839,7 @@ const Payroll: React.FC = () => {
                     className="flex-1 !bg-teal-500 hover:!bg-teal-600 shadow-teal-500/20"
                     isLoading={createRunMutation.isPending}
                     onClick={() => createRunMutation.mutate(createRunForm)}
-                    disabled={!createRunForm.approver_user_id || (createRunForm.scope_type !== 'all' && !createRunForm.scope_ref_id)}
+                    disabled={createRunForm.scope_type !== 'all' && !createRunForm.scope_ref_id}
                   >
                     Start Run
                   </Button>

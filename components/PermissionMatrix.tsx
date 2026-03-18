@@ -24,9 +24,13 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
 
     useEffect(() => {
         setLocalPermissions(selectedPermissions);
-        // Expand all modules by default
-        setExpandedModules(new Set(Object.keys(permissions)));
-    }, [selectedPermissions, permissions]);
+    }, [selectedPermissions]);
+
+    useEffect(() => {
+        if (Object.keys(permissions).length > 0 && expandedModules.size === 0) {
+            setExpandedModules(new Set(Object.keys(permissions)));
+        }
+    }, [permissions]);
 
     const handleScopeChange = (permissionId: number, scope: string | null) => {
         const updated = { ...localPermissions };

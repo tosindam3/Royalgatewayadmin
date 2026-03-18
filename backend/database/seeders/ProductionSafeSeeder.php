@@ -27,11 +27,8 @@ class ProductionSafeSeeder extends Seeder
         $this->runSeeder('EmployeeSalarySeeder', 'Employee salary structures');
         
         // Payroll Seeders
-        $this->runSeeder('PayrollItemsSeeder', 'Payroll items (allowances, deductions)');
-        $this->runSeeder('PayrollPeriodsSeeder', 'Payroll periods');
-        $this->runSeeder('PayrollDataSeeder', 'Payroll data');
         $this->runSeeder('PayrollWorkflowSeeder', 'Payroll approval workflows');
-        $this->runSeeder('PayrollVerificationSeeder', 'Payroll verification data');
+        $this->runSeeder('ComprehensivePayrollSeeder', 'Comprehensive payroll data with approval flow demo');
 
         Log::info('ProductionSafeSeeder completed successfully');
     }
