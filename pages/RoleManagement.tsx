@@ -162,7 +162,7 @@ const RoleManagement: React.FC = () => {
     };
 
     const tabs = [
-        { key: 'roles', label: 'Roles', count: rolesData?.length || 0 },
+        { key: 'roles', label: 'Roles', count: Array.isArray(rolesData) ? rolesData.length : (rolesData as any)?.data?.length || 0 },
         { key: 'permissions', label: 'Permissions', count: null },
     ];
 
@@ -224,8 +224,8 @@ const RoleManagement: React.FC = () => {
                             <>
                                 <CardSkeleton /> <CardSkeleton /> <CardSkeleton />
                             </>
-                        ) : rolesData && Array.isArray(rolesData) && rolesData.length > 0 ? (
-                            rolesData.map((role) => (
+                        ) : rolesData && (Array.isArray(rolesData) || (rolesData as any).data) ? (
+                            (Array.isArray(rolesData) ? rolesData : (rolesData as any).data).map((role: Role) => (
                                 <GlassCard key={role.id} className="!p-6 hover:bg-white/[0.05] transition-all">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex-1">

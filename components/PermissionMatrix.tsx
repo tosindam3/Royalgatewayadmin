@@ -130,7 +130,7 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                                 </svg>
                                 <span className="text-sm font-black text-slate-900 dark:text-white uppercase">{module}</span>
                                 <span className="text-[9px] text-slate-500 font-bold">
-                                    ({(modulePermissions as Permission[]).filter(p => localPermissions[p.id]).length}/{(modulePermissions as Permission[]).length})
+                                    ({Array.isArray(modulePermissions) ? modulePermissions.filter(p => localPermissions[p.id]).length : 0}/{Array.isArray(modulePermissions) ? modulePermissions.length : 0})
                                 </span>
                             </button>
                             <div className="flex gap-2">
@@ -150,9 +150,9 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                         </div>
 
                         {/* Module Permissions */}
-                        {expandedModules.has(module) && (
+                        {expandedModules.has(module) && Array.isArray(modulePermissions) && (
                             <div className="p-4 space-y-3">
-                                {(modulePermissions as Permission[]).map(permission => (
+                                {modulePermissions.map(permission => (
                                     <div
                                         key={permission.id}
                                         className="flex items-center justify-between p-3 bg-white dark:bg-white/5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-transparent"
@@ -166,7 +166,7 @@ const PermissionMatrix: React.FC<PermissionMatrixProps> = ({
                                             </p>
                                         </div>
                                         <div className="flex gap-2">
-                                            {permission.available_scopes.map(scope => {
+                                            {Array.isArray(permission?.available_scopes) && permission.available_scopes.map(scope => {
                                                 const isSelected = localPermissions[permission.id] === scope;
                                                 return (
                                                     <button

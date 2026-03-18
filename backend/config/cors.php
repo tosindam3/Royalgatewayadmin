@@ -24,6 +24,7 @@ return [
         'http://127.0.0.1:3000',
         'http://localhost:3001',
         'http://127.0.0.1:3001',
+        env('FRONTEND_URL', 'https://www.royalgatewayadmin.com'),
     ],
 
     'allowed_origins_patterns' => [],
