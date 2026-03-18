@@ -90,7 +90,7 @@ const Sidebar: React.FC<SidebarProps> = ({ brand, isCollapsed, onToggleCollapse,
                     {!isCollapsed && <h1 className="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic animate-in fade-in slide-in-from-left-2">{brand.company_name || 'HR360'}</h1>}
                 </div>
             </div>
-            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-0.5">
+            <nav className="flex-1 overflow-y-auto no-scrollbar space-y-0.5" style={{ maxHeight: 'calc(100vh - 200px)' }}>
                 {menuItems.map((item, idx) => (
                     <SidebarItem key={idx} item={item} isCollapsed={isCollapsed} />
                 ))}

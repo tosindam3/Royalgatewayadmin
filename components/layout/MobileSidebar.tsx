@@ -73,7 +73,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="flex-1 overflow-y-auto py-4 no-scrollbar" style={{ maxHeight: 'calc(100vh - 88px)' }}>
           {menuItems.map((item, idx) => {
             if (item.isHeader) {
               return (
