@@ -55,7 +55,8 @@ class AttendanceAccessMiddleware
             case 'view':
             default:
                 // Basic view access - everyone with employee profile can view their own
-                if (!$user->employeeProfile) {
+                // Superadmins and Admins can view even without a profile
+                if (!$user->employeeProfile && !$user->hasRole('super_admin') && !$user->hasRole('admin')) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Employee profile not found',
