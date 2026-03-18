@@ -260,7 +260,7 @@ const RoleManagement: React.FC = () => {
                                         <div>
                                             <p className="text-[9px] text-slate-500 font-bold uppercase mb-1">Permissions</p>
                                             <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase border border-emerald-500/20">
-                                                {Array.isArray(role.permissions) ? role.permissions.length : 0}
+                                                {role.permissions_count || 0}
                                             </span>
                                         </div>
                                         <div>

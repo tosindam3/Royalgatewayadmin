@@ -14,7 +14,10 @@ class EmployeeSalaryController extends Controller
      */
     public function index(Request $request)
     {
-        $query = EmployeeSalary::with(['employee', 'salaryStructure']);
+        $query = EmployeeSalary::with([
+            'employee:id,first_name,last_name,employee_code',
+            'salaryStructure:id,name'
+        ]);
         
         if ($request->has('employee_id')) {
             $query->where('employee_id', $request->employee_id);

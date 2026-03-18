@@ -38,7 +38,14 @@ class EmployeeController extends Controller
         }
 
         $scope = $user->getPermissionScope('employees.view') ?? 'self';
-        $query = Employee::with(['branch', 'department', 'designation', 'manager']);
+        
+        $query = Employee::query();
+        
+        if ($request->boolean('minimal')) {
+            $query->select(['id', 'first_name', 'last_name', 'employee_code', 'email', 'avatar']);
+        } else {
+            $query->with(['branch', 'department', 'designation', 'manager']);
+        }
 
         // Apply RBAC scoping
         if ($scope && $scope !== 'all') {

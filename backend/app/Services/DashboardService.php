@@ -7,6 +7,7 @@ use App\Models\AttendanceRecord;
 use App\Models\LeaveRequest;
 use App\Models\LeaveBalance;
 use App\Models\AttendanceLog;
+use App\Models\OrganizationSetting;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -144,17 +145,17 @@ class DashboardService
         $q = Employee::query()->where('status', 'active');
         if ($branchId) $q->where('branch_id', $branchId);
 
-        $gender = $q->select('genotype', DB::raw('count(*) as value'))
-            ->groupBy('genotype')
+        $gender = $q->select(DB::raw('LOWER(genotype) as type'), DB::raw('count(*) as value'))
+            ->groupBy(DB::raw('LOWER(genotype)'))
             ->get()
-            ->map(fn($r) => ['label' => $r->genotype ?? 'Unknown', 'value' => $r->value])
+            ->map(fn($r) => ['label' => strtoupper($r->type ?? 'Unknown'), 'value' => $r->value])
             ->values()
             ->toArray();
 
-        $empType = $q->select('employment_type', DB::raw('count(*) as value'))
-            ->groupBy('employment_type')
+        $empType = $q->select(DB::raw('LOWER(employment_type) as type'), DB::raw('count(*) as value'))
+            ->groupBy(DB::raw('LOWER(employment_type)'))
             ->get()
-            ->map(fn($r) => ['label' => ucfirst($r->employment_type ?? 'Unknown'), 'value' => $r->value])
+            ->map(fn($r) => ['label' => ucfirst($r->type ?? 'Unknown'), 'value' => $r->value])
             ->values()
             ->toArray();
 
@@ -179,31 +180,122 @@ class DashboardService
             ->whereBetween('attendance_date', [$startOfMonth, $today])
             ->get();
 
-        $daysPresent = $records->whereIn('status', ['present', 'late'])->count();
-        $daysAbsent  = $records->where('status', 'absent')->count();
-        $lateDays    = $records->where('status', 'late')->count();
+        $totalDays = $records->count();
+        $presentDays = $records->whereIn('status', ['present', 'partial'])->count();
+        $absentDays = $records->where('status', 'absent')->count();
+        $lateDays = $records->where('late_minutes', '>', 0)->count();
+        $totalWorkedMinutes = $records->sum(function($r) { return abs($r->work_minutes); });
+        $totalWorkedHours = round($totalWorkedMinutes / 60, 1);
 
-        // Leave balance total
+        // Get organization settings
+        $settings = OrganizationSetting::whereIn('key', [
+            'attendance.work_hours_per_day',
+            'attendance.working_days'
+        ])->pluck('value', 'key');
+
+        $requiredHoursPerDay = isset($settings['attendance.work_hours_per_day']) ? (int)$settings['attendance.work_hours_per_day'] : 8;
+        $workingDays = isset($settings['attendance.working_days']) ? json_decode($settings['attendance.working_days'], true) : [1, 2, 3, 4, 5];
+        
+        // Calculate expected working days (based on settings)
+        $expectedWorkingDays = 0;
+        $current = $startOfMonth->copy();
+        while ($current->lte($today)) {
+            if (in_array($current->isoWeekday(), $workingDays)) {
+                $expectedWorkingDays++;
+            }
+            $current->addDay();
+        }
+
+        // Calculate leave days that fall on working days (to subtract from absent count)
+        $leaveDaysOnWorkDays = 0;
+        $approvedLeaves = LeaveRequest::where('employee_id', $employeeId)
+            ->where('status', 'approved')
+            ->where(function($q) use ($startOfMonth, $today) {
+                $q->whereBetween('start_date', [$startOfMonth, $today])
+                  ->orWhereBetween('end_date', [$startOfMonth, $today])
+                  ->orWhere(function($sub) use ($startOfMonth, $today) {
+                      $sub->where('start_date', '<=', $startOfMonth)
+                          ->where('end_date', '>=', $today);
+                  });
+            })
+            ->get();
+
+        foreach ($approvedLeaves as $leave) {
+            $lStart = Carbon::parse($leave->start_date)->startOfDay();
+            $lEnd = Carbon::parse($leave->end_date)->endOfDay();
+            
+            $checkStart = $lStart->gt($startOfMonth) ? $lStart : $startOfMonth;
+            $checkEnd = $lEnd->lt($today) ? $lEnd : $today;
+            
+            $temp = $checkStart->copy();
+            while ($temp->lte($checkEnd)) {
+                if (in_array($temp->isoWeekday(), $workingDays)) {
+                    $leaveDaysOnWorkDays++;
+                }
+                $temp->addDay();
+            }
+        }
+        
+        // Calculate absent days: Expected - (Present + Leave)
+        // If they were present on a leave day (unlikely but possible), we don't double count
+        $absentDays = max(0, $expectedWorkingDays - ($presentDays + $leaveDaysOnWorkDays));
+
+        $expectedTotalHours = $expectedWorkingDays * $requiredHoursPerDay;
+        $attendanceRate = $expectedWorkingDays > 0 
+            ? round(($presentDays / $expectedWorkingDays) * 100, 1) 
+            : 0;
+
+        return [
+            'total_days' => $totalDays,
+            'present_days' => $presentDays,
+            'absent_days' => $absentDays,
+            'late_days' => $lateDays,
+            'total_worked_hours' => $totalWorkedHours,
+            'expected_working_days' => $expectedWorkingDays,
+            'expected_total_hours' => $expectedTotalHours,
+            'attendance_rate' => $attendanceRate,
+        ];
+    }
+
+    /**
+     * Get leave balance summary
+     */
+    public function getLeaveBalance(int $employeeId): array
+    {
         $leaveBalance = LeaveBalance::where('employee_id', $employeeId)
             ->where('year', now()->year)
             ->sum('available');
 
-        // Clock status from today's log
+        return [
+            'leave_balance_total' => (int) $leaveBalance,
+        ];
+    }
+
+    /**
+     * Get complete employee summary for dashboard
+     */
+    public function getEmployeeSummary(int $employeeId, ?string $period = null): array
+    {
+        $personalSummary = $this->getPersonalSummary($employeeId);
+        $leaveBalance = $this->getLeaveBalance($employeeId);
+        
+        // Get today's clock status
+        $today = Carbon::today();
         $todayLog = AttendanceLog::where('employee_id', $employeeId)
-            ->whereDate('created_at', $today)
-            ->orderBy('created_at', 'desc')
+            ->whereDate('timestamp', $today)
+            ->orderBy('timestamp', 'desc')
             ->first();
 
         $clockStatus = 'not_started';
         $clockInTime = null;
         if ($todayLog) {
-            $clockStatus = $todayLog->type === 'check_in' ? 'clocked_in' : 'clocked_out';
-            if ($todayLog->type === 'check_in') {
-                $clockInTime = $todayLog->created_at->format('H:i:s');
+            $clockStatus = $todayLog->check_type === 'check_in' ? 'clocked_in' : 'clocked_out';
+            if ($todayLog->check_type === 'check_in') {
+                $clockInTime = $todayLog->timestamp->format('H:i:s');
             }
         }
 
-        // Weekly breakdown (last 4 weeks)
+        // Get weekly attendance breakdown (last 4 weeks)
         $weeks = [];
         for ($i = 3; $i >= 0; $i--) {
             $weekStart = Carbon::now()->subWeeks($i)->startOfWeek();
@@ -213,20 +305,77 @@ class DashboardService
                 ->get();
             $weeks[] = [
                 'week'    => 'Week ' . (4 - $i),
-                'present' => $weekRecs->where('status', 'present')->count(),
-                'late'    => $weekRecs->where('status', 'late')->count(),
+                'present' => $weekRecs->whereIn('status', ['present', 'partial'])->count(),
+                'late'    => $weekRecs->where('late_minutes', '>', 0)->count(),
                 'absent'  => $weekRecs->where('status', 'absent')->count(),
             ];
         }
 
+        return array_merge($personalSummary, $leaveBalance, [
+            'clock_status' => $clockStatus,
+            'clock_in_time' => $clockInTime,
+            'attendance_by_week' => $weeks,
+            'days_present' => $personalSummary['present_days'],
+            'days_absent' => $personalSummary['absent_days'],
+            'late_days' => $personalSummary['late_days'],
+        ]);
+    }
+
+    /**
+     * Get milestones (birthdays, anniversaries, etc.)
+     */
+    public function getMilestones(): array
+    {
+        $today = Carbon::today();
+        $thisMonth = $today->month;
+        
+        // Birthdays this month
+        $birthdays = Employee::where('status', 'active')
+            ->whereMonth('date_of_birth', $thisMonth)
+            ->with('user:id,name')
+            ->get()
+            ->map(function($emp) use ($today) {
+                $birthday = Carbon::parse($emp->date_of_birth)->setYear($today->year);
+                return [
+                    'type' => 'birthday',
+                    'employee_name' => $emp->full_name,
+                    'date' => $birthday->format('M d'),
+                    'is_today' => $birthday->isToday(),
+                ];
+            })
+            ->sortBy('date')
+            ->values()
+            ->toArray();
+
+        // Work anniversaries this month
+        $anniversaries = Employee::where('status', 'active')
+            ->whereMonth('hire_date', $thisMonth)
+            ->with('user:id,name')
+            ->get()
+            ->map(function($emp) use ($today) {
+                $hireDate = Carbon::parse($emp->hire_date);
+                $anniversary = $hireDate->setYear($today->year);
+                $years = $today->year - $hireDate->year;
+                
+                if ($years > 0) {
+                    return [
+                        'type' => 'anniversary',
+                        'employee_name' => $emp->full_name,
+                        'date' => $anniversary->format('M d'),
+                        'years' => $years,
+                        'is_today' => $anniversary->isToday(),
+                    ];
+                }
+                return null;
+            })
+            ->filter()
+            ->sortBy('date')
+            ->values()
+            ->toArray();
+
         return [
-            'days_present'        => $daysPresent,
-            'days_absent'         => $daysAbsent,
-            'late_days'           => $lateDays,
-            'leave_balance_total' => (int) $leaveBalance,
-            'clock_status'        => $clockStatus,
-            'clock_in_time'       => $clockInTime,
-            'attendance_by_week'  => $weeks,
+            'birthdays' => $birthdays,
+            'anniversaries' => $anniversaries,
         ];
     }
 }

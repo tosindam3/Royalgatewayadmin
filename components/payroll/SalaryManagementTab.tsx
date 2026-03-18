@@ -49,8 +49,8 @@ const SalaryManagementTab: React.FC = () => {
     });
 
     const { data: employeesResponse } = useQuery({
-        queryKey: ['employees'],
-        queryFn: () => employeeService.getDirectory(),
+        queryKey: ['employees', 'minimal'],
+        queryFn: () => employeeService.getDirectory({ minimal: 'true', per_page: 'all' }),
     });
     const employees = employeesResponse?.data || [];
 
