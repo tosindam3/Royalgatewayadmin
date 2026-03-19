@@ -5,11 +5,14 @@ namespace App\Services;
 use App\Models\JobOpening;
 use App\Models\Application;
 use App\Models\Candidate;
+use App\Traits\CacheTagsHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 
 class RecruitmentService
 {
+    use CacheTagsHelper;
+
     protected $scopeEngine;
 
     public function __construct(ScopeEngine $scopeEngine)
@@ -84,7 +87,7 @@ class RecruitmentService
         $job = JobOpening::create($data);
 
         // Clear cache
-        Cache::tags(['talent', 'jobs'])->flush();
+        $this->flushCacheTags(['talent', 'jobs']);
 
         return $job->load(['department', 'branch']);
     }
@@ -101,7 +104,7 @@ class RecruitmentService
         $job->update($data);
 
         // Clear cache
-        Cache::tags(['talent', 'jobs'])->flush();
+        $this->flushCacheTags(['talent', 'jobs']);
 
         return $job->fresh(['department', 'branch']);
     }
@@ -123,14 +126,14 @@ class RecruitmentService
         $job->delete();
 
         // Clear cache
-        Cache::tags(['talent', 'jobs'])->flush();
+        $this->flushCacheTags(['talent', 'jobs']);
     }
 
     public function getJobStatistics($user)
     {
         $cacheKey = 'job_stats_' . $user->id;
 
-        return Cache::tags(['talent', 'jobs'])->remember($cacheKey, 300, function () use ($user) {
+        return $this->cacheWithTags(['talent', 'jobs'], $cacheKey, 300, function () use ($user) {
             $query = JobOpening::query();
             $query = $this->scopeEngine->applyScope($query, $user, 'onboarding.view');
 

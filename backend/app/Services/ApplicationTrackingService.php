@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Candidate;
 use App\Models\JobOpening;
+use App\Traits\CacheTagsHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,8 @@ use Illuminate\Support\Str;
 
 class ApplicationTrackingService
 {
+    use CacheTagsHelper;
+
     protected $scopeEngine;
 
     public function __construct(ScopeEngine $scopeEngine)
@@ -72,7 +75,7 @@ class ApplicationTrackingService
             DB::commit();
 
             // Clear cache
-            Cache::tags(['talent', 'applications'])->flush();
+            $this->flushCacheTags(['talent', 'applications']);
 
             return $application->load(['candidate', 'jobOpening']);
         } catch (\Exception $e) {
@@ -144,7 +147,7 @@ class ApplicationTrackingService
         }
 
         // Clear cache
-        Cache::tags(['talent', 'applications'])->flush();
+        $this->flushCacheTags(['talent', 'applications']);
 
         return $application->fresh(['candidate', 'jobOpening']);
     }
@@ -153,7 +156,7 @@ class ApplicationTrackingService
     {
         $cacheKey = 'pipeline_stats_' . $user->id;
 
-        return Cache::tags(['talent', 'applications'])->remember($cacheKey, 300, function () use ($user) {
+        return $this->cacheWithTags(['talent', 'applications'], $cacheKey, 300, function () use ($user) {
             $accessibleJobIds = JobOpening::query();
             $accessibleJobIds = $this->scopeEngine->applyScope($accessibleJobIds, $user, 'onboarding.view');
             $jobIds = $accessibleJobIds->pluck('id');
