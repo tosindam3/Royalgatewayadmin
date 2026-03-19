@@ -72,3 +72,16 @@ export const showWarningToast = (message: string) => {
     setTimeout(() => recentToasts.delete(message), TOAST_DEBOUNCE_MS);
   }
 };
+
+/**
+ * Backward compatibility for older components
+ */
+export const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  switch (type) {
+    case 'success': return showSuccessToast(message);
+    case 'error': return showErrorToast(message);
+    case 'warning': return showWarningToast(message);
+    case 'info':
+    default: return showInfoToast(message);
+  }
+};

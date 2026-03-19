@@ -143,7 +143,14 @@ class ScopeEngine
             return $query->whereRaw('1 = 0');
         }
 
-        $column = $this->getColumnForModel($query->getModel(), 'employee_id');
+        // Special handling for models that don't have employee_id
+        $model = $query->getModel();
+        if ($model instanceof \App\Models\JobOpening) {
+            // Job openings are visible to all employees (self scope = all jobs)
+            return $query;
+        }
+
+        $column = $this->getColumnForModel($model, 'employee_id');
         return $query->where($column, $user->employee->id);
     }
 
@@ -162,6 +169,14 @@ class ScopeEngine
             ],
             \App\Models\Employee::class => [
                 'employee_id' => 'id',
+                'branch_id' => 'branch_id',
+                'department_id' => 'department_id',
+            ],
+            \App\Models\JobOpening::class => [
+                'branch_id' => 'branch_id',
+                'department_id' => 'department_id',
+            ],
+            \App\Models\Application::class => [
                 'branch_id' => 'branch_id',
                 'department_id' => 'department_id',
             ]

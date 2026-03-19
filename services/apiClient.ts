@@ -37,7 +37,13 @@ apiClient.interceptors.response.use(
         return response.data || {};
     },
     (error) => {
-        const message = error.response?.data?.message || 'A transmission error occurred in the intelligence hub.';
+        let message = error.response?.data?.message || 'A transmission error occurred in the intelligence hub.';
+        
+        // Anti-crash guard for React Error #31: Ensure message is always a string and not an object
+        if (typeof message === 'object' && message !== null) {
+            message = JSON.stringify(message);
+        }
+        
         const status = error.response?.status;
 
         if (status === 401) {

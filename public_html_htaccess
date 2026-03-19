@@ -1,6 +1,10 @@
 <IfModule mod_rewrite.c>
 RewriteEngine On
 
+# Handle Authorization Header Pass-through for Laravel API
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Force HTTPS
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
