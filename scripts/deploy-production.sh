@@ -92,14 +92,18 @@ run_remote "cd $PROD_PATH && git fetch origin && git checkout $BRANCH && git pul
 echo -e "${GREEN}✓ Production code updated${NC}"
 echo ""
 
-# Step 9: Run migrations and clear caches
-echo -e "${YELLOW}[9/10] Running migrations and clearing caches...${NC}"
+# Step 9: Run migrations, clear caches, and optimize
+echo -e "${YELLOW}[9/10] Running migrations, clearing caches, and optimizing...${NC}"
 run_remote "cd $PROD_PATH/backend && php artisan migrate --force"
 run_remote "cd $PROD_PATH/backend && php artisan config:clear"
 run_remote "cd $PROD_PATH/backend && php artisan route:clear"
 run_remote "cd $PROD_PATH/backend && php artisan cache:clear"
 run_remote "cd $PROD_PATH/backend && php artisan view:clear"
-echo -e "${GREEN}✓ Migrations run and caches cleared${NC}"
+echo -e "${GREEN}✓ Caches cleared${NC}"
+run_remote "cd $PROD_PATH/backend && php artisan config:cache"
+run_remote "cd $PROD_PATH/backend && php artisan route:cache"
+run_remote "cd $PROD_PATH/backend && php artisan optimize"
+echo -e "${GREEN}✓ Application optimized and caches rebuilt${NC}"
 echo ""
 
 # Step 10: Verify deployment
