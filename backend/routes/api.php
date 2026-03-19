@@ -423,33 +423,42 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
 
     // Talent Management Routes
     Route::prefix('talent')->middleware('auth:sanctum')->group(function () {
-        // Job Openings (everyone can view, permission-based for create/update)
-        Route::get('/jobs', [App\Http\Controllers\JobOpeningController::class, 'index'])
-            ->middleware('permission:onboarding.view,self');
+        // !! Static/specific routes MUST come before parameterized routes !!
+
+        // Job Statistics (before /{id} routes)
         Route::get('/jobs/statistics', [App\Http\Controllers\JobOpeningController::class, 'statistics'])
             ->middleware('permission:onboarding.view,department');
-        Route::get('/jobs/{id}', [App\Http\Controllers\JobOpeningController::class, 'show'])
+
+        // Job Openings - list and create
+        Route::get('/jobs', [App\Http\Controllers\JobOpeningController::class, 'index'])
             ->middleware('permission:onboarding.view,self');
-        
+
         // Job Management (recruiter/admin only)
         Route::middleware('permission:onboarding.update,department')->group(function () {
             Route::post('/jobs', [App\Http\Controllers\JobOpeningController::class, 'store']);
             Route::put('/jobs/{id}', [App\Http\Controllers\JobOpeningController::class, 'update']);
             Route::delete('/jobs/{id}', [App\Http\Controllers\JobOpeningController::class, 'destroy']);
         });
-        
-        // Applications
-        Route::post('/jobs/{jobId}/apply', [App\Http\Controllers\ApplicationController::class, 'apply'])
-            ->middleware('permission:onboarding.create,self');
-        Route::get('/applications/me', [App\Http\Controllers\ApplicationController::class, 'myApplications'])
+
+        // Job show - parameterized (AFTER static routes)
+        Route::get('/jobs/{id}', [App\Http\Controllers\JobOpeningController::class, 'show'])
             ->middleware('permission:onboarding.view,self');
-        
-        // Application Management (recruiter/admin only)
+
+        // Application statistics (MUST be before /jobs/{jobId}/apply and /applications/{id})
         Route::middleware('permission:onboarding.view,department')->group(function () {
             Route::get('/applications', [App\Http\Controllers\ApplicationController::class, 'index']);
             Route::get('/applications/statistics', [App\Http\Controllers\ApplicationController::class, 'statistics']);
         });
-        
+
+        // My applications (static route - BEFORE parameterized)
+        Route::get('/applications/me', [App\Http\Controllers\ApplicationController::class, 'myApplications'])
+            ->middleware('permission:onboarding.view,self');
+
+        // Apply for job (parameterized AFTER static routes)
+        Route::post('/jobs/{jobId}/apply', [App\Http\Controllers\ApplicationController::class, 'apply'])
+            ->middleware('permission:onboarding.create,self');
+
+        // Application stage update (parameterized)
         Route::middleware('permission:onboarding.update,department')->group(function () {
             Route::put('/applications/{id}/stage', [App\Http\Controllers\ApplicationController::class, 'updateStage']);
         });

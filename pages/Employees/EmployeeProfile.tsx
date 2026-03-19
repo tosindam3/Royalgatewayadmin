@@ -20,15 +20,18 @@ const EmployeeProfile: React.FC = () => {
     const [openActionsMenu, setOpenActionsMenu] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Get current user role and employee ID
+    // Get current user role and employee ID — read from localStorage safely
     const userStr = localStorage.getItem('royalgateway_user');
-    const currentUser = userStr ? JSON.parse(userStr) : null;
-    const permissions = JSON.parse(localStorage.getItem('user_permissions') || '[]');
+    let currentUser: { employee_profile?: { id?: number | string } } | null = null;
+    try { currentUser = userStr ? JSON.parse(userStr) : null; } catch { currentUser = null; }
+    const permissions: Array<{ name: string; pivot?: { scope_level?: string } }> = (() => {
+        try { return JSON.parse(localStorage.getItem('user_permissions') || '[]'); } catch { return []; }
+    })();
     
-    const isAdmin = permissions.some((p: any) => 
+    const isAdmin = permissions.some((p) => 
         ['employees.all', 'employees.update'].includes(p.name) && p.pivot?.scope_level !== 'self'
     );
-    const isOwnProfile = currentUser?.employee_profile?.id?.toString() === id;
+    const isOwnProfile = String(currentUser?.employee_profile?.id ?? '') === String(id ?? '');
 
     const { data: employee, isLoading } = useQuery({
         queryKey: ['employee', id],
