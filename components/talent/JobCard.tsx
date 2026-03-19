@@ -28,7 +28,7 @@ const JobCard: React.FC<JobCardProps> = ({
       case 'on_hold':
         return 'secondary';
       case 'closed':
-        return 'error';
+        return 'danger';
       default:
         return 'secondary';
     }

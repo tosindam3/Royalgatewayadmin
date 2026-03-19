@@ -20,7 +20,7 @@ const CallModal: React.FC<CallModalProps> = ({ isOpen, onClose, channelName, cha
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="w-full max-w-5xl h-[80vh] relative group">
+            <div className="w-full md:max-w-5xl h-full md:h-[80vh] relative group">
                 <GlassCard className="w-full h-full p-0 overflow-hidden flex flex-col border-[#8252e9]/20 shadow-2xl shadow-purple-500/20">
                     {/* Header */}
                     <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">

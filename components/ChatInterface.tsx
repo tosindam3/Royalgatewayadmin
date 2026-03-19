@@ -431,7 +431,7 @@ const ChatInterface: React.FC = () => {
         {selectedChannel ? (
           <>
             {/* Chat Header */}
-            <div className="shrink-0 p-4 md:p-6 bg-slate-50/80 dark:bg-[#1a1625]/80 backdrop-blur-md border-b border-slate-200 dark:border-white/5 flex justify-between items-center z-20">
+            <div className="shrink-0 p-3 md:p-6 bg-slate-50/80 dark:bg-[#1a1625]/80 backdrop-blur-md border-b border-slate-200 dark:border-white/5 flex justify-between items-center z-20">
               <div className="flex items-center gap-2 md:gap-4 min-w-0">
                 {/* Back button — mobile only */}
                 <button
@@ -490,7 +490,7 @@ const ChatInterface: React.FC = () => {
                 </div>
                 
                 {/* Admin Dashboard Action */}
-                {hasPermission('chat.admin') && (
+                {hasPermission(currentUser, 'chat.admin') && (
                   <button
                     onClick={() => setIsAdminDashboardOpen(true)}
                     className="hidden sm:block p-2.5 bg-purple-500/10 dark:bg-gradient-to-br dark:from-purple-500/20 dark:to-blue-500/20 border border-purple-500/20 dark:border-purple-500/30 rounded-xl text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 dark:hover:text-white transition-all shadow-sm"
@@ -553,7 +553,7 @@ const ChatInterface: React.FC = () => {
                        </div>
                     )}
                     <div className={`flex-1 min-w-0 max-w-[92%] md:max-w-[80%] space-y-1 ${isCurrentUser ? 'flex flex-col items-end' : ''}`}>
-                      <div className={`${isCurrentUser ? 'gradient-bg text-white' : 'bg-slate-100 dark:bg-[#1a1625] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white'} p-3 md:p-4 px-4 md:px-5 rounded-[22px] ${isCurrentUser ? 'rounded-tr-none' : 'rounded-tl-none'} shadow-sm transition-all hover:shadow-md relative overflow-hidden`}>
+                      <div className={`${isCurrentUser ? 'gradient-bg text-white' : 'bg-slate-100 dark:bg-[#1a1625] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white'} p-2.5 md:p-4 px-3.5 md:px-5 rounded-[22px] ${isCurrentUser ? 'rounded-tr-none' : 'rounded-tl-none'} shadow-sm transition-all hover:shadow-md relative overflow-hidden`}>
                         {!isCurrentUser && (
                           <p className="text-[10px] font-bold text-[#8252e9] mb-1 opacity-80">{message.user?.name}</p>
                         )}

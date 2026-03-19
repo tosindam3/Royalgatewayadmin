@@ -276,9 +276,51 @@ jobs:
           find /home/u237094395/domains/royalgatewayadmin.com/public_html -type d -exec chmod 755 {} \;
 
 # ---------------------------------------
+# Verify index.php points to correct backend
+# ---------------------------------------
+    - name: Verify index.php integrity
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          set -e
+          INDEX=/home/u237094395/domains/royalgatewayadmin.com/public_html/index.php
+          echo "Verifying index.php points to correct backend..."
+          if ! grep -q "apps/royalgatewayadmin/backend/vendor/autoload.php" "$INDEX"; then
+            echo "ERROR: index.php is pointing to the wrong Laravel app!"
+            echo "Current content:"
+            cat "$INDEX"
+            echo "Applying fix..."
+            cp /home/u237094395/apps/royalgatewayadmin/backend/public/index.production.php "$INDEX"
+            echo "Fixed. Verifying again..."
+            grep "apps/royalgatewayadmin/backend" "$INDEX" && echo "index.php is now correct."
+          else
+            echo "index.php is correct - points to backend/"
+          fi
+
+# ---------------------------------------
 # Health Check
 # ---------------------------------------
     - name: Health Check
       run: |
         sleep 10
-        curl -f https://www.royalgatewayadmin.com/api/health || echo "Health check failed"
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://www.royalgatewayadmin.com/api/health)
+        echo "Health check status: $STATUS"
+        if [ "$STATUS" != "200" ]; then
+          echo "WARNING: Health check returned $STATUS"
+        fi
+        
+        # Verify key API routes are reachable (should return 401, not 404)
+        for ENDPOINT in "v1/talent/jobs" "v1/talent/applications/statistics" "v1/dashboard/metrics/quick-stats"; do
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" https://www.royalgatewayadmin.com/api/$ENDPOINT)
+          if [ "$CODE" = "404" ]; then
+            echo "FAIL: /api/$ENDPOINT returned 404 - routing is broken!"
+            exit 1
+          else
+            echo "OK: /api/$ENDPOINT returned $CODE (expected 401/200)"
+          fi
+        done
+        echo "All route checks passed."
