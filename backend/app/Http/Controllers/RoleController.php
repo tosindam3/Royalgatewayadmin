@@ -77,8 +77,20 @@ class RoleController extends Controller
     {
         $role = Role::findOrFail($id);
 
-        if ($role->is_system || $role->name === 'super_admin') {
-            return $this->error('The Super Administrator role is a protected system role and cannot be modified.', 403);
+        $isSuperAdminUser = $request->user()?->hasRole('super_admin') || $request->user()?->role === 'super_admin';
+
+        if ($role->is_system) {
+            if (!$isSuperAdminUser) {
+                return $this->error('Only Super Administrators can modify system roles.', 403);
+            }
+
+            if ($request->has('name') && $request->name !== $role->name) {
+                return $this->error('The internal name of a system role cannot be changed as it is used by the system.', 403);
+            }
+
+            if ($role->name === 'super_admin' && $request->has('is_active') && !$request->boolean('is_active')) {
+                return $this->error('The super_admin role cannot be deactivated.', 403);
+            }
         }
 
         $validated = $request->validate([
