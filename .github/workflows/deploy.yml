@@ -120,6 +120,37 @@ jobs:
 # ---------------------------------------
 # Deploy Laravel Backend
 # ---------------------------------------
+    - name: Ensure Production on Main Branch
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.HOSTINGER_SSH_HOST }}
+        username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+        key: ${{ secrets.HOSTINGER_SSH_KEY }}
+        port: ${{ secrets.HOSTINGER_SSH_PORT }}
+        script: |
+          set -e
+          cd /home/u237094395/apps/royalgatewayadmin
+          echo "Ensuring production is on main branch..."
+          
+          # Stash any local changes
+          git stash save "Auto-stash before deployment $(date +%Y%m%d_%H%M%S)" || true
+          
+          # Fetch latest from origin
+          git fetch origin
+          
+          # Switch to main if not already on it
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [ "$CURRENT_BRANCH" != "main" ]; then
+            echo "Switching from $CURRENT_BRANCH to main..."
+            git checkout main
+          fi
+          
+          # Pull latest changes
+          git pull origin main
+          
+          echo "Production is now on main branch and up to date"
+          git log -1 --oneline
+
     - name: Deploy Laravel
       uses: appleboy/ssh-action@v1
       with:
