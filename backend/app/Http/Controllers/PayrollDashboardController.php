@@ -45,6 +45,7 @@ class PayrollDashboardController extends Controller
             // Recently approved runs for trend
             $recentRuns = PayrollRun::approved()
                 ->with('period')
+                ->withCount('employees')
                 ->orderBy('approved_at', 'desc')
                 ->limit(5)
                 ->get();
@@ -98,7 +99,7 @@ class PayrollDashboardController extends Controller
                             'name' => $run->period?->name ?? 'Unknown Period',
                             'amount' => (float) $run->total_net,
                             'date' => $run->approved_at?->toDateString() ?? $run->updated_at?->toDateString() ?? now()->toDateString(),
-                            'employees' => $run->employees()->count()
+                            'employees' => $run->employees_count
                         ];
                     })
                 ]
