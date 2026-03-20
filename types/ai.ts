@@ -21,6 +21,7 @@ export interface BriefingResponse {
   health_score:   number;
   gemini_enabled: boolean;
   generated_at:   string;
+  is_enriched?:   boolean;
 }
 
 export interface TrendNews {

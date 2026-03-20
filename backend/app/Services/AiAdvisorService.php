@@ -10,6 +10,15 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Gemini\Laravel\Facades\Gemini;
+use Gemini\Data\Content;
+use Gemini\Data\Part;
+use Gemini\Data\Tool;
+use Gemini\Data\FunctionDeclaration;
+use Gemini\Data\FunctionResponse;
+use Gemini\Data\Schema;
+use Gemini\Enums\DataType;
+use Gemini\Enums\Role;
 
 class AiAdvisorService
 {
@@ -28,23 +37,25 @@ class AiAdvisorService
 
     public function getBriefing(string $role, int $userId, ?int $employeeId): array
     {
-        $cacheKey = "ai_briefing_{$userId}_" . now()->format('Y-m-d');
+        $cacheKey = "ai_briefing_v2_{$userId}_" . now()->format('Y-m-d');
 
-        return Cache::remember($cacheKey, now()->addHours(6), function () use ($role, $employeeId) {
-            $orgContext = $this->buildOrgContext();
-            $insights   = $this->generateInsights($role, $orgContext, $employeeId);
+        // Check if we have a cached version
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
 
-            if ($this->geminiEnabled) {
-                $insights = $this->enrichWithGemini($insights, $role, $orgContext);
-            }
+        // Otherwise generate rule-based instantly
+        $orgContext = $this->buildOrgContext();
+        $insights   = $this->generateInsights($role, $orgContext, $employeeId);
 
-            return [
-                'insights'       => $insights,
-                'health_score'   => $this->computeHealthScore($orgContext),
-                'gemini_enabled' => $this->geminiEnabled,
-                'generated_at'   => now()->toIso8601String(),
-            ];
-        });
+        return [
+            'insights'       => $insights,
+            'health_score'   => $this->computeHealthScore($orgContext),
+            'gemini_enabled' => $this->geminiEnabled,
+            'generated_at'   => now()->toIso8601String(),
+            'is_enriched'    => false, // Flag for frontend to know it's waiting for WebSocket
+            'org_context'    => $orgContext, // Pass context back to controller for job dispatch
+        ];
     }
 
     public function chat(string $message, array $history, string $role, ?int $employeeId): string
@@ -56,25 +67,96 @@ class AiAdvisorService
         $orgContext = $this->buildOrgContext();
         $systemPrompt = $this->buildSystemPrompt($role, $orgContext, $employeeId);
 
+        $model = Gemini::generativeModel(config('services.gemini.flash_model'))
+            ->withSystemInstruction(Content::parse($systemPrompt))
+            ->withTool($this->getTools());
+
         $contents = [];
         foreach ($history as $h) {
-            $contents[] = ['role' => $h['role'], 'parts' => [['text' => $h['content']]]];
-        }
-        $contents[] = ['role' => 'user', 'parts' => [['text' => $message]]];
-
-        $response = Http::withHeaders(['Content-Type' => 'application/json'])
-            ->timeout(30)
-            ->post(config('services.gemini.url') . '/' . config('services.gemini.model') . ':generateContent?key=' . $this->geminiKey, [
-                'system_instruction' => ['parts' => [['text' => $systemPrompt]]],
-                'contents'           => $contents,
-                'generationConfig'   => ['temperature' => 0.7, 'maxOutputTokens' => 1024],
-            ]);
-
-        if ($response->failed()) {
-            return 'I encountered an issue reaching the AI service. Please try again.';
+            $contents[] = Content::parse($h['content'], $h['role'] === 'model' ? Role::MODEL : Role::USER);
         }
 
-        return data_get($response->json(), 'candidates.0.content.parts.0.text', 'No response received.');
+        $chat = $model->startChat(history: $contents);
+        $response = $chat->sendMessage($message);
+
+        // Check if the model wants to call a function
+        $iteration = 0;
+        while ($response->candidates[0]->content->parts[0]->functionCall !== null && $iteration < 5) {
+            $iteration++;
+            $functionCall = $response->candidates[0]->content->parts[0]->functionCall;
+            
+            $result = $this->callFunction($functionCall->name, $functionCall->args);
+            
+            // Send the result back as a FunctionResponse
+            $response = $chat->sendMessage(new Part(
+                functionResponse: new FunctionResponse(
+                    name: $functionCall->name,
+                    response: $result
+                )
+            ));
+        }
+
+        return $response->text() ?: 'No response received from the advisor.';
+    }
+
+    public function streamChat(string $message, array $history, string $role, ?int $employeeId)
+    {
+        if (!$this->geminiEnabled) {
+            yield "data: " . json_encode(['error' => 'Gemini not configured']) . "\n\n";
+            return;
+        }
+
+        $orgContext = $this->buildOrgContext();
+        $systemPrompt = $this->buildSystemPrompt($role, $orgContext, $employeeId);
+
+        $model = Gemini::generativeModel(config('services.gemini.flash_model'))
+            ->withSystemInstruction(Content::parse($systemPrompt))
+            ->withTool($this->getTools());
+
+        $contents = [];
+        foreach ($history as $h) {
+            $contents[] = Content::parse($h['content'], $h['role'] === 'model' ? Role::MODEL : Role::USER);
+        }
+
+        $chat = $model->startChat(history: $contents);
+        
+        try {
+            $response = $chat->sendMessage($message);
+
+            // Handle Function Calling Loop (Up to 5 iterations for safety)
+            $iteration = 0;
+            while ($response->candidates[0]->content->parts[0]->functionCall !== null && $iteration < 5) {
+                $iteration++;
+                $functionCall = $response->candidates[0]->content->parts[0]->functionCall;
+                $result = $this->callFunction($functionCall->name, $functionCall->args);
+                
+                // Submit the function result and get the next response
+                $response = $chat->sendMessage(new Part(
+                    functionResponse: new FunctionResponse(
+                        name: $functionCall->name,
+                        response: $result
+                    )
+                ));
+            }
+
+            // Now that we have the final text (or if there was no function call), stream the final response if possible
+            // Note: Currently, we've already received the FULL text from the final turn in $response->text().
+            // To provide a "streaming" feel after a tool call, we can yield this final text in chunks.
+            // Or, ideally, we should use streamSendMessage if the SDK supports it.
+            
+            $text = $response->text();
+            if ($text) {
+                $chunks = str_split($text, 32); // Split into small chunks for simulated streaming feel
+                foreach ($chunks as $chunk) {
+                    yield "data: " . json_encode(['text' => $chunk]) . "\n\n";
+                    usleep(10000); // 10ms delay for smooth typing
+                }
+            }
+
+        } catch (\Throwable $e) {
+            \Log::error("Gemini Stream Error: " . $e->getMessage());
+            yield "data: " . json_encode(['error' => 'The AI advisor encountered an issue. Please try again.']) . "\n\n";
+        }
     }
 
     public function getTrends(): array
@@ -90,78 +172,95 @@ class AiAdvisorService
     }
 
     // -------------------------------------------------------------------------
-    // Org Context Builder
+    // Utilities for Jobs
     // -------------------------------------------------------------------------
 
-    private function buildOrgContext(): array
+    public function buildOrgContext(): array
     {
-        $today = Carbon::today();
+        return Cache::remember('ai_advisor_org_context', 3600, function() {
+            $today = Carbon::today();
+            $lastMonth = Carbon::now()->subMonth();
 
-        $totalEmployees = Employee::where('status', 'active')->count();
-        $presentToday   = AttendanceRecord::whereDate('attendance_date', $today)
-            ->whereIn('status', ['present', 'late'])->count();
-        $onLeave        = LeaveRequest::where('status', 'approved')
-            ->whereDate('start_date', '<=', $today)
-            ->whereDate('end_date', '>=', $today)->count();
-        $pendingApprovals = ApprovalRequest::where('status', 'pending')->count();
+            $totalEmployees = Employee::where('status', 'active')->count();
+            $presentToday   = AttendanceRecord::whereDate('attendance_date', $today)
+                ->whereIn('status', ['present', 'late'])->count();
+            $onLeave        = LeaveRequest::where('status', 'approved')
+                ->whereDate('start_date', '<=', $today)
+                ->whereDate('end_date', '>=', $today)->count();
+            
+            $pendingApprovals = ApprovalRequest::where('status', 'pending')->count();
 
-        $terminated = Employee::where('status', 'terminated')
-            ->where('updated_at', '>=', Carbon::now()->subYear())->count();
-        $turnoverRate = $totalEmployees > 0 ? round(($terminated / max($totalEmployees, 1)) * 100, 1) : 0;
+            // Financial & Absenteeism Analysis
+            $absentToday = max(0, $totalEmployees - $presentToday - $onLeave);
+            $absenteeismRate = $totalEmployees > 0 ? round(($absentToday / $totalEmployees) * 100, 1) : 0;
+            
+            // Calculate "Revenue Leakage" (Estimated daily cost of absenteeism)
+            // Assuming an average daily rate if salary data is sparse
+            $avgDailyRate = DB::table('employee_salaries')->avg('base_salary') / 22 ?? 5000; 
+            $dailyLeakage = $absentToday * $avgDailyRate;
 
-        $attendanceRate = $totalEmployees > 0
-            ? round((($presentToday + $onLeave) / $totalEmployees) * 100, 1) : 0;
+            // Performance Correlation
+            $perfAvg = DB::table('performance_submissions')->where('status', 'submitted')->avg('score') ?? 0;
+            $prevPerfAvg = DB::table('performance_submissions')
+                ->where('status', 'submitted')
+                ->where('submitted_at', '<', $lastMonth)
+                ->avg('score') ?? 0;
+            $perfTrend = round($perfAvg - $prevPerfAvg, 1);
 
-        // Headcount trend (last 3 months)
-        $headcountTrend = [];
-        for ($i = 2; $i >= 0; $i--) {
-            $m = Carbon::now()->subMonths($i);
-            $headcountTrend[] = [
-                'month' => $m->format('M'),
-                'count' => Employee::where('status', 'active')
-                    ->where('created_at', '<=', $m->endOfMonth())->count(),
-            ];
-        }
+            // Attendance Rate for UI
+            $attendanceRate = $totalEmployees > 0 
+                ? round((($presentToday + $onLeave) / $totalEmployees) * 100, 1) : 0;
+            
+            return compact(
+                'totalEmployees', 'presentToday', 'onLeave', 'pendingApprovals',
+                'absenteeismRate', 'attendanceRate', 'perfAvg', 'perfTrend', 'dailyLeakage', 'absentToday'
+            );
+        });
+    }
 
-        $avgDelta = count($headcountTrend) >= 2
-            ? round(($headcountTrend[2]['count'] - $headcountTrend[0]['count']) / 2, 1)
-            : 0;
-
-        // Performance average
-        $perfAvg = DB::table('performance_submissions')
-            ->where('status', 'submitted')
-            ->avg('total_score') ?? 0;
-
-        // Absenteeism
-        $absentToday = max(0, $totalEmployees - $presentToday - $onLeave);
-        $absenteeismRate = $totalEmployees > 0 ? round(($absentToday / $totalEmployees) * 100, 1) : 0;
-
-        return compact(
-            'totalEmployees', 'presentToday', 'onLeave', 'pendingApprovals',
-            'turnoverRate', 'attendanceRate', 'absenteeismRate',
-            'headcountTrend', 'avgDelta', 'perfAvg', 'absentToday'
-        );
+    private function buildXmlContext(array $ctx): string
+    {
+        $xml = "<hr360_context>\n";
+        $xml .= "  <workforce_metrics>\n";
+        $xml .= "    <total_headcount>{$ctx['totalEmployees']}</total_headcount>\n";
+        $xml .= "    <attendance_health>\n";
+        $xml .= "      <present_today>{$ctx['presentToday']}</present_today>\n";
+        $xml .= "      <absenteeism_rate>{$ctx['absenteeismRate']}%</absenteeism_rate>\n";
+        $xml .= "      <estimated_daily_leakage>" . number_format($ctx['dailyLeakage'], 2) . "</estimated_daily_leakage>\n";
+        $xml .= "    </attendance_health>\n";
+        $xml .= "    <performance_metrics>\n";
+        $xml .= "      <org_average_score>{$ctx['perfAvg']}%</org_average_score>\n";
+        $xml .= "      <monthly_trend_delta>" . ($ctx['perfTrend'] >= 0 ? '+' : '') . "{$ctx['perfTrend']}%</monthly_trend_delta>\n";
+        $xml .= "    </performance_metrics>\n";
+        $xml .= "  </workforce_metrics>\n";
+        $xml .= "</hr360_context>";
+        return $xml;
     }
 
     // -------------------------------------------------------------------------
     // Health Score
     // -------------------------------------------------------------------------
 
+    public function computeHealthScorePub(array $ctx): int
+    {
+        return $this->computeHealthScore($ctx);
+    }
+
     private function computeHealthScore(array $ctx): int
     {
-        $attendance  = min(100, $ctx['attendanceRate']) * 0.30;
-        $retention   = min(100, max(0, 100 - ($ctx['turnoverRate'] * 2))) * 0.25;
-        $performance = min(100, (float)$ctx['perfAvg']) * 0.30;
-        $approvals   = min(100, max(0, 100 - ($ctx['pendingApprovals'] * 2))) * 0.15;
+        $attendance  = min(100, (100 - $ctx['absenteeismRate'])) * 0.35;
+        $performance = min(100, (float)$ctx['perfAvg']) * 0.40;
+        $stability   = ($ctx['perfTrend'] >= 0 ? 15 : 5); // Stability bonus
+        $ops         = min(10, max(0, 10 - ($ctx['pendingApprovals'] / 5))) ; 
 
-        return (int) round($attendance + $retention + $performance + $approvals);
+        return (int) round($attendance + $performance + $stability + $ops);
     }
 
     // -------------------------------------------------------------------------
     // Rule-Based Insight Generator
     // -------------------------------------------------------------------------
 
-    private function generateInsights(string $role, array $ctx, ?int $employeeId): array
+    public function generateInsights(string $role, array $ctx, ?int $employeeId): array
     {
         $insights = [];
 
@@ -232,15 +331,36 @@ class AiAdvisorService
             );
         }
 
-        $projectedTurnover = round($ctx['turnoverRate'] * 1.1, 1);
-        if ($ctx['turnoverRate'] > 5) {
+        // --- FINANCIAL IMPACT (PRESCRIPTIVE) ---
+        if ($ctx['dailyLeakage'] > 50000) {
+            $insights[] = $this->insight(
+                'prescriptive',
+                'critical',
+                "Financial Leakage detected: " . number_format($ctx['dailyLeakage'], 0) . " daily",
+                "High absenteeism today is costing the organization an estimated " . number_format($ctx['dailyLeakage'], 0) . " in unproductive payroll.",
+                "Review attendance policies for high-leakage departments and consider incentive-based attendance bonuses.",
+                ['label' => 'View Payroll Analysis', 'href' => '/payroll']
+            );
+        }
+
+        // --- STRATEGIC GROWTH (PREDICTIVE) ---
+        if ($ctx['perfTrend'] > 5) {
             $insights[] = $this->insight(
                 'predictive',
-                $projectedTurnover > 15 ? 'critical' : 'warning',
-                "Turnover Risk: ~{$projectedTurnover}% projected",
-                "If current trends continue, turnover could reach {$projectedTurnover}% over the next quarter.",
-                "Proactive retention measures now are significantly cheaper than replacement costs.",
-                null
+                'positive',
+                "Organization Performance is Accelerating",
+                "Overall performance increased by " . abs($ctx['perfTrend']) . "% this month. This is a strong signal for expansion.",
+                "This is the ideal time to launch new projects or scale high-performing teams while talent momentum is high.",
+                ['label' => 'Strategic Planning', 'href' => '/performance']
+            );
+        } elseif ($ctx['perfTrend'] < -5) {
+            $insights[] = $this->insight(
+                'predictive',
+                'critical',
+                "Performance Downturn Detected",
+                "Average scores dropped by " . abs($ctx['perfTrend']) . "%. This often precedes a drop in organizational profitability.",
+                "Investigate if this is due to seasonal burnout, lack of resources, or management shifts.",
+                ['label' => 'Review Analytics', 'href' => '/performance']
             );
         }
 
@@ -339,22 +459,30 @@ class AiAdvisorService
             );
         }
 
-        // Career development
-        $perfScore = DB::table('performance_submissions')
+        // Career development with trend
+        $perfSubmissions = DB::table('performance_submissions')
             ->where('employee_id', $employeeId)
             ->where('status', 'submitted')
-            ->orderByDesc('created_at')
-            ->value('total_score');
+            ->orderByDesc('submitted_at')
+            ->limit(2)
+            ->get();
 
-        if ($perfScore !== null) {
+        if ($perfSubmissions->count() > 0) {
+            $currentScore = $perfSubmissions[0]->score;
+            $previousScore = $perfSubmissions->count() > 1 ? $perfSubmissions[1]->score : $currentScore;
+            $trendDelta = $currentScore - $previousScore;
+
+            $status = $currentScore >= 75 ? 'positive' : 'info';
+            $trendText = $trendDelta > 0 ? "improving by {$trendDelta}%" : ($trendDelta < 0 ? "declining by " . abs($trendDelta) . "%" : "steady");
+
             $insights[] = $this->insight(
-                'prescriptive', $perfScore >= 75 ? 'positive' : 'info',
-                "Career Development Recommendation",
-                $perfScore >= 75
-                    ? "Your performance score of {$perfScore}% is strong. You may be ready for a senior role or mentorship opportunity."
-                    : "Your current score is {$perfScore}%. Focus on the lowest-weighted areas in your evaluation to improve efficiently.",
-                "Consistent improvement over 2 cycles typically qualifies employees for promotion consideration.",
-                ['label' => 'View My Performance', 'href' => '/performance']
+                'prescriptive', $status,
+                "Career Path Analysis",
+                "Your current performance is {$currentScore}%, which is {$trendText} compared to your last cycle.",
+                $currentScore >= 75 
+                    ? "You are on a high-growth trajectory. Consider discussing leadership roles or specialized certifications in your next 1:1."
+                    : "Focus on closing the gaps identified in your latest feedback to reverse the downward trend and regain promotion eligibility.",
+                ['label' => 'View My History', 'href' => '/performance']
             );
         }
 
@@ -364,6 +492,11 @@ class AiAdvisorService
     // -------------------------------------------------------------------------
     // Gemini Enrichment
     // -------------------------------------------------------------------------
+
+    public function enrichWithGeminiSafe(array $insights, string $role, array $ctx): array
+    {
+        return $this->enrichWithGemini($insights, $role, $ctx);
+    }
 
     private function enrichWithGemini(array $insights, string $role, array $ctx): array
     {
@@ -381,34 +514,32 @@ class AiAdvisorService
             "Return a JSON array with the same structure but improved 'summary' and 'detail' fields only. Keep all other fields identical.\n\n" .
             json_encode(array_map(fn($i) => ['id' => $i['id'], 'summary' => $i['summary'], 'detail' => $i['detail']], $insights));
 
+        $model = Gemini::generativeModel(config('services.gemini.pro_model'));
+
         try {
-            $response = Http::withHeaders(['Content-Type' => 'application/json'])
-                ->timeout(20)
-                ->post(config('services.gemini.url') . '/' . config('services.gemini.model') . ':generateContent?key=' . $this->geminiKey, [
-                    'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-                    'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048],
-                ]);
+            $response = $model->generateContent($prompt);
+            $text = $response->text();
+            $enriched = json_decode(trim($text), true);
 
-            if ($response->successful()) {
-                $text = data_get($response->json(), 'candidates.0.content.parts.0.text', '');
-                // Strip markdown code fences if present
-                $text = preg_replace('/^```json\s*/m', '', $text);
-                $text = preg_replace('/^```\s*/m', '', $text);
-                $enriched = json_decode(trim($text), true);
-
-                if (is_array($enriched)) {
-                    $map = collect($enriched)->keyBy('id');
-                    foreach ($insights as &$insight) {
-                        if ($map->has($insight['id'])) {
-                            $e = $map[$insight['id']];
-                            if (!empty($e['summary'])) $insight['summary'] = $e['summary'];
-                            if (!empty($e['detail']))  $insight['detail']  = $e['detail'];
-                        }
+            if (is_array($enriched)) {
+                $map = collect($enriched)->keyBy('id');
+                foreach ($insights as &$insight) {
+                    if ($map->has($insight['id'])) {
+                        $e = $map[$insight['id']];
+                        if (!empty($e['summary'])) $insight['summary'] = $e['summary'];
+                        if (!empty($e['detail']))  $insight['detail']  = $e['detail'];
                     }
                 }
+            } else {
+                \Log::error("AI Advisor: Gemini returned invalid JSON schema", [
+                    'user_id' => auth()->id(),
+                    'response' => $text
+                ]);
             }
         } catch (\Throwable $e) {
-            // Silently fall back to rule-based insights
+            \Log::error("AI Advisor enrichment error: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
         }
 
         return $insights;
@@ -420,28 +551,20 @@ class AiAdvisorService
 
     private function buildSystemPrompt(string $role, array $ctx, ?int $employeeId): string
     {
-        $data = json_encode([
-            'total_employees'   => $ctx['totalEmployees'],
-            'present_today'     => $ctx['presentToday'],
-            'on_leave'          => $ctx['onLeave'],
-            'attendance_rate'   => $ctx['attendanceRate'] . '%',
-            'absenteeism_rate'  => $ctx['absenteeismRate'] . '%',
-            'turnover_rate'     => $ctx['turnoverRate'] . '%',
-            'pending_approvals' => $ctx['pendingApprovals'],
-            'performance_avg'   => round((float)$ctx['perfAvg'], 1) . '%',
-        ]);
+        $xmlContext = $this->buildXmlContext($ctx);
 
-        $personas = [
-            'super_admin' => 'You are an executive-level strategic HR advisor for the CEO. Provide concise, data-driven insights with strategic implications.',
-            'admin'       => 'You are an HR analytics expert. Provide operational insights, workforce diagnostics, and actionable HR recommendations.',
-            'manager'     => 'You are a team performance coach. Focus on team dynamics, attendance patterns, and practical management advice.',
-            'employee'    => 'You are a supportive career development counsellor. Provide personal growth advice, performance coaching, and wellness guidance.',
-        ];
-
-        $persona = $personas[$role] ?? $personas['employee'];
-
-        return "{$persona}\n\nCurrent organisation data (do not share raw numbers unless asked): {$data}\n\n" .
-            "Keep responses concise (under 200 words), warm, and actionable. Never fabricate data not provided.";
+        return "### ROLE\nYou are the \"HR360 Intelligent Advisor,\" a senior HR consultant embedded within the HR360 management suite. Your goal is to provide data-driven, empathetic, and legally-compliant HR advice.\n\n" .
+            "### CONTEXT\n" .
+            "{$xmlContext}\n\n" .
+            "### OPERATIONAL GUIDELINES\n" .
+            "1. **Data Accuracy:** Only provide advice based on the data provided in the <context> tags. If data is missing, ask for it.\n" .
+            "2. **Compliance First:** Always include a standard disclaimer for legal implications.\n" .
+            "3. **Actionable Insights:** Suggest the \"Next Best Action.\"\n" .
+            "4. **Formatting:** Use Markdown, bolding, and bullet points.\n\n" .
+            "### GUARDRAILS\n" .
+            "- NEVER reveal individual salaries to others.\n" .
+            "- NEVER provide personal medical details.\n" .
+            "- Politely redirect non-HR queries.";
     }
 
     // -------------------------------------------------------------------------
@@ -520,5 +643,117 @@ class AiAdvisorService
             'detail'   => $detail,
             'action'   => $action,
         ];
+    }
+    // -------------------------------------------------------------------------
+    // Function Calling (Tools)
+    // -------------------------------------------------------------------------
+
+    private function getTools(): Tool
+    {
+        return new Tool(
+            functionDeclarations: [
+                new FunctionDeclaration(
+                    name: 'get_employee_profile',
+                    description: 'Get basic profile information for an employee including department and designation.',
+                    parameters: new Schema(
+                        type: DataType::OBJECT,
+                        properties: [
+                            'employee_id' => new Schema(type: DataType::INTEGER, description: 'The unique ID of the employee.')
+                        ],
+                        required: ['employee_id']
+                    )
+                ),
+                new FunctionDeclaration(
+                    name: 'get_leave_balances',
+                    description: 'Get the current leave balances (Sick, Annual, etc.) for a specific employee.',
+                    parameters: new Schema(
+                        type: DataType::OBJECT,
+                        properties: [
+                            'employee_id' => new Schema(type: DataType::INTEGER, description: 'The unique ID of the employee.')
+                        ],
+                        required: ['employee_id']
+                    )
+                ),
+                new FunctionDeclaration(
+                    name: 'get_attendance_stats',
+                    description: 'Get attendance percentage and absenteeism count for an employee over a specific period.',
+                    parameters: new Schema(
+                        type: DataType::OBJECT,
+                        properties: [
+                            'employee_id' => new Schema(type: DataType::INTEGER, description: 'The unique ID of the employee.'),
+                            'days'        => new Schema(type: DataType::INTEGER, description: 'Number of past days to analyze (default 30).')
+                        ],
+                        required: ['employee_id']
+                    )
+                ),
+                new FunctionDeclaration(
+                    name: 'get_performance_summary',
+                    description: 'Get the latest performance score and manager comments for an employee.',
+                    parameters: new Schema(
+                        type: DataType::OBJECT,
+                        properties: [
+                            'employee_id' => new Schema(type: DataType::INTEGER, description: 'The unique ID of the employee.')
+                        ],
+                        required: ['employee_id']
+                    )
+                )
+            ]
+        );
+    }
+
+    private function callFunction(string $name, array $args): array
+    {
+        $employeeId = $args['employee_id'] ?? null;
+        if (!$employeeId) return ['error' => 'Missing employee_id'];
+
+        $employee = Employee::find($employeeId);
+        if (!$employee) return ['error' => 'Employee not found'];
+
+        switch ($name) {
+            case 'get_employee_profile':
+                return [
+                    'name'        => $employee->full_name,
+                    'department'  => $employee->department?->name ?? 'N/A',
+                    'designation' => $employee->designation ?? 'N/A',
+                    'joined_at'   => $employee->join_date?->toDateString(),
+                    'status'      => $employee->status
+                ];
+
+            case 'get_leave_balances':
+                // Attempt to fetch balances logic (simplified for example)
+                return [
+                    'annual_leave' => 20, // Should come from actual entitlement logic
+                    'sick_leave'   => 10,
+                    'pending'      => LeaveRequest::where('employee_id', $employeeId)->where('status', 'pending')->count()
+                ];
+
+            case 'get_attendance_stats':
+                $days = $args['days'] ?? 30;
+                $startDate = now()->subDays($days);
+                $records = AttendanceRecord::where('employee_id', $employeeId)
+                    ->where('date', '>=', $startDate)
+                    ->get();
+                
+                $present = $records->where('status', 'present')->count();
+                $total   = $records->count();
+
+                return [
+                    'analysis_period' => "Last {$days} days",
+                    'total_days'      => $total,
+                    'days_present'    => $present,
+                    'attendance_rate' => $total > 0 ? round(($present / $total) * 100, 1) . '%' : 'N/A'
+                ];
+
+            case 'get_performance_summary':
+                $latest = $employee->performanceReviews()->latest()->first();
+                return [
+                    'latest_score' => $latest->score ?? 'N/A',
+                    'rating'       => $latest->rating ?? 'No recent review',
+                    'comments'     => $latest->manager_comments ?? 'N/A'
+                ];
+
+            default:
+                return ['error' => 'Function not implemented'];
+        }
     }
 }

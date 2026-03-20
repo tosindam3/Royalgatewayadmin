@@ -410,11 +410,11 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::delete('/{id}', [App\Http\Controllers\MemoFolderController::class, 'destroy']);
     });
 
-    // AI Advisor Routes
     Route::prefix('ai')->middleware('auth:sanctum')->group(function () {
-        Route::get('/briefing', [App\Http\Controllers\AiAdvisorController::class, 'briefing']);
-        Route::post('/chat',    [App\Http\Controllers\AiAdvisorController::class, 'chat']);
-        Route::get('/trends',   [App\Http\Controllers\AiAdvisorController::class, 'trends']);
+        Route::get('/briefing',  [App\Http\Controllers\AiAdvisorController::class, 'briefing']);
+        Route::post('/chat',     [App\Http\Controllers\AiAdvisorController::class, 'chat']);
+        Route::post('/chat/stream', [App\Http\Controllers\AiAdvisorController::class, 'streamChat']);
+        Route::get('/trends',    [App\Http\Controllers\AiAdvisorController::class, 'trends']);
     });
 
     // Brand Settings Routes
@@ -532,5 +532,6 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::prefix('notifications')->middleware('auth:sanctum')->group(function () {
         Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
         Route::post('/mark-read', [App\Http\Controllers\NotificationController::class, 'markRead']);
+        Route::post('/read-all', [App\Http\Controllers\NotificationController::class, 'markAllRead']);
     });
 });

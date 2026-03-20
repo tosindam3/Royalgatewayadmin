@@ -14,6 +14,8 @@ interface MobileHeaderProps {
   onMarkAsRead: (id: string) => void;
   onOpenSidebar: () => void;
   onOpenClockModal: () => void;
+  unreadCount?: number;
+  chatMemoUnread?: number;
 }
 
 const MobileHeader: React.FC<MobileHeaderProps> = ({
@@ -25,7 +27,9 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
   notifications,
   onMarkAsRead,
   onOpenSidebar,
-  onOpenClockModal
+  onOpenClockModal,
+  unreadCount = 0,
+  chatMemoUnread = 0
 }) => {
   return (
     <header className="md:hidden flex h-16 border-b border-slate-200 dark:border-white/5 items-center px-4 bg-white/80 dark:bg-[#0d0a1a]/60 backdrop-blur-2xl justify-between z-40 sticky top-0">
@@ -53,7 +57,7 @@ const MobileHeader: React.FC<MobileHeaderProps> = ({
         
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         
-        <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} />
+        <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} unreadCount={unreadCount} chatMemoUnread={chatMemoUnread} />
         
         <div 
           className="w-8 h-8 rounded-full border-2 border-orange-500 bg-orange-500/20 flex items-center justify-center text-orange-500 font-black italic shadow-sm overflow-hidden cursor-pointer shrink-0"

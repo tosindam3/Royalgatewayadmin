@@ -23,6 +23,9 @@ const notificationApi = {
 
   markRead: (id: string): Promise<void> =>
     apiClient.post('/notifications/mark-read', { id }),
+
+  markAllRead: (): Promise<void> =>
+    apiClient.post('/notifications/read-all'),
 };
 
 export default notificationApi;

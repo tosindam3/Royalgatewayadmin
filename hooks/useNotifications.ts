@@ -1,8 +1,19 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import notificationApi, { ApiNotification } from '../services/notificationApi';
 import { Notification } from '../types';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
 
-const POLL_INTERVAL = 30000; // 30s
+// Polyfill window for Echo
+declare global {
+  interface Window {
+    Pusher: typeof Pusher;
+    Echo: Echo;
+  }
+}
+
+window.Pusher = Pusher;
 
 /** Maps backend notification to the frontend Notification shape */
 const mapNotification = (n: ApiNotification): Notification => ({
@@ -19,6 +30,7 @@ const mapNotification = (n: ApiNotification): Notification => ({
 export const useNotifications = () => {
   const queryClient = useQueryClient();
 
+  // Fetch initial data WITHOUT HTTP polling
   const { data, isLoading: loading, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
@@ -28,9 +40,54 @@ export const useNotifications = () => {
         unreadCount: resp.unread_count ?? 0
       };
     },
-    refetchInterval: POLL_INTERVAL,
-    staleTime: POLL_INTERVAL,
+    staleTime: Infinity, // Rely on WS to update cache
   });
+
+  // Setup WebSocket connection
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('royalgateway_user');
+      const token = localStorage.getItem('royalgateway_auth_token');
+      if (!userStr || !token) return;
+
+      const user = JSON.parse(userStr);
+
+      if (!window.Echo) {
+        window.Echo = new Echo({
+            broadcaster: 'pusher',
+            key: '52b91711bf1f63cd7102',
+            cluster: 'eu',
+            forceTLS: true,
+            authEndpoint: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/broadcasting/auth` : 'http://localhost:8000/api/v1/broadcasting/auth',
+            auth: {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        });
+      }
+
+      const channel = window.Echo.private(`App.Models.User.${user.id}`);
+      
+      channel.notification((notification: any) => {
+        // Optimistically prepend to cache
+        queryClient.setQueryData(['notifications'], (old: any) => {
+          if (!old) return old;
+          const mapped = mapNotification(notification as unknown as ApiNotification);
+          return {
+            list: [mapped, ...old.list],
+            unreadCount: old.unreadCount + 1,
+          };
+        });
+      });
+
+      return () => {
+        channel.stopListening('.Illuminate\\Notifications\\Events\\BroadcastNotificationCreated');
+      };
+    } catch (e) {
+      console.error("Echo WS setup failed", e);
+    }
+  }, [queryClient]);
 
   const notifications = data?.list ?? [];
   const unreadCount = data?.unreadCount ?? 0;
@@ -38,37 +95,49 @@ export const useNotifications = () => {
   const markReadMutation = useMutation({
     mutationFn: (id: string) => notificationApi.markRead(id),
     onMutate: async (id) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
       await queryClient.cancelQueries({ queryKey: ['notifications'] });
-
-      // Snapshot the previous value
-      const previousNotifications = queryClient.getQueryData<Notification[]>(['notifications']);
-
-      // Optimistically update to the new value
-      queryClient.setQueryData(['notifications'], (old: Notification[] | undefined) =>
-        old ? old.map(n => n.id === id ? { ...n, isRead: true } : n) : []
-      );
-
-      return { previousNotifications };
+      const prev = queryClient.getQueryData(['notifications']);
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old) return old;
+        return {
+          list: old.list.map((n: Notification) => n.id === id ? { ...n, isRead: true } : n),
+          unreadCount: Math.max(0, old.unreadCount - 1)
+        };
+      });
+      return { prev };
     },
     onError: (err, id, context) => {
-      if (context?.previousNotifications) {
-        queryClient.setQueryData(['notifications'], context.previousNotifications);
-      }
+      if (context?.prev) queryClient.setQueryData(['notifications'], context.prev);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  const markAsRead = (id: string) => markReadMutation.mutate(id);
+  const markAllReadMutation = useMutation({
+    mutationFn: () => notificationApi.markAllRead(),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const prev = queryClient.getQueryData(['notifications']);
+      queryClient.setQueryData(['notifications'], (old: any) => {
+        if (!old) return old;
+        return {
+          list: old.list.map((n: Notification) => ({ ...n, isRead: true })),
+          unreadCount: 0
+        };
+      });
+      return { prev };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(['notifications'], context.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
 
-  const markAllAsRead = () => {
-     // Optional: Connect to bulk API if available. For now, local only or sequential (not ideal).
-     queryClient.setQueryData(['notifications'], (old: Notification[] | undefined) =>
-        old ? old.map(n => ({ ...n, isRead: true })) : []
-     );
+  return { 
+    notifications, 
+    unreadCount, 
+    loading, 
+    markAsRead: (id: string) => markReadMutation.mutate(id), 
+    markAllAsRead: () => markAllReadMutation.mutate(), 
+    refresh: refetch 
   };
-
-  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, refresh: refetch };
 };

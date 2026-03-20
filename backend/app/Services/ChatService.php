@@ -178,8 +178,21 @@ class ChatService
 
         try {
             broadcast(new MessageSent($message))->toOthers();
+            
+            // Notify other members via unified system notification
+            $otherMembers = clone $channel->members()->where('users.id', '!=', $userId)->get();
+            if ($otherMembers->isNotEmpty()) {
+                \Illuminate\Support\Facades\Notification::send($otherMembers, new \App\Notifications\SystemNotification(
+                    'CHAT',
+                    $channel->name ?? 'Team Chat',
+                    ($message->user->name ?? 'Someone') . ': ' . \Illuminate\Support\Str::limit(strip_tags($message->content), 80),
+                    '/communication/chat',
+                    'MEDIUM',
+                    ['channel_id' => $channel->id]
+                ));
+            }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Chat broadcast failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Chat broadcast/notification failed: ' . $e->getMessage());
         }
 
         return $message;

@@ -166,7 +166,8 @@ const MainApp: React.FC<{
           selectedBranchScope={selectedBranchScope}
           onBranchScopeChange={setSelectedBranchScope}
           onOpenClockModal={() => setIsClockModalOpen(true)}
-          extraUnread={unreadCount + chatMemoUnread}
+          unreadCount={unreadCount}
+          chatMemoUnread={chatMemoUnread}
         />
 
         {/* Mobile Header */}
@@ -180,7 +181,8 @@ const MainApp: React.FC<{
           onMarkAsRead={markAsRead}
           onOpenSidebar={() => setIsMobileSidebarOpen(true)}
           onOpenClockModal={() => setIsClockModalOpen(true)}
-          extraUnread={unreadCount + chatMemoUnread}
+          unreadCount={unreadCount}
+          chatMemoUnread={chatMemoUnread}
         />
 
         <main className="flex-1 overflow-y-auto relative p-3 sm:p-4 md:p-10 scroll-smooth no-scrollbar text-slate-900 dark:text-white">

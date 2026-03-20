@@ -20,7 +20,8 @@ interface HeaderProps {
     selectedBranchScope: string;
     onBranchScopeChange: (scope: string) => void;
     onOpenClockModal: () => void;
-    extraUnread?: number;
+    unreadCount?: number;
+    chatMemoUnread?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -36,7 +37,8 @@ const Header: React.FC<HeaderProps> = ({
     selectedBranchScope,
     onBranchScopeChange,
     onOpenClockModal,
-    extraUnread = 0,
+    unreadCount = 0,
+    chatMemoUnread = 0,
 }) => {
     const navigate = useNavigate();
     const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -92,7 +94,7 @@ const Header: React.FC<HeaderProps> = ({
 
                 <ThemeToggle theme={theme} onToggle={onToggleTheme} />
 
-                <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} onMarkAllAsRead={onMarkAllAsRead} extraUnread={extraUnread} />
+                <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} onMarkAllAsRead={onMarkAllAsRead} unreadCount={unreadCount} chatMemoUnread={chatMemoUnread} />
 
                 <div className="relative">
                     <div

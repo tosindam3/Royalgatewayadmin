@@ -266,6 +266,22 @@ class MemoService
                         'status' => 'delivered',
                     ]);
                     
+                    $user = \App\Models\User::find($recipientId);
+                    if ($user) {
+                        try {
+                            $user->notify(new \App\Notifications\SystemNotification(
+                                'MEMO',
+                                'New Memo: ' . Str::limit($memo->subject, 30),
+                                Str::limit($memo->body_plain ?? 'You have a new memo.', 80),
+                                '/communication/memo',
+                                strtoupper($memo->priority ?? 'MEDIUM'),
+                                ['sender' => optional($memo->sender)->name]
+                            ));
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::warning('Failed to send memo notification', ['error' => $e->getMessage()]);
+                        }
+                    }
+
                     $this->clearUserCache($recipientId);
                 }
             }

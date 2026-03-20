@@ -8,7 +8,7 @@ const AIAdvisorButton: React.FC = () => {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand-primary/10 dark:bg-brand-primary/20 hover:bg-brand-primary/20 dark:hover:bg-brand-primary/30 border border-brand-primary/20 dark:border-brand-primary/30 transition-all duration-200 group"
+        className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand-primary/10 dark:bg-brand-primary/20 hover:bg-brand-primary/20 dark:hover:bg-brand-primary/30 border border-brand-primary/20 dark:border-brand-primary/30 transition-all duration-200 group hover:shadow-[0_0_15px_rgba(130,82,233,0.3)] dark:hover:shadow-[0_0_20px_rgba(130,82,233,0.2)]"
         aria-label="Open AI Advisor"
       >
         {/* Orb */}

@@ -8,6 +8,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
+use App\Models\AttendanceRecord;
+use App\Models\LeaveRequest;
+use App\Models\ApprovalRequest;
+use App\Observers\AttendanceObserver;
+use App\Observers\LeaveRequestObserver;
+use App\Observers\ApprovalObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -38,6 +44,11 @@ class AppServiceProvider extends ServiceProvider
 
         // Configure rate limiting
         $this->configureRateLimiting();
+
+        // Register AI Advisor Observers for smart cache invalidation
+        AttendanceRecord::observe(AttendanceObserver::class);
+        LeaveRequest::observe(LeaveRequestObserver::class);
+        ApprovalRequest::observe(ApprovalObserver::class);
     }
 
     /**

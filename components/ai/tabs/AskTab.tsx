@@ -6,6 +6,8 @@ interface Props {
   isStreaming: boolean;
   geminiEnabled: boolean;
   onSend: (msg: string) => void;
+  onStop: () => void;
+  onReset: () => void;
 }
 
 const STARTERS = [
@@ -15,7 +17,7 @@ const STARTERS = [
   'Give me a career development plan for my role.',
 ];
 
-const AskTab: React.FC<Props> = ({ messages, isStreaming, geminiEnabled, onSend }) => {
+const AskTab: React.FC<Props> = ({ messages, isStreaming, geminiEnabled, onSend, onStop, onReset }) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -44,8 +46,30 @@ const AskTab: React.FC<Props> = ({ messages, isStreaming, geminiEnabled, onSend 
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Header with Back button */}
+      {messages.length > 0 && (
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-white/5 flex-shrink-0">
+          <button
+            onClick={onReset}
+            className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand-primary transition-colors"
+          >
+            <span className="text-sm group-hover:-translate-x-0.5 transition-transform">←</span>
+            Back to Ask
+          </button>
+          
+          {isStreaming && (
+            <button
+              onClick={onStop}
+              className="px-3 py-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-full text-[9px] font-black uppercase tracking-widest transition-all animate-pulse"
+            >
+              Stop Generation
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 pb-2 min-h-[200px] max-h-[340px]">
+      <div className="flex-1 overflow-y-auto space-y-4 pb-2 min-h-[200px] max-h-[380px] scrollbar-hide">
         {messages.length === 0 ? (
           <div className="space-y-2 pt-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">

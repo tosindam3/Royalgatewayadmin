@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { InsightItem } from '../../types/ai';
+import InsightFocusView from './InsightFocusView';
 
 const typeConfig = {
   descriptive:  { label: 'Descriptive',  badge: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',  bar: 'bg-slate-400' },
@@ -17,17 +19,32 @@ const severityConfig = {
 
 interface Props {
   insight: InsightItem;
+  onClose?: () => void;
 }
 
-const InsightCard: React.FC<Props> = ({ insight }) => {
+const InsightCard: React.FC<Props> = ({ insight, onClose }) => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
+  const [showFocus, setShowFocus] = useState(false);
   const tc = typeConfig[insight.type];
   const sc = severityConfig[insight.severity];
   const hasDetail = !!insight.detail || !!insight.action;
 
+  const handleAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (insight.action?.href) {
+      if (onClose) onClose();
+      navigate(insight.action.href);
+    }
+  };
+
   return (
-    <div className={`relative flex gap-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl p-4 transition-all duration-200 ${hasDetail ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''}`}
-      onClick={() => hasDetail && setExpanded(e => !e)}>
+    <>
+      <div className={`group relative flex gap-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-[28px] p-5 shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-brand-primary/5 hover:-translate-y-1 cursor-pointer overflow-hidden`}
+        onClick={() => setShowFocus(true)}>
+        
+        {/* Hover Glow Effect */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-tr from-brand-primary/5 via-transparent to-transparent transition-opacity duration-500" />
 
       {/* Left accent bar */}
       <div className={`absolute left-0 top-3 bottom-3 w-1 rounded-full ${tc.bar}`} />
@@ -42,12 +59,12 @@ const InsightCard: React.FC<Props> = ({ insight }) => {
         </div>
 
         {/* Headline */}
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug">
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug line-clamp-1">
           {insight.headline}
         </p>
 
         {/* Summary */}
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+        <p className={`text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
           {insight.summary}
         </p>
 
@@ -60,13 +77,12 @@ const InsightCard: React.FC<Props> = ({ insight }) => {
               </p>
             )}
             {insight.action && (
-              <a
-                href={insight.action.href}
-                onClick={e => e.stopPropagation()}
+              <button
+                onClick={handleAction}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand-primary hover:underline"
               >
                 {insight.action.label} →
-              </a>
+              </button>
             )}
           </div>
         )}
@@ -78,7 +94,17 @@ const InsightCard: React.FC<Props> = ({ insight }) => {
           ▾
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Focus View Portal-like Modal */}
+      {showFocus && (
+        <InsightFocusView 
+          insight={insight} 
+          onClose={() => setShowFocus(false)}
+          onNavigate={onClose}
+        />
+      )}
+    </>
   );
 };
 

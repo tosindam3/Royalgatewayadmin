@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import BriefingTab from './tabs/BriefingTab';
 import InsightsTab from './tabs/InsightsTab';
 import TrendsTab from './tabs/TrendsTab';
@@ -52,17 +53,26 @@ const AIAdvisorModal: React.FC<Props> = ({ onClose }) => {
     employee:    'Employee',
   };
 
-  return (
+  const modalContent = (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300"
+        className="fixed inset-0 z-[998] bg-slate-950/40 backdrop-blur-xl animate-in fade-in duration-500"
         onClick={onClose}
       />
+      
+      {/* Neural Glow Background (Fixed relative to the modal viewport) */}
+      <div className="fixed inset-0 pointer-events-none z-[999] overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-brand-primary/20 rounded-full blur-[160px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/20 rounded-full blur-[140px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
 
-      {/* Modal */}
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 md:p-6 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-2xl max-h-[88vh] bg-white/90 dark:bg-[#0d0a1a]/95 backdrop-blur-xl rounded-[40px] border border-slate-200 dark:border-white/10 shadow-2xl animate-in zoom-in-95 duration-500 flex flex-col overflow-hidden">
+      {/* Modal Container */}
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-8 pointer-events-none">
+        <div className="pointer-events-auto w-full max-w-5xl h-full max-h-[90vh] bg-white/40 dark:bg-[#060411]/60 backdrop-blur-3xl rounded-[56px] border border-white/30 dark:border-white/10 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.6)] animate-in zoom-in-95 slide-in-from-bottom-12 duration-1000 flex flex-col overflow-hidden">
+
+
 
           {/* Gradient top bar */}
           <div className="h-1 w-full bg-gradient-to-r from-brand-primary via-purple-400 to-brand-primary/30 flex-shrink-0" />
@@ -122,19 +132,25 @@ const AIAdvisorModal: React.FC<Props> = ({ onClose }) => {
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
+          <div key={activeTab} className="flex-1 overflow-y-auto px-10 py-8 min-h-0 animate-in fade-in slide-in-from-right-4 duration-500">
             {activeTab === 'briefing' && (
               <BriefingTab
                 briefing={advisor.briefing}
                 isLoading={advisor.isLoadingBriefing}
                 error={advisor.error}
+                onClose={onClose}
               />
             )}
             {activeTab === 'insights' && (
               <InsightsTab insights={advisor.briefing?.insights ?? []} />
             )}
             {activeTab === 'trends' && (
-              <TrendsTab trends={advisor.trends} isLoading={advisor.isLoadingTrends} />
+              <TrendsTab 
+                trends={advisor.trends} 
+                isLoading={advisor.isLoadingTrends} 
+                error={advisor.error}
+                onRetry={advisor.loadTrends}
+              />
             )}
             {activeTab === 'ask' && (
               <AskTab
@@ -142,6 +158,8 @@ const AIAdvisorModal: React.FC<Props> = ({ onClose }) => {
                 isStreaming={advisor.isStreaming}
                 geminiEnabled={advisor.geminiEnabled}
                 onSend={advisor.sendMessage}
+                onStop={advisor.stopStreaming}
+                onReset={advisor.resetChat}
               />
             )}
           </div>
@@ -149,6 +167,8 @@ const AIAdvisorModal: React.FC<Props> = ({ onClose }) => {
       </div>
     </>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default AIAdvisorModal;

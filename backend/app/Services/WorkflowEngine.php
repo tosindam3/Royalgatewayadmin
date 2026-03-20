@@ -69,7 +69,21 @@ class WorkflowEngine
             );
 
             // Send notification to approver(s)
-            // Notification::send($approvers, new ApprovalRequestNotification($request));
+            try {
+                \Illuminate\Support\Facades\Notification::send($approvers, new \App\Notifications\SystemNotification(
+                    'PENDING_REVIEW',
+                    'Pending Approval',
+                    'Approval request #' . $request->request_number . ' awaits your action.',
+                    '/approvals',
+                    'HIGH',
+                    [
+                        'requester' => optional($requester)->name,
+                        'module'    => class_basename($entity),
+                    ]
+                ));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to send approval notification', ['error' => $e->getMessage()]);
+            }
 
             return $request->load(['workflow', 'requester', 'currentApprover']);
         });
@@ -117,7 +131,21 @@ class WorkflowEngine
                 ]);
 
                 // Notify next approver
-                // Notification::send($nextApprovers, new ApprovalRequestNotification($request));
+                try {
+                    \Illuminate\Support\Facades\Notification::send($nextApprovers, new \App\Notifications\SystemNotification(
+                        'PENDING_REVIEW',
+                        'Pending Approval',
+                        'Approval request #' . $request->request_number . ' awaits your action.',
+                        '/approvals',
+                        'HIGH',
+                        [
+                            'requester' => optional($request->requester)->name,
+                            'module'    => class_basename($request->requestable_type),
+                        ]
+                    ));
+                } catch (\Exception $e) {
+                    // Log or ignore
+                }
             } else {
                 // Final approval - complete the request
                 $request->update([

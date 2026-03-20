@@ -93,6 +93,15 @@ class SubmitPayrollRunAction
                 $approver = User::find($firstApproverId);
                 if ($approver) {
                     $this->notificationService->notifyApprovalPending($run, $approvalRequest, $approver);
+                    
+                    $approver->notify(new \App\Notifications\SystemNotification(
+                        'PENDING_REVIEW',
+                        'Pending Payroll Approval',
+                        'Payroll run awaits your approval.',
+                        '/approvals',
+                        'HIGH',
+                        ['requester' => $submitter->name]
+                    ));
                 }
             } catch (\Exception $e) {
                 Log::error('Failed to send approval notification', [

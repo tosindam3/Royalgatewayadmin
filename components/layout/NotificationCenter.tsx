@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Notification } from '../../types';
 import { playNotificationAlertSound } from '../../utils/soundUtils';
+import { Link } from 'react-router-dom';
 
 interface NotificationCenterProps {
     notifications: Notification[];
     onMarkAsRead: (id: string) => void;
     onMarkAllAsRead?: () => void;
-    extraUnread?: number; // unread count from chat + memo
+    unreadCount?: number;
+    chatMemoUnread?: number;
 }
 
-const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, onMarkAsRead, onMarkAllAsRead, extraUnread = 0 }) => {
+const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, onMarkAsRead, onMarkAllAsRead, unreadCount = 0, chatMemoUnread = 0 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isMuted, setIsMuted] = useState(() => localStorage.getItem('royalgateway_notifications_muted') === 'true');
     const dropdownRef = useRef<HTMLDivElement>(null);
     const soundIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const unreadCount = notifications.filter(n => !n.isRead).length + extraUnread;
-    const hasUnread = unreadCount > 0;
+    const totalUnread = unreadCount + chatMemoUnread;
+    const hasUnread = totalUnread > 0;
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -28,11 +31,17 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
 
     // Play sound ONLY when NEW notifications arrive (count increases)
     useEffect(() => {
-        if (unreadCount > prevUnreadCountRef.current && !isOpen) {
+        if (totalUnread > prevUnreadCountRef.current && !isOpen && !isMuted) {
             playNotificationAlertSound();
         }
-        prevUnreadCountRef.current = unreadCount;
-    }, [unreadCount, isOpen]);
+        prevUnreadCountRef.current = totalUnread;
+    }, [totalUnread, isOpen, isMuted]);
+
+    const toggleMute = () => {
+        const next = !isMuted;
+        setIsMuted(next);
+        localStorage.setItem('royalgateway_notifications_muted', next.toString());
+    };
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -50,7 +59,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
                 </svg>
                 {hasUnread && (
                     <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 bg-rose-500 border-2 border-white dark:border-[#0f172a] rounded-full flex items-center justify-center text-[9px] font-black text-white shadow-[0_0_8px_#f43f5e]">
-                        {unreadCount > 99 ? '99+' : unreadCount}
+                        {totalUnread > 99 ? '99+' : totalUnread}
                     </span>
                 )}
             </button>
@@ -58,18 +67,26 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
             {isOpen && (
                 <div className="absolute right-0 mt-4 w-[380px] bg-white dark:bg-[#120e24]/95 backdrop-blur-3xl border border-slate-200 dark:border-white/10 rounded-[32px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] dark:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.5)] z-[100] animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Notifications</h3>
-                        <span className="px-2.5 py-1 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[9px] font-black uppercase rounded-lg">{unreadCount} New</span>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest italic flex items-center gap-2">
+                            Notifications
+                            <button onClick={toggleMute} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-opacity" title={isMuted ? "Unmute Alerts" : "Mute Alerts"}>
+                                {isMuted ? '🔇' : '🔊'}
+                            </button>
+                        </h3>
+                        <span className="px-2.5 py-1 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-[9px] font-black uppercase rounded-lg">{totalUnread} New</span>
                     </div>
 
                     <div className="max-h-[450px] overflow-y-auto no-scrollbar py-2 text-slate-900 dark:text-white">
                         {/* Chat & Memo unread summary banners */}
-                        {extraUnread > 0 && (
+                        {chatMemoUnread > 0 && (
                             <div className="px-5 pt-3 pb-1 space-y-2">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Live Activity</p>
+                                {notifications.length === 0 && (
+                                    <p className="text-[10px] text-slate-500 pb-2">You have unread chats or memos. Please check the sidebar.</p>
+                                )}
                             </div>
                         )}
-                        {notifications.length === 0 && extraUnread === 0 ? (
+                        {notifications.length === 0 && chatMemoUnread === 0 ? (
                             <div className="py-20 text-center px-10">
                                 <div className="text-4xl mb-4 opacity-20">📭</div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">No new alerts.</p>
@@ -103,6 +120,13 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
                                                     <span className="text-[8px] font-bold text-slate-500 uppercase whitespace-nowrap ml-2">{n.timestamp}</span>
                                                 </div>
                                                 <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{n.message}</p>
+                                                {n.actionUrl && (
+                                                    <div className="mt-2">
+                                                        <Link to={n.actionUrl} className="text-[10px] font-bold text-[var(--brand-primary)] hover:underline">
+                                                            View Details →
+                                                        </Link>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         {!n.isRead && (

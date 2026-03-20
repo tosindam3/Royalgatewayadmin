@@ -1,21 +1,19 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import type { BriefingResponse, TrendsResponse, ChatMessage } from '../types/ai';
 
-const base = '/api/v1/ai';
+const base = '/ai';
 
 export const aiAdvisorApi = {
   getBriefing: async (): Promise<BriefingResponse> => {
-    const { data } = await axios.get(`${base}/briefing`);
-    return data.data;
+    return apiClient.get(`${base}/briefing`);
   },
 
   getTrends: async (): Promise<TrendsResponse> => {
-    const { data } = await axios.get(`${base}/trends`);
-    return data.data;
+    return apiClient.get(`${base}/trends`);
   },
 
   chat: async (message: string, history: ChatMessage[]): Promise<string> => {
-    const { data } = await axios.post(`${base}/chat`, { message, history });
-    return data.data.reply;
+    const data: any = await apiClient.post(`${base}/chat`, { message, history });
+    return data.reply;
   },
 };
