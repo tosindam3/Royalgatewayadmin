@@ -520,4 +520,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('/push-subscriptions', [App\Http\Controllers\PushSubscriptionController::class, 'update']);
         Route::delete('/push-subscriptions', [App\Http\Controllers\PushSubscriptionController::class, 'destroy']);
     });
+
+    // Aggregated Notifications
+    Route::prefix('notifications')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
+        Route::post('/mark-read', [App\Http\Controllers\NotificationController::class, 'markRead']);
+    });
 });

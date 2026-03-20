@@ -15,9 +15,11 @@ interface HeaderProps {
     onLogout: () => void;
     notifications: Notification[];
     onMarkAsRead: (id: string) => void;
+    onMarkAllAsRead?: () => void;
     selectedBranchScope: string;
     onBranchScopeChange: (scope: string) => void;
     onOpenClockModal: () => void;
+    extraUnread?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -29,9 +31,11 @@ const Header: React.FC<HeaderProps> = ({
     onLogout,
     notifications,
     onMarkAsRead,
+    onMarkAllAsRead,
     selectedBranchScope,
     onBranchScopeChange,
     onOpenClockModal,
+    extraUnread = 0,
 }) => {
     const navigate = useNavigate();
     const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -100,7 +104,7 @@ const Header: React.FC<HeaderProps> = ({
 
                 <ThemeToggle theme={theme} onToggle={onToggleTheme} />
 
-                <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} />
+                <NotificationCenter notifications={notifications} onMarkAsRead={onMarkAsRead} onMarkAllAsRead={onMarkAllAsRead} extraUnread={extraUnread} />
 
                 <div className="relative">
                     <div

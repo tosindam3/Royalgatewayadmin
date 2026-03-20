@@ -18,6 +18,8 @@ import MobileHeader from './components/layout/MobileHeader';
 import PageSkeleton from './components/ui/PageSkeleton';
 import AppLoadingSkeleton from './components/ui/AppLoadingSkeleton';
 import AttendanceClockModal from './components/attendance/AttendanceClockModal';
+import { useUnreadCounts } from './hooks/useUnreadCounts';
+import { useNotifications } from './hooks/useNotifications';
 
 // Lazy Loaded Pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -45,12 +47,6 @@ const FormBuilder = lazy(() => import('./components/FormBuilder'));
 // Direct imports (not lazy) - used outside Suspense boundary
 import Login from './pages/Login';
 import Landing from './pages/Landing';
-
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  { id: '1', type: 'PENDING_REVIEW', title: 'Pending Evaluation', message: 'Reminder: Ethan Parker appraisal due in 2 days.', timestamp: '10 min ago', isRead: false, priority: 'HIGH' },
-  { id: '2', type: 'CYCLE_EVENT', title: 'New Cycle Initialized', message: 'Q2 Performance Cycle has been provisioned globally.', timestamp: '1h ago', isRead: false, priority: 'MEDIUM' },
-  { id: '3', type: 'EVALUATION_COMPLETE', title: 'Review Finalized', message: 'Sarah Mitchell evaluation has been verified by HR.', timestamp: '3h ago', isRead: true, priority: 'LOW' },
-];
 
 const SIDEBAR_CONFIG = [
   { label: 'Dashboard', icon: <ICONS.Dashboard />, route: '/', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE], permissions: ['dashboard.view', 'dashboard.management'] },
@@ -90,9 +86,11 @@ const MainApp: React.FC<{
 }> = ({ onLogout, brand, onUpdateBrand, userProfile, currentUserRole, onUpdateProfile, userPermissions, theme, onToggleTheme }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [selectedBranchScope, setSelectedBranchScope] = useState('All Branches');
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
+
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { total: chatMemoUnread } = useUnreadCounts();
 
   const filteredMenu = SIDEBAR_CONFIG.filter(item => {
     // 1. Check Role Match
@@ -121,22 +119,7 @@ const MainApp: React.FC<{
     return true;
   });
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
-
-  const addNotification = (title: string, message: string, type: Notification['type']) => {
-    const newNotif: Notification = {
-      id: Date.now().toString(),
-      type,
-      title,
-      message,
-      timestamp: 'Just now',
-      isRead: false,
-      priority: 'MEDIUM'
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-  };
+  // markAsRead and addNotification come from useNotifications hook
 
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#0d0a1a] selection:bg-purple-500/30">
@@ -183,6 +166,7 @@ const MainApp: React.FC<{
           selectedBranchScope={selectedBranchScope}
           onBranchScopeChange={setSelectedBranchScope}
           onOpenClockModal={() => setIsClockModalOpen(true)}
+          extraUnread={unreadCount + chatMemoUnread}
         />
 
         {/* Mobile Header */}
@@ -196,6 +180,7 @@ const MainApp: React.FC<{
           onMarkAsRead={markAsRead}
           onOpenSidebar={() => setIsMobileSidebarOpen(true)}
           onOpenClockModal={() => setIsClockModalOpen(true)}
+          extraUnread={unreadCount + chatMemoUnread}
         />
 
         <main className="flex-1 overflow-y-auto relative p-3 sm:p-4 md:p-10 scroll-smooth no-scrollbar text-slate-900 dark:text-white">
@@ -229,7 +214,7 @@ const MainApp: React.FC<{
                     <Route path="/payroll" element={<Payroll />} />
                   </>
                 ) : null}
-                <Route path="/performance" element={<Performance userRole={currentUserRole} onNotify={(t, m, type) => addNotification(t, m, type)} />} />
+                <Route path="/performance" element={<Performance userRole={currentUserRole} onNotify={() => {}} />} />
                 <Route path="/performance/settings" element={<PerformanceSettings userRole={currentUserRole} />} />
                 <Route path="/performance/builder/:mode/:id" element={<FormBuilder />} />
                 <Route path="/performance/builder/:mode" element={<FormBuilder />} />

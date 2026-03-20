@@ -160,3 +160,31 @@ export const playInfoSound = () => {
     console.warn('Could not play info sound:', error);
   }
 };
+
+/**
+ * Play a gentle notification alert (double-chime) used for the bell reminder.
+ */
+export const playNotificationAlertSound = () => {
+  try {
+    const ctx = getAudioContext();
+
+    const playChime = (startTime: number, freq1: number, freq2: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq1, startTime);
+      osc.frequency.setValueAtTime(freq2, startTime + 0.08);
+      gain.gain.setValueAtTime(0.18, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+      osc.start(startTime);
+      osc.stop(startTime + 0.35);
+    };
+
+    playChime(ctx.currentTime, 880, 1100);
+    playChime(ctx.currentTime + 0.4, 880, 1100);
+  } catch (error) {
+    console.warn('Could not play notification alert sound:', error);
+  }
+};

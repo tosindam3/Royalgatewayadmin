@@ -19,6 +19,9 @@ const MemoSystem: React.FC = () => {
   const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'forward'>('compose');
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  // Mobile navigation: 'folders' | 'list' | 'detail'
+  const [mobilePane, setMobilePane] = useState<'folders' | 'list' | 'detail'>('list');
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   const {
     memos,
@@ -43,6 +46,7 @@ const MemoSystem: React.FC = () => {
   const handleFolderChange = useCallback((folder: string) => {
     setSelectedFolder(folder);
     setFilters(prev => ({ ...prev, folder }));
+    setMobilePane('list');
   }, []);
 
   const handleSearch = useCallback(async (query: string) => {
@@ -52,6 +56,7 @@ const MemoSystem: React.FC = () => {
 
   const handleMemoSelect = useCallback(async (memoId: number) => {
     setSelectedMemoId(memoId);
+    setMobilePane('detail');
     // Mark as read when selected (only for received memos, not sent)
     const memo = memos.find(m => m.id === memoId);
     if (memo && memo.recipients?.some(r => !r.read_at) && selectedFolder !== 'sent') {
@@ -178,12 +183,19 @@ const MemoSystem: React.FC = () => {
         ? 'bg-[#0f172a] border-white/5'
         : 'bg-white border-gray-200'
         }`}>
-        {/* Left Sidebar: Filters */}
-        <aside className={`w-56 border-r flex flex-col p-6 space-y-8 ${isDark
-          ? 'bg-white/[0.02] border-white/5'
-          : 'bg-gray-50 border-gray-200'
-          }`}>
+        {/* Left Sidebar: Filters — hidden on mobile unless mobilePane === 'folders' */}
+        <aside className={`
+          border-r flex flex-col p-6 space-y-8
+          ${mobilePane === 'folders' ? 'flex' : 'hidden'} md:flex
+          w-full md:w-56
+          ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-200'}
+        `}>
           <div className="space-y-4">
+            {/* Mobile: close folders pane */}
+            <div className="flex items-center justify-between md:hidden mb-2">
+              <span className={`text-[11px] font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-gray-900'}`}>Folders</span>
+              <button onClick={() => setMobilePane('list')} className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>✕</button>
+            </div>
             <div className="relative">
               <svg className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDark ? 'text-slate-500' : 'text-gray-400'
                 }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,12 +242,27 @@ const MemoSystem: React.FC = () => {
           </div>
         </aside>
 
-        {/* Middle Pane: Memo List */}
-        <aside className={`w-[320px] border-r flex flex-col p-6 ${isDark
-          ? 'bg-white/[0.01] border-white/5'
-          : 'bg-gray-25 border-gray-200'
-          }`}>
-          <div className="flex items-center gap-2 mb-6">
+        {/* Middle Pane: Memo List — hidden on mobile unless mobilePane === 'list' */}
+        <aside className={`
+          border-r flex flex-col p-4 md:p-6
+          ${mobilePane === 'list' ? 'flex' : 'hidden'} md:flex
+          w-full md:w-[320px]
+          ${isDark ? 'bg-white/[0.01] border-white/5' : 'bg-gray-25 border-gray-200'}
+        `}>
+          <div className="flex items-center gap-2 mb-4 md:mb-6">
+            {/* Mobile: folder toggle button */}
+            <button
+              onClick={() => setMobilePane('folders')}
+              className={`md:hidden p-2 border rounded-xl transition-all ${isDark
+                ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                : 'bg-white border-gray-300 text-gray-400 hover:text-gray-600'
+                }`}
+              title="Folders"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18M3 12h18M3 17h18" />
+              </svg>
+            </button>
             <button
               onClick={() => setIsComposeOpen(true)}
               className="flex-1 py-2.5 bg-[#f59e0b] hover:bg-[#d97706] text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-orange-500/20 transition-all"
@@ -361,26 +388,40 @@ const MemoSystem: React.FC = () => {
           </div>
         </aside>
 
-        {/* Main Content: Memo Detail */}
-        <main className={`flex-1 flex flex-col relative ${isDark ? 'bg-[#0f172a]' : 'bg-white'
-          }`}>
-          <div className={`p-8 border-b flex justify-between items-center ${isDark ? 'border-white/5' : 'border-gray-200'
+        {/* Main Content: Memo Detail — hidden on mobile unless mobilePane === 'detail' */}
+        <main className={`
+          flex-1 flex flex-col relative
+          ${mobilePane === 'detail' ? 'flex' : 'hidden'} md:flex
+          ${isDark ? 'bg-[#0f172a]' : 'bg-white'}
+        `}>
+          <div className={`p-4 md:p-8 border-b flex justify-between items-center gap-2 ${isDark ? 'border-white/5' : 'border-gray-200'
             }`}>
-            {selectedMemo ? (
-              <h3 className={`text-xl font-black tracking-tight uppercase italic ${isDark ? 'text-white' : 'text-gray-900'
-                }`}>
-                {selectedMemo.subject}
-              </h3>
-            ) : (
-              <h3 className={`text-xl font-black tracking-tight uppercase italic ${isDark ? 'text-white' : 'text-gray-900'
-                }`}>
-                Select a memo
-              </h3>
-            )}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Mobile back button */}
+              <button
+                onClick={() => setMobilePane('list')}
+                className={`md:hidden p-1.5 rounded-lg flex-shrink-0 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              {selectedMemo ? (
+                <h3 className={`text-base md:text-xl font-black tracking-tight uppercase italic truncate ${isDark ? 'text-white' : 'text-gray-900'
+                  }`}>
+                  {selectedMemo.subject}
+                </h3>
+              ) : (
+                <h3 className={`text-base md:text-xl font-black tracking-tight uppercase italic ${isDark ? 'text-white' : 'text-gray-900'
+                  }`}>
+                  Select a memo
+                </h3>
+              )}
+            </div>
+            <div className="flex gap-1 md:gap-2 flex-shrink-0">
               <button
                 onClick={handleReply}
-                className={`px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${isDark
+                className={`px-2 md:px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest hidden sm:flex items-center gap-2 transition-all ${isDark
                   ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
                   : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}>
@@ -388,7 +429,7 @@ const MemoSystem: React.FC = () => {
               </button>
               <button
                 onClick={handleReply}
-                className={`px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${isDark
+                className={`px-2 md:px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest hidden lg:flex items-center gap-2 transition-all ${isDark
                   ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
                   : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}>
@@ -396,11 +437,24 @@ const MemoSystem: React.FC = () => {
               </button>
               <button
                 onClick={handleForward}
-                className={`px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${isDark
+                className={`px-2 md:px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest hidden lg:flex items-center gap-2 transition-all ${isDark
                   ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
                   : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}>
                 Forward <svg className="w-3.5 h-3.5 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 10h10a8 8 0 018 8v2M3 10l5 5m-5-5l5-5" strokeWidth="2.5" /></svg>
+              </button>
+              {/* Mobile: chat toggle */}
+              <button
+                onClick={() => setShowMobileChat(v => !v)}
+                className={`xl:hidden p-2 border rounded-xl transition-all ${isDark
+                  ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900'
+                  }`}
+                title="Thread"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
               </button>
               <div className="relative">
                 <button
@@ -446,18 +500,18 @@ const MemoSystem: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-12 space-y-10">
+              <div className="p-4 md:p-12 space-y-6 md:space-y-10">
                 {/* Memo Metadata */}
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                   <div className="flex items-center gap-4">
                     <img
                       src={selectedMemo.sender?.avatar || `https://picsum.photos/64?sig=${selectedMemo.sender?.name || 'user'}`}
-                      className={`w-12 h-12 rounded-[18px] border-2 ${isDark ? 'border-[#8252e9]/30' : 'border-blue-200'
+                      className={`w-10 h-10 md:w-12 md:h-12 rounded-[18px] border-2 flex-shrink-0 ${isDark ? 'border-[#8252e9]/30' : 'border-blue-200'
                         }`}
                       alt={selectedMemo.sender?.name || 'User'}
                     />
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h4 className={`text-base font-black ${isDark ? 'text-white' : 'text-gray-900'
                           }`}>
                           {selectedMemo.sender?.name || 'Unknown Sender'}
@@ -501,7 +555,7 @@ const MemoSystem: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <span className={`text-xs font-black tracking-widest uppercase ${isDark ? 'text-slate-600' : 'text-gray-500'
+                  <span className={`text-xs font-black tracking-widest uppercase flex-shrink-0 ${isDark ? 'text-slate-600' : 'text-gray-500'
                     }`}>
                     {formatTime(selectedMemo.created_at)}
                   </span>
@@ -610,11 +664,23 @@ const MemoSystem: React.FC = () => {
           </div>
         </main>
 
-        {/* Right Sidebar: Contextual Chat */}
-        <aside className={`w-80 border-l flex flex-col p-6 space-y-6 ${isDark
-          ? 'bg-white/[0.01] border-white/5'
-          : 'bg-gray-50 border-gray-200'
-          }`}>
+        {/* Right Sidebar: Contextual Chat — hidden on mobile, slide-over via showMobileChat */}
+        {/* Mobile overlay */}
+        {showMobileChat && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 xl:hidden"
+            onClick={() => setShowMobileChat(false)}
+          />
+        )}
+        <aside className={`
+          border-l flex flex-col p-6 space-y-6
+          xl:relative xl:w-80 xl:flex
+          ${showMobileChat
+            ? 'fixed right-0 top-0 bottom-0 w-80 z-50 flex'
+            : 'hidden xl:flex'
+          }
+          ${isDark ? 'bg-[#0f172a] border-white/5' : 'bg-gray-50 border-gray-200'}
+        `}>
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className={`text-[11px] font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-gray-900'
@@ -622,12 +688,18 @@ const MemoSystem: React.FC = () => {
                 People <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-gray-500'
                   }`}>(5)</span>
               </h3>
-              <button className={`transition-colors ${isDark ? 'text-slate-600 hover:text-white' : 'text-gray-400 hover:text-gray-600'
-                }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" strokeWidth="2" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                <button className={`transition-colors ${isDark ? 'text-slate-600 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+                  }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" strokeWidth="2" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowMobileChat(false)}
+                  className={`xl:hidden transition-colors ${isDark ? 'text-slate-500 hover:text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                >✕</button>
+              </div>
             </div>
             {selectedMemo?.sender && (
               <div className={`flex items-center gap-3 p-2 rounded-[20px] border relative group cursor-pointer ${isDark
