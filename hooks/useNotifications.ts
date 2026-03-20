@@ -70,5 +70,5 @@ export const useNotifications = () => {
      );
   };
 
-  return { notifications, loading, markAsRead, markAllAsRead, refresh: refetch };
+  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, refresh: refetch };
 };

@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'gemini' => [
+        'key'   => env('GEMINI_API_KEY'),
+        'model' => 'gemini-1.5-flash',
+        'url'   => 'https://generativelanguage.googleapis.com/v1beta/models',
+    ],
+
+    'newsapi' => [
+        'key' => env('NEWS_API_KEY'),
+        'url' => 'https://newsapi.org/v2',
+    ],
+
 ];

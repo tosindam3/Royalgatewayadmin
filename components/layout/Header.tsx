@@ -5,6 +5,7 @@ import NotificationCenter from './NotificationCenter';
 import { UserProfile, Notification, UserRole, BrandSettings } from '../../types';
 import HeaderClockPanel from '../attendance/HeaderClockPanel';
 import { useAttendanceOverview } from '../../hooks/useAttendanceData';
+import AIAdvisorButton from '../ai/AIAdvisorButton';
 
 interface HeaderProps {
     userProfile: UserProfile;
@@ -74,21 +75,8 @@ const Header: React.FC<HeaderProps> = ({
                     />
                 </div>
 
-                <div className="hidden lg:flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-4 py-2 hover:bg-white/10 transition-all cursor-pointer group">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-white">Scope:</span>
-                    <select
-                        value={selectedBranchScope}
-                        onChange={(e) => onBranchScopeChange(e.target.value)}
-                        className="bg-transparent text-[10px] font-black text-slate-200 uppercase tracking-widest outline-none appearance-none cursor-pointer"
-                    >
-                        <option value="All Branches" className="bg-[#0d0a1a]">Global Overview</option>
-                        <option value="Main HQ" className="bg-[#0d0a1a]">Main HQ (San Francisco)</option>
-                        <option value="Tech North" className="bg-[#0d0a1a]">Tech North (Seattle)</option>
-                        <option value="Lagos Branch" className="bg-[#0d0a1a]">Lagos Branch (Nigeria)</option>
-                    </select>
-                    <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path d="M19 9l-7 7-7-7" strokeWidth="3" />
-                    </svg>
+                <div className="hidden lg:block">
+                    <AIAdvisorButton />
                 </div>
             </div>
 

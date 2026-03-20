@@ -410,6 +410,13 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::delete('/{id}', [App\Http\Controllers\MemoFolderController::class, 'destroy']);
     });
 
+    // AI Advisor Routes
+    Route::prefix('ai')->middleware('auth:sanctum')->group(function () {
+        Route::get('/briefing', [App\Http\Controllers\AiAdvisorController::class, 'briefing']);
+        Route::post('/chat',    [App\Http\Controllers\AiAdvisorController::class, 'chat']);
+        Route::get('/trends',   [App\Http\Controllers\AiAdvisorController::class, 'trends']);
+    });
+
     // Brand Settings Routes
     // Public endpoint for getting brand settings (needed for login page branding)
     Route::get('brand-settings', [App\Http\Controllers\BrandSettingsController::class, 'index']);

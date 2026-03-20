@@ -31,9 +31,42 @@ const ManagerDashboard: React.FC<Props> = ({ data }) => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <KpiCard label="Team Size"         value={qs.total_employees}   color="brand" />
-        <KpiCard label="Present Today"     value={qs.present_today}     color="emerald" />
-        <KpiCard label="Pending Approvals" value={qs.pending_approvals} color="amber" />
+        <KpiCard
+          label="Team Size" value={qs.total_employees} color="brand"
+          details={{
+            heading: 'Team Composition',
+            description: 'Your direct team headcount.',
+            rows: [
+              { label: 'Team Size',        value: qs.total_employees },
+              { label: 'Present Today',    value: qs.present_today },
+              { label: 'On Leave',         value: qs.on_leave },
+              { label: 'Attendance Rate',  value: qs.total_employees > 0 ? `${Math.round((qs.present_today / qs.total_employees) * 100)}%` : '—' },
+            ],
+          }}
+        />
+        <KpiCard
+          label="Present Today" value={qs.present_today} color="emerald"
+          details={{
+            heading: 'Attendance Snapshot',
+            description: "Today's team attendance.",
+            rows: [
+              { label: 'Present',          value: qs.present_today, color: 'text-emerald-500' },
+              { label: 'On Leave',         value: qs.on_leave,      color: 'text-amber-500' },
+              { label: 'Absent / Unknown', value: Math.max(0, qs.total_employees - qs.present_today - qs.on_leave), color: 'text-red-500' },
+            ],
+          }}
+        />
+        <KpiCard
+          label="Pending Approvals" value={qs.pending_approvals} color="amber"
+          details={{
+            heading: 'Approval Queue',
+            description: 'Team requests awaiting your action.',
+            rows: [
+              { label: 'Total Pending', value: qs.pending_approvals, color: 'text-amber-500' },
+            ],
+            footer: 'Visit the Approvals section to action these requests.',
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
