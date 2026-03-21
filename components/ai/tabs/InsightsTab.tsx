@@ -22,7 +22,7 @@ const InsightsTab: React.FC<Props> = ({ insights }) => {
   return (
     <div className="space-y-4">
       {/* Filter pills */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide flex-nowrap pb-1">
         {tabs.map(t => (
           <button
             key={t.key}

@@ -65,7 +65,7 @@ const TrendsTab: React.FC<Props> = ({ trends, isLoading, error, onRetry }) => {
               href={item.url !== '#' ? item.url : undefined}
               target={item.url !== '#' ? '_blank' : undefined}
               rel="noreferrer"
-              className={`group relative block bg-white/50 dark:bg-white/5 backdrop-blur-md border border-slate-200/50 dark:border-white/10 rounded-3xl p-6 transition-all duration-300 ${item.url !== '#' ? 'hover:shadow-2xl hover:shadow-brand-primary/10 hover:-translate-y-1 cursor-pointer' : ''}`}
+              className={`group relative block bg-white/50 dark:bg-white/5 backdrop-blur-md border border-slate-200/50 dark:border-white/10 rounded-3xl p-4 sm:p-6 transition-all duration-300 ${item.url !== '#' ? 'hover:shadow-2xl hover:shadow-brand-primary/10 hover:-translate-y-1 cursor-pointer' : ''}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <p className="text-base font-bold text-slate-900 dark:text-white leading-tight group-hover:text-brand-primary transition-colors">{item.title}</p>
@@ -88,7 +88,7 @@ const TrendsTab: React.FC<Props> = ({ trends, isLoading, error, onRetry }) => {
         </p>
         <div className="grid grid-cols-1 gap-3">
           {trends.hr_insights.map((item, i) => (
-            <div key={i} className="flex gap-4 bg-slate-50/50 dark:bg-white/5 backdrop-blur-sm border border-slate-100 dark:border-white/10 rounded-3xl p-5 hover:border-brand-primary/30 transition-colors">
+            <div key={i} className="flex gap-4 bg-slate-50/50 dark:bg-white/5 backdrop-blur-sm border border-slate-100 dark:border-white/10 rounded-3xl p-4 sm:p-5 hover:border-brand-primary/30 transition-colors">
               <div className="w-10 h-10 rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary text-xl flex-shrink-0">
                 ✦
               </div>

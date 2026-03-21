@@ -63,7 +63,7 @@ const BriefingTab: React.FC<Props> = ({ briefing, isLoading, error, onClose }) =
   return (
     <div className="space-y-5">
       {/* Health score */}
-      <div className="flex items-center gap-4 bg-slate-50 dark:bg-white/5 rounded-2xl p-4">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 bg-slate-50 dark:bg-white/5 rounded-2xl p-4">
         <HealthRing score={briefing.health_score} />
         <div>
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Organisation Health Score</p>
@@ -74,7 +74,7 @@ const BriefingTab: React.FC<Props> = ({ briefing, isLoading, error, onClose }) =
             Updated {new Date(briefing.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </p>
           {briefing.gemini_enabled && briefing.is_enriched === false && (
-            <div className="mt-4 p-3 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/10 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="mt-4 p-2.5 sm:p-3 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/10 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="flex gap-1.5">
                 <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
                 <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:-0.15s]" />

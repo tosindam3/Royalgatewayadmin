@@ -69,7 +69,7 @@ const AskTab: React.FC<Props> = ({ messages, isStreaming, geminiEnabled, onSend,
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 pb-2 min-h-[200px] max-h-[380px] scrollbar-hide">
+      <div className="flex-1 overflow-y-auto space-y-4 pb-2 min-h-0 scrollbar-hide">
         {messages.length === 0 ? (
           <div className="space-y-2 pt-2">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">
@@ -114,7 +114,7 @@ const AskTab: React.FC<Props> = ({ messages, isStreaming, geminiEnabled, onSend,
       </div>
 
       {/* Input */}
-      <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex gap-2">
+      <div className="pt-3 pb-4 sm:pb-0 border-t border-slate-100 dark:border-white/10 flex gap-2 flex-shrink-0">
         <input
           type="text"
           value={input}
