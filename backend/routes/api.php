@@ -338,7 +338,7 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         // Analytics & Leaderboard
         Route::get('/analytics/personal', [App\Http\Controllers\PerformanceController::class, 'personalAnalytics'])->middleware('permission:performance.view,self');
         Route::get('/analytics/branch', [App\Http\Controllers\PerformanceController::class, 'branchAnalytics'])->middleware('permission:performance.view,branch');
-        Route::get('/leaderboard', [App\Http\Controllers\PerformanceController::class, 'leaderboard'])->middleware('permission:performance.view,all');
+        Route::get('/leaderboard', [App\Http\Controllers\PerformanceController::class, 'leaderboard'])->middleware('permission:performance.view,department');
         Route::get('/department-summaries', [App\Http\Controllers\PerformanceController::class, 'departmentSummaries'])->middleware('permission:performance.view,department');
         Route::get('/analytics', [App\Http\Controllers\PerformanceController::class, 'analytics'])->middleware('permission:performance.view,all');
 

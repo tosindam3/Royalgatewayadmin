@@ -47,9 +47,19 @@ export const dashboardApi = {
     api.get('/performance/analytics/personal') as any,
 
   pendingApprovals: (): Promise<PendingApprovalItem[]> =>
-    api.get('/approvals/pending').then((res: any) =>
-      Array.isArray(res) ? res : res?.data ?? []
-    ),
+    api.get('/approvals/pending').then((res: any) => {
+      const raw: any[] = Array.isArray(res) ? res : res?.data ?? [];
+      return raw.map((item: any) => ({
+        id: item.id,
+        request_number: item.request_number ?? `#${item.id}`,
+        // requester may be a User object or a plain string
+        requester: typeof item.requester === 'string'
+          ? item.requester
+          : item.requester?.display_name ?? item.requester?.name ?? 'Unknown',
+        type: item.workflow?.module ?? item.type ?? 'Request',
+        submitted_at: item.submitted_at ?? item.created_at,
+      }));
+    }),
 
   teamAttendance: (): Promise<TeamMemberAttendance[]> =>
     api.get('/hr-core/attendance/live').then((res: any) =>
