@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import GlassCard from '../components/GlassCard';
-import { BrandSettings, UserProfile } from '../types';
+import { BrandSettings, UserProfile, UserRole } from '../types';
 import { updateBrandColor } from '../utils/brandColors';
 import CurrencySettings from '../components/CurrencySettings';
+import api from '../services/apiClient';
+import { toast } from 'sonner';
 
 interface SettingsProps {
   brand: BrandSettings;
@@ -15,7 +17,11 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpdateProfile }) => {
   const [localBrand, setLocalBrand] = useState<BrandSettings>(brand);
   const [localProfile, setLocalProfile] = useState<UserProfile>(userProfile);
-  const [activeTab, setActiveTab] = useState<'brand' | 'profile' | 'currency'>('profile');
+  const [activeTab, setActiveTab] = useState<'brand' | 'profile' | 'currency' | 'danger'>('profile');
+
+  // Danger zone state
+  const [wipeConfirmText, setWipeConfirmText] = useState('');
+  const [wiping, setWiping] = useState(false);
 
   const handleSaveBrand = () => {
     onUpdate(localBrand);
@@ -23,6 +29,23 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
 
   const handleSaveProfile = () => {
     onUpdateProfile(localProfile);
+  };
+
+  const handleWipe = async () => {
+    if (wipeConfirmText !== 'WIPE EVERYTHING') return;
+    setWiping(true);
+    try {
+      const res: any = await api.post('/system/wipe', { confirmation: wipeConfirmText });
+      // Store the new token and force a full page reload to re-authenticate
+      if (res?.token) {
+        localStorage.setItem('royalgateway_auth_token', res.token);
+      }
+      toast.success('System wiped. Reloading...');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Wipe failed. Check server logs.');
+      setWiping(false);
+    }
   };
 
   // Update CSS variables when brand color changes
@@ -92,6 +115,17 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
         >
           Currency Settings
           {activeTab === 'currency' && <div className="absolute bottom-0 left-0 w-full h-0.5 shadow-[0_0_8px_currentColor]" style={{ backgroundColor: localBrand.primary_color }} />}
+        </button>
+        <button
+          onClick={() => setActiveTab('danger')}
+          className={`pb-4 text-[10px] font-black uppercase tracking-widest relative transition-all ${
+            activeTab === 'danger'
+              ? 'text-rose-600 dark:text-rose-400'
+              : 'text-slate-500 hover:text-rose-500'
+          }`}
+        >
+          Danger Zone
+          {activeTab === 'danger' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-rose-500" />}
         </button>
       </div>
 
@@ -174,6 +208,72 @@ const Settings: React.FC<SettingsProps> = ({ brand, onUpdate, userProfile, onUpd
           ) : activeTab === 'currency' ? (
             <div className="animate-in slide-in-from-bottom-2 duration-500">
               <CurrencySettings />
+            </div>
+          ) : activeTab === 'danger' ? (
+            <div className="animate-in slide-in-from-bottom-2 duration-500 space-y-6">
+              {/* Warning banner */}
+              <div className="flex items-start gap-4 p-5 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-2xl">
+                <span className="text-2xl flex-shrink-0">⚠️</span>
+                <div>
+                  <p className="text-sm font-black text-rose-700 dark:text-rose-400 uppercase tracking-wide">Irreversible Action</p>
+                  <p className="text-xs text-rose-600 dark:text-rose-300 mt-1 leading-relaxed">
+                    This will permanently delete all employees, users, attendance records, payroll runs, performance data, leave records, and chat history.
+                    Your super admin account will be preserved. Roles, permissions, and organization settings are kept.
+                    Use this to hand the system to a client on a clean slate.
+                  </p>
+                </div>
+              </div>
+
+              <GlassCard title="System Reset — Clean Slate">
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {[
+                      { label: 'Employees & Users', wiped: true },
+                      { label: 'Attendance Records', wiped: true },
+                      { label: 'Payroll Runs', wiped: true },
+                      { label: 'Performance Data', wiped: true },
+                      { label: 'Leave Requests', wiped: true },
+                      { label: 'Chat & Memos', wiped: true },
+                      { label: 'Roles & Permissions', wiped: false },
+                      { label: 'Organization Settings', wiped: false },
+                      { label: 'Brand Configuration', wiped: false },
+                      { label: 'Your Admin Account', wiped: false },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center gap-2">
+                        <span className={item.wiped ? 'text-rose-500' : 'text-emerald-500'}>
+                          {item.wiped ? '✕' : '✓'}
+                        </span>
+                        <span className={item.wiped ? 'text-slate-600 dark:text-slate-400' : 'text-slate-500 dark:text-slate-500'}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-slate-200 dark:border-white/5 pt-6 space-y-3">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest block">
+                      Type <span className="text-rose-500 font-mono">WIPE EVERYTHING</span> to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={wipeConfirmText}
+                      onChange={e => setWipeConfirmText(e.target.value)}
+                      placeholder="WIPE EVERYTHING"
+                      className="w-full bg-slate-50 dark:bg-white/5 border border-rose-300 dark:border-rose-500/30 rounded-2xl px-5 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                    />
+                    <button
+                      onClick={handleWipe}
+                      disabled={wipeConfirmText !== 'WIPE EVERYTHING' || wiping}
+                      className="w-full py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all
+                        disabled:opacity-40 disabled:cursor-not-allowed
+                        bg-rose-600 hover:bg-rose-700 text-white shadow-lg hover:shadow-rose-500/30
+                        active:scale-95"
+                    >
+                      {wiping ? 'Wiping...' : 'Wipe All Data & Reset System'}
+                    </button>
+                  </div>
+                </div>
+              </GlassCard>
             </div>
           ) : (
             <GlassCard title="Brand Identity" className="animate-in slide-in-from-bottom-2 duration-500">

@@ -291,6 +291,10 @@ Route::prefix('v1')->middleware('throttle:api')->group(function () {
         Route::post('/currency/settings', [App\Http\Controllers\OrganizationSettingController::class, 'updateCurrencySettings']);
     });
 
+    // System Reset — super_admin only, irreversible
+    Route::post('/system/wipe', [App\Http\Controllers\SystemResetController::class, 'wipe'])
+        ->middleware(['auth:sanctum', 'throttle:3,60']);
+
     // Payroll Approval Routes
     Route::prefix('payroll/approvals')->middleware('auth:sanctum')->group(function () {
         Route::get('/inbox', [App\Http\Controllers\PayrollApprovalController::class, 'inbox']);
