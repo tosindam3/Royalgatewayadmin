@@ -165,32 +165,47 @@ class PerformanceController extends Controller
         $cacheKey = 'perf_leaderboard_' . md5(json_encode($request->all()));
 
         $leaderboard = Cache::remember($cacheKey, 300, function () use ($request, $limit) {
+            // Do NOT use with() on a grouped query — causes MySQL strict mode errors.
             $query = PerformanceSubmission::select(
                     'employee_id',
                     DB::raw('AVG(score) as average_score'),
                     DB::raw('COUNT(*) as submission_count')
                 )
-                ->with('employee:id,first_name,last_name,employee_code,department_id', 'employee.department:id,name')
                 ->where('status', 'submitted')
                 ->whereNotNull('score');
 
             $query = $this->scopeEngine->applyScope($query, $request->user(), 'performance.view');
             $this->applyDateFilters($query, $request);
 
-            return $query->groupBy('employee_id')
+            $rows = $query->groupBy('employee_id')
                 ->orderBy('average_score', 'desc')
                 ->limit($limit)
-                ->get()
-                ->map(function ($item, $index) {
+                ->get();
+
+            // withTrashed so soft-deleted employees still show their name
+            $employeeIds = $rows->pluck('employee_id')->filter()->unique()->values();
+            $employees   = \App\Models\Employee::withTrashed()
+                ->with('department:id,name')
+                ->whereIn('id', $employeeIds)
+                ->get(['id', 'first_name', 'last_name', 'employee_code', 'department_id', 'deleted_at'])
+                ->keyBy('id');
+
+            $rank = 0;
+            return $rows
+                ->filter(fn($item) => $employees->has($item->employee_id))
+                ->values()
+                ->map(function ($item) use ($employees, &$rank) {
+                    $rank++;
+                    $emp = $employees->get($item->employee_id);
                     return [
-                        'rank'          => $index + 1,
+                        'rank'          => $rank,
                         'employee_id'   => $item->employee_id,
-                        'name'          => $item->employee->first_name . ' ' . $item->employee->last_name,
-                        'employee_code' => $item->employee->employee_code,
-                        'department'    => $item->employee->department->name ?? 'N/A',
+                        'name'          => $emp->first_name . ' ' . $emp->last_name,
+                        'employee_code' => $emp->employee_code ?? null,
+                        'department'    => $emp->department?->name ?? 'N/A',
                         'score'         => round($item->average_score, 2),
                         'submissions'   => $item->submission_count,
-                        'medal'         => $index === 0 ? 'gold' : ($index === 1 ? 'silver' : ($index === 2 ? 'bronze' : null)),
+                        'medal'         => $rank === 1 ? 'gold' : ($rank === 2 ? 'silver' : ($rank === 3 ? 'bronze' : null)),
                     ];
                 });
         });
