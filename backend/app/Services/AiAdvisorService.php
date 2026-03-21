@@ -210,10 +210,24 @@ class AiAdvisorService
             // Attendance Rate for UI
             $attendanceRate = $totalEmployees > 0 
                 ? round((($presentToday + $onLeave) / $totalEmployees) * 100, 1) : 0;
+
+            // Turnover Rate (employees who left in the last 30 days vs total)
+            $terminatedLastMonth = Employee::where('status', 'inactive')
+                ->where('updated_at', '>=', $lastMonth)->count();
+            $turnoverRate = $totalEmployees > 0
+                ? round(($terminatedLastMonth / $totalEmployees) * 100, 1) : 0;
+
+            // Headcount delta (avg monthly change over last 3 months)
+            $threeMonthsAgo = Carbon::now()->subMonths(3);
+            $headcountThen = Employee::where('status', 'active')
+                ->where('created_at', '<=', $threeMonthsAgo)->count();
+            $avgDelta = $totalEmployees > 0
+                ? round(($totalEmployees - $headcountThen) / 3, 1) : 0;
             
             return compact(
                 'totalEmployees', 'presentToday', 'onLeave', 'pendingApprovals',
-                'absenteeismRate', 'attendanceRate', 'perfAvg', 'perfTrend', 'dailyLeakage', 'absentToday'
+                'absenteeismRate', 'attendanceRate', 'perfAvg', 'perfTrend', 'dailyLeakage', 'absentToday',
+                'turnoverRate', 'avgDelta'
             );
         });
     }
@@ -262,6 +276,22 @@ class AiAdvisorService
 
     public function generateInsights(string $role, array $ctx, ?int $employeeId): array
     {
+        // Defensive defaults — guards against stale cached arrays missing newer keys
+        $ctx = array_merge([
+            'totalEmployees'   => 0,
+            'presentToday'     => 0,
+            'onLeave'          => 0,
+            'pendingApprovals' => 0,
+            'absenteeismRate'  => 0,
+            'attendanceRate'   => 0,
+            'perfAvg'          => 0,
+            'perfTrend'        => 0,
+            'dailyLeakage'     => 0,
+            'absentToday'      => 0,
+            'turnoverRate'     => 0,
+            'avgDelta'         => 0,
+        ], $ctx);
+
         $insights = [];
 
         // --- DESCRIPTIVE ---
