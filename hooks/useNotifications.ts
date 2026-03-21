@@ -53,15 +53,17 @@ export const useNotifications = () => {
       const user = JSON.parse(userStr);
 
       if (!window.Echo) {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
         window.Echo = new Echo({
             broadcaster: 'pusher',
-            key: '52b91711bf1f63cd7102',
-            cluster: 'eu',
+            key: import.meta.env.VITE_PUSHER_APP_KEY || '52b91711bf1f63cd7102',
+            cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'eu',
             forceTLS: true,
-            authEndpoint: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/broadcasting/auth` : 'http://localhost:8000/api/v1/broadcasting/auth',
+            authEndpoint: `${apiBase}/broadcasting/auth`,
             auth: {
                 headers: {
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json',
                 }
             }
         });
