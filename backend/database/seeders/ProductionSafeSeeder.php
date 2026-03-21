@@ -10,10 +10,14 @@ class ProductionSafeSeeder extends Seeder
 {
     /**
      * Run the production-safe database seeders.
-     * This seeder only runs seeders that are safe for production environments.
+     * Only seeds reference/config data — never sample employee data.
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command->warn('ProductionSafeSeeder running in PRODUCTION — only config/reference data will be seeded.');
+        }
+
         Log::info('Starting ProductionSafeSeeder');
 
         // Roles & Permissions — must run first so all other data is permission-aware
@@ -21,14 +25,12 @@ class ProductionSafeSeeder extends Seeder
 
         // Performance Template Seeder
         $this->runSeeder('PerformanceConfigSeeder', 'Performance templates and configurations');
-        
-        // Employee Seeders
-        $this->runSeeder('EmployeeSeeder', 'Employee data');
-        $this->runSeeder('EmployeeSalarySeeder', 'Employee salary structures');
-        
-        // Payroll Seeders
+
+        // Payroll workflow config (not sample data)
         $this->runSeeder('PayrollWorkflowSeeder', 'Payroll approval workflows');
-        $this->runSeeder('ComprehensivePayrollSeeder', 'Comprehensive payroll data with approval flow demo');
+
+        // NOTE: EmployeeSeeder, ComprehensivePayrollSeeder, and any other sample-data
+        // seeders are intentionally excluded here. Never seed sample employees in production.
 
         Log::info('ProductionSafeSeeder completed successfully');
     }

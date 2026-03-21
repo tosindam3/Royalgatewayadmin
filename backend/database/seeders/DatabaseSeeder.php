@@ -12,9 +12,15 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     * BLOCKED in production — dev/staging only.
      */
     public function run(): void
     {
+        if (app()->environment('production')) {
+            $this->command->error('DatabaseSeeder is blocked in production. Use ProductionSafeSeeder for production-safe data only.');
+            return;
+        }
+
         $this->call([
             UserSeeder::class,
             EmployeeSeeder::class,

@@ -23,7 +23,7 @@ class EmployeeService
         // Do NOT wrap in its own transaction — nested transactions with lockForUpdate
         // cause a PDO conflict on MySQL, which was causing the 500 error on employee creation.
         $lastEmployee = Employee::withTrashed()
-            ->whereRaw("employee_code REGEXP '^[0-9]+$'")
+            ->whereRaw("employee_code REGEXP '^[0-9]+'")
             ->orderByRaw('CAST(employee_code AS UNSIGNED) DESC')
             ->lockForUpdate()
             ->first();
@@ -68,13 +68,13 @@ class EmployeeService
             $user = null;
             if (isset($data['password']) && !empty($data['password'])) {
                 $user = User::create([
-                    'name' => $data['first_name'] . ' ' . $data['last_name'],
-                    'email' => $data['email'],
-                    'password' => Hash::make($data['password']),
-                    'status' => 'active',
-                    'branch_id' => $data['branch_id'] ?? null,
-                    'department_id' => $data['department_id'] ?? null,
-                    'manager_id' => $data['manager_id'],
+                    'name'            => $data['first_name'] . ' ' . $data['last_name'],
+                    'email'           => $data['email'],
+                    'password'        => Hash::make($data['password']),
+                    'status'          => 'active',
+                    'branch_id'       => $data['branch_id'] ?? null,
+                    'department_id'   => $data['department_id'] ?? null,
+                    'manager_id'      => $data['manager_id'] ?? null,
                     'primary_role_id' => $primaryRoleId,
                 ]);
 
@@ -111,13 +111,12 @@ class EmployeeService
                         null,
                         array_merge($employee->toArray(), [
                             'user_account_created' => $user !== null,
-                            'employee_code' => $employee->employee_code,
+                            'employee_code'        => $employee->employee_code,
                         ])
                     );
                 }
             } catch (\Exception $auditEx) {
-                // Audit logging failed — log to error channel but don't abort the transaction
-                \Illuminate\Support\Facades\Log::error('Audit log failed for employee_created: ' . $auditEx->getMessage());
+                Log::error('Audit log failed for employee_created: ' . $auditEx->getMessage());
             }
 
             return $employee->load(['branch', 'department', 'designation', 'manager', 'user']);
@@ -149,7 +148,7 @@ class EmployeeService
     {
         return DB::transaction(function () use ($employee, $file) {
             $oldData = $employee->toArray();
-            
+
             // Delete old avatar if exists and not default
             if ($employee->avatar && !str_contains($employee->avatar, 'default')) {
                 $oldPath = public_path($employee->avatar);
@@ -185,29 +184,62 @@ class EmployeeService
         });
     }
 
+    /**
+     * Soft-delete an employee while preserving all historical records.
+     *
+     * Enterprise approach:
+     * - Employee row is soft-deleted (deleted_at set) — invisible to all active queries
+     *   but retained for audit, payroll history, and performance records.
+     * - Linked user account is disabled (status = 'inactive') and all active tokens
+     *   are revoked so they cannot log in.
+     * - Subordinates have their manager_id nullified so they are not orphaned.
+     * - All historical data (attendance, payroll, performance) is intentionally kept.
+     */
     public function deleteEmployee(Employee $employee): bool
     {
         // Service-level protection for Superadmin
         if ($employee->user && $employee->user->hasRole('super_admin')) {
-            throw new \Exception('The Super Administrator profile is protected at the service level and cannot be deleted.');
+            throw new \Exception('The Super Administrator profile is protected and cannot be deleted.');
         }
 
         return DB::transaction(function () use ($employee) {
-            $oldData = $employee->toArray();
-            $result = $employee->delete();
+            $employeeId = $employee->id;
+            $userId     = $employee->user_id;
+            $oldData    = $employee->toArray();
 
-            // Log audit trail
-            if (class_exists(\App\Services\AuditLogger::class)) {
-                app(\App\Services\AuditLogger::class)->log(
-                    'employee_deleted',
-                    Employee::class,
-                    $employee->id,
-                    $oldData,
-                    null
-                );
+            // Nullify manager references so subordinates are not orphaned
+            DB::table('employees')->where('manager_id', $employeeId)->update(['manager_id' => null]);
+            DB::table('users')->where('manager_id', $employeeId)->update(['manager_id' => null]);
+
+            // Soft-delete the employee — historical records remain intact and linked
+            $employee->delete();
+
+            // Disable the linked user account and revoke all active sessions
+            if ($userId) {
+                User::where('id', $userId)->update(['status' => 'inactive']);
+
+                DB::table('personal_access_tokens')
+                    ->where('tokenable_type', User::class)
+                    ->where('tokenable_id', $userId)
+                    ->delete();
             }
 
-            return $result;
+            // Log audit trail
+            try {
+                if (class_exists(\App\Services\AuditLogger::class)) {
+                    app(\App\Services\AuditLogger::class)->log(
+                        'employee_deleted',
+                        Employee::class,
+                        $employeeId,
+                        $oldData,
+                        null
+                    );
+                }
+            } catch (\Exception $e) {
+                Log::error('Audit log failed for employee_deleted: ' . $e->getMessage());
+            }
+
+            return true;
         });
     }
 
@@ -221,15 +253,15 @@ class EmployeeService
         ", [now()->startOfMonth(), now()->endOfMonth()])->first();
 
         return [
-            'total_employees' => (int) $stats->total_employees,
-            'active_employees' => (int) $stats->active_employees,
-            'on_leave_today' => 0, // This would integrate with leave management
+            'total_employees'      => (int) $stats->total_employees,
+            'active_employees'     => (int) $stats->active_employees,
+            'on_leave_today'       => 0,
             'new_hires_this_month' => (int) $stats->new_hires_this_month,
-            'probation_count' => (int) $stats->probation_count,
-            'by_employment_type' => Employee::select('employment_type', DB::raw('count(*) as count'))
+            'probation_count'      => (int) $stats->probation_count,
+            'by_employment_type'   => Employee::select('employment_type', DB::raw('count(*) as count'))
                 ->groupBy('employment_type')
                 ->pluck('count', 'employment_type'),
-            'by_work_mode' => Employee::select('work_mode', DB::raw('count(*) as count'))
+            'by_work_mode'         => Employee::select('work_mode', DB::raw('count(*) as count'))
                 ->groupBy('work_mode')
                 ->pluck('count', 'work_mode'),
         ];
